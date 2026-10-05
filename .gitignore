@@ -5,3 +5,5 @@ data/
 *.db
 *.db-wal
 *.db-shm
+# social-media assets (not part of the repo)
+media/
