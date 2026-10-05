@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "test": "node --test test/",
+    "test": "node --test test/*.test.js",
     "e2e": "node scripts/e2e.mjs",
     "mcp": "node mcp/server.mjs",
     "example": "node examples/connected-agent.mjs"
