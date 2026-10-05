@@ -8,7 +8,7 @@
 
 Bộ nhớ được tổ chức theo mô hình bộ não người: 13 vùng não, hai vòng thức/ngủ, theo khung CoALA. Kiến trúc tham khảo từ tài liệu *Vita Cognitive Memory Architecture*. Giao diện cho phép **xem trực tiếp** từng vùng não hoạt động, và hỗ trợ **Tiếng Việt · English · 日本語**.
 
-Yêu cầu: **Node.js ≥ 18.18**. Dữ liệu lưu bằng **SQLite** qua `better-sqlite3` (có sẵn bản build cho Linux/macOS/Windows; nếu nền tảng không có bản build sẵn thì `npm install` cần Python, make và trình biên dịch C++). Docker + GPU NVIDIA chỉ cần khi muốn chạy model local qua vLLM.
+Yêu cầu: **Node.js ≥ 22** (hoặc chỉ cần Docker). Dữ liệu lưu bằng **SQLite** qua `better-sqlite3` (có sẵn bản build cho Linux/macOS/Windows; nếu nền tảng không có bản build sẵn thì `npm install` cần Python, make và trình biên dịch C++). Docker + GPU NVIDIA chỉ cần khi muốn chạy model local qua vLLM.
 
 ```bash
 npm install
@@ -291,7 +291,7 @@ examples/           connected-agent.mjs: agent bên ngoài dùng LLM riêng + b�
 public/             app.js (khung + màn hình bộ não), views/ (agents, value, audit, settings), i18n.js, icons.js, brain.js, styles.css (design tokens sáng/tối)
 scripts/            start-vllm.sh, e2e.mjs
 Dockerfile, docker-compose.yml, .env.example   chạy bằng một lệnh (volume dữ liệu, health check /healthz, profile vllm)
-.github/            CI (test Node 18/22/24 + build Docker + e2e), mẫu issue/PR
+.github/            CI (test Node 22/24 + build Docker + e2e), mẫu issue/PR
 test/               brain.test.js (bộ não, QA nghiệm thu), llm.test.js (nhà cung cấp LLM), store.test.js (SQLite)
 data/               (tự tạo, đã gitignore) brain.db = bộ nhớ SQLite, settings.json = cấu hình LLM + API key
 ```

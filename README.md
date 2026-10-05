@@ -27,7 +27,7 @@ docker compose --profile vllm up -d  # also runs Qwen3-4B locally on vLLM (NVIDI
 
 Optional configuration: `cp .env.example .env`, then set `PORT`, `BRAIN_ADMIN_TOKEN`, LLM provider keys and so on. With the `vllm` profile, open **Settings → vLLM** and set the base URL to `http://vllm:8000/v1`. An LLM server already running on your machine (Ollama, LM Studio, vLLM) is reachable from the container at `http://host.docker.internal:<port>/v1`, for example `http://host.docker.internal:11434/v1` for Ollama.
 
-Or with Node.js ≥ 18.18:
+Or with Node.js ≥ 22:
 
 ```bash
 npm install
@@ -303,7 +303,7 @@ examples/           connected-agent.mjs: an external agent with its own LLM + th
 public/             app.js (shell + brain screen), views/ (agents, value, audit, settings), i18n.js, icons.js, brain.js, styles.css (light/dark design tokens)
 scripts/            start-vllm.sh, e2e.mjs
 Dockerfile, docker-compose.yml, .env.example   one-command setup (data volume, /healthz health check, vllm profile)
-.github/            CI (tests on Node 18/22/24 + Docker build + e2e), issue/PR templates
+.github/            CI (tests on Node 22/24 + Docker build + e2e), issue/PR templates
 test/               brain.test.js (brain, acceptance QA), llm.test.js (LLM providers), store.test.js (SQLite)
 data/               (created at runtime, gitignored) brain.db = SQLite memory, settings.json = LLM config + API keys
 ```

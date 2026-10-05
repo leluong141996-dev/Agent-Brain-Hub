@@ -10,7 +10,7 @@ Thanks for helping! Issues, docs fixes, translations and code are all welcome.
 
 ## Development setup
 
-Requires Node.js ≥ 18.18.
+Requires Node.js ≥ 22 (or just use Docker).
 
 ```bash
 npm install

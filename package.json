@@ -13,10 +13,10 @@
     "example": "node examples/connected-agent.mjs"
   },
   "engines": {
-    "node": ">=18.18"
+    "node": ">=22"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
-    "better-sqlite3": "^11.10.0"
+    "better-sqlite3": "^13.0.3"
   }
 }

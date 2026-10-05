@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Fixed
 
+- Crash on Node 24 (`Assertion failed: (env) != nullptr` in `node::RemoveEnvironmentCleanupHook`): better-sqlite3 11 aborts the process when V8 garbage-collects a dropped prepared statement while the event loop is idle. This could take down the Docker image at random, for example after opening the value dashboard. Fixed by upgrading to better-sqlite3 13.
 - Docker: setting `PORT` in `.env` made the hub unreachable (the container listened on that port while compose mapped it to 4317). `PORT` now only sets the port on your machine.
 - CI: `npm test` failed on Node 22, which no longer expands a directory passed to `node --test`.
 
@@ -18,7 +19,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ### Changed
 
 - Docker image based on Node 24 LTS (Node 20 reached end of life in April 2026), with an init process for clean signal handling.
-- CI tests Node 18, 22 and 24.
+- **Node.js 22 or newer is now required** (better-sqlite3 13 needs it; Node 18 and 20 are end-of-life). Docker users are not affected.
+- CI tests Node 22 and 24.
 
 ## [0.1.0] - 2026-10-06
 
