@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Brain Hub</title>
+  <meta name="color-scheme" content="light dark" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f46e5'/><circle cx='11' cy='12' r='3' fill='white'/><circle cx='21' cy='12' r='3' fill='white'/><circle cx='16' cy='21' r='3' fill='white'/><path d='M11 12L21 12L16 21Z' stroke='white' stroke-width='1.6' fill='none'/></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <script>
+    // Apply the saved theme before first paint (no flash).
+    try { const th = localStorage.getItem('brain.theme'); if (th === 'light' || th === 'dark') document.documentElement.dataset.theme = th; } catch {}
+  </script>
+</head>
+<body>
+  <div class="shell">
+    <!-- ======================= Sidebar navigation ======================= -->
+    <aside class="nav" id="nav">
+      <div class="nav-brand">
+        <span class="logo-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" width="28" height="28"><rect width="32" height="32" rx="8" fill="currentColor"/><path d="M11 12L21 12L16 21Z" stroke="#fff" stroke-opacity=".55" stroke-width="1.6" fill="none"/><circle cx="11" cy="12" r="3" fill="#fff"/><circle cx="21" cy="12" r="3" fill="#fff"/><circle cx="16" cy="21" r="3" fill="#fff"/></svg>
+        </span>
+        <div class="nav-brand-text">
+          <div class="nav-name">Agent Brain Hub</div>
+          <div class="nav-tag" data-i18n="tagline"></div>
+        </div>
+      </div>
+
+      <div class="nav-section" data-i18n="nav_workspace"></div>
+      <nav class="nav-links" id="navLinks" aria-label="Main">
+        <a href="#brain" data-view="brain"><i data-icon="activity"></i><span data-i18n="nav_brain"></span></a>
+        <a href="#agents" data-view="agents"><i data-icon="bot"></i><span data-i18n="nav_agents"></span><span class="nav-count" id="navAgentCount"></span></a>
+        <a href="#value" data-view="value"><i data-icon="chart"></i><span data-i18n="nav_value"></span></a>
+        <a href="#audit" data-view="audit"><i data-icon="shield"></i><span data-i18n="nav_audit"></span></a>
+        <a href="#settings" data-view="settings"><i data-icon="sliders"></i><span data-i18n="nav_settings"></span></a>
+      </nav>
+
+      <div class="nav-foot">
+        <div class="model-status" id="modelStatus"></div>
+        <div class="nav-field">
+          <span class="nav-field-label" data-i18n="language"></span>
+          <div class="menu-wrap">
+            <button class="select-btn" id="langTrigger" type="button" aria-haspopup="menu" aria-expanded="false" data-menu="langMenu">
+              <i data-icon="globe"></i><span id="langCurrent"></span><i data-icon="chevronDown" class="caret"></i>
+            </button>
+            <div class="popover up" id="langMenu" role="menu" hidden></div>
+          </div>
+        </div>
+        <div class="nav-field">
+          <span class="nav-field-label" data-i18n="theme"></span>
+          <div class="segmented" id="themeSwitch" role="radiogroup">
+            <button type="button" data-theme-opt="system" role="radio"><i data-icon="monitor" data-size="14"></i></button>
+            <button type="button" data-theme-opt="light" role="radio"><i data-icon="sun" data-size="14"></i></button>
+            <button type="button" data-theme-opt="dark" role="radio"><i data-icon="moon" data-size="14"></i></button>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <div class="nav-scrim" id="navScrim"></div>
+
+    <!-- ======================= Main ======================= -->
+    <main class="main">
+      <!-- View: Live brain -->
+      <section class="view view-brain" id="view-brain">
+        <header class="page-head">
+          <button class="icon-btn menu-btn" type="button" data-act="menu" data-i18n-aria="open_menu"><i data-icon="menu" data-size="18"></i></button>
+          <div class="page-title">
+            <h1 data-i18n="nav_brain"></h1>
+            <p data-i18n="brain_sub"></p>
+          </div>
+          <div class="page-actions">
+            <label class="field-inline">
+              <i data-icon="user"></i>
+              <span class="sr-only" data-i18n="customer"></span>
+              <select id="customerSelect"></select>
+              <button id="addCustomer" class="icon-btn sm" type="button" data-i18n-title="new_customer"><i data-icon="plus" data-size="14"></i></button>
+            </label>
+            <button id="sleepBtn" class="btn" type="button"><i data-icon="moon"></i><span data-i18n="sleep_btn"></span></button>
+            <div class="menu-wrap">
+              <button class="btn" type="button" data-menu="timeMenu" aria-haspopup="menu"><i data-icon="forward"></i><span data-i18n="time_travel"></span><i data-icon="chevronDown" class="caret"></i></button>
+              <div class="popover right" id="timeMenu" role="menu" hidden>
+                <div class="popover-head"><span data-i18n="clock"></span><b id="clockValue"></b></div>
+                <button type="button" role="menuitem" data-days="1"></button>
+                <button type="button" role="menuitem" data-days="7"></button>
+                <button type="button" role="menuitem" data-days="30"></button>
+              </div>
+            </div>
+            <div class="menu-wrap">
+              <button class="icon-btn bordered" type="button" data-menu="moreMenu" aria-haspopup="menu" data-i18n-title="more"><i data-icon="more" data-size="18"></i></button>
+              <div class="popover right wide" id="moreMenu" hidden>
+                <label class="popover-row switch-row"><span><i data-icon="star"></i><span data-i18n="vip"></span></span><input type="checkbox" class="switch" id="vipToggle" /></label>
+                <label class="popover-row col"><span><i data-icon="gauge"></i><span data-i18n="speed"></span></span><input type="range" id="speed" min="120" max="1200" step="20" value="520" /></label>
+                <div class="popover-sep"></div>
+                <button type="button" class="popover-row danger" id="resetBtn"><span><i data-icon="reset"></i><span data-i18n="reset"></span></span></button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div class="brain-grid">
+          <!-- Brain map + trace -->
+          <section class="card canvas-card">
+            <div class="card-head">
+              <div class="card-title"><span data-i18n="canvas_title"></span><span class="status-chip" id="loopBadge"></span></div>
+              <div class="caption" id="caption"></div>
+              <div class="legend-inline">
+                <span><i class="dot st-ok"></i><span data-i18n="st_ok"></span></span>
+                <span><i class="dot st-warn"></i><span data-i18n="st_warn"></span></span>
+                <span><i class="dot st-alert"></i><span data-i18n="st_alert"></span></span>
+                <span><i class="dot st-hit"></i><span data-i18n="st_hit"></span></span>
+              </div>
+            </div>
+            <div class="canvas-body">
+              <div class="brain-wrap">
+                <svg id="brain" role="img" aria-label="Agent brain map"></svg>
+                <div class="region-card" id="regionCard" hidden></div>
+              </div>
+              <aside class="trace">
+                <div class="trace-head"><span data-i18n="trace_title"></span><span class="muted" id="traceMeta"></span></div>
+                <ol class="trace-list" id="traceList"></ol>
+              </aside>
+            </div>
+          </section>
+
+          <!-- Memory inspector -->
+          <section class="card inspector">
+            <nav class="tabs" id="tabs" role="tablist">
+              <button data-tab="query" class="active" role="tab" data-i18n="tab_query"></button>
+              <button data-tab="working" role="tab" data-i18n="tab_working"></button>
+              <button data-tab="semantic" role="tab" data-i18n="tab_semantic"></button>
+              <button data-tab="episodic" role="tab" data-i18n="tab_episodic"></button>
+              <button data-tab="procedural" role="tab" data-i18n="tab_procedural"></button>
+              <button data-tab="nba" role="tab" data-i18n="tab_nba"></button>
+              <button data-tab="bus" role="tab" data-i18n="tab_bus"></button>
+            </nav>
+            <div class="tab-body" id="tabBody"></div>
+          </section>
+
+          <!-- Conversation -->
+          <section class="card chat">
+            <div class="chat-head">
+              <div class="menu-wrap grow">
+                <button class="agent-picker" id="agentPicker" type="button" data-menu="agentMenu" aria-haspopup="menu"></button>
+                <div class="popover agent-menu" id="agentMenu" role="menu" hidden></div>
+              </div>
+              <div class="menu-wrap">
+                <button class="btn ghost sm" type="button" data-menu="promptMenu" aria-haspopup="menu"><i data-icon="sparkles"></i><span data-i18n="quick_prompts"></span></button>
+                <div class="popover right prompt-menu" id="promptMenu" role="menu" hidden></div>
+              </div>
+            </div>
+            <div class="messages" id="messages" aria-live="polite"></div>
+            <form class="composer" id="composer">
+              <div class="composer-box">
+                <textarea id="input" rows="1"></textarea>
+                <button type="submit" class="btn primary icon-only" id="sendBtn" data-i18n-title="send"><i data-icon="send"></i></button>
+              </div>
+              <div class="composer-note" id="composerNote" hidden></div>
+            </form>
+          </section>
+        </div>
+      </section>
+
+      <section class="view page" id="view-agents" hidden></section>
+      <section class="view page" id="view-value" hidden></section>
+      <section class="view page" id="view-audit" hidden></section>
+      <section class="view page" id="view-settings" hidden></section>
+    </main>
+  </div>
+
+  <dialog id="dialog" class="dialog"></dialog>
+  <div class="viz-tip" id="vizTip" role="tooltip" hidden></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

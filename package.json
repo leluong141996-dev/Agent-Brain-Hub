@@ -1,0 +1,22 @@
+{
+  "name": "agent-brain-hub",
+  "version": "0.3.0",
+  "description": "A centralized, brain-inspired memory hub shared by many AI agents — native or connected via REST, SDK or MCP — with a live visualizer, governance and business-value dashboard (vi/en/ja)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "test": "node --test test/",
+    "e2e": "node scripts/e2e.mjs",
+    "mcp": "node mcp/server.mjs",
+    "example": "node examples/connected-agent.mjs"
+  },
+  "engines": {
+    "node": ">=18.18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "better-sqlite3": "^11.10.0"
+  }
+}
