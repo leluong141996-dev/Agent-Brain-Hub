@@ -8,12 +8,19 @@ services:
     build: .
     image: agent-brain-hub:latest
     ports:
-      - "${PORT:-4317}:4317"
+      - "${PORT:-4317}:4317"   # PORT in .env = port on your machine
     env_file:
       - path: .env
         required: false
+    environment:
+      PORT: "4317"             # inside the container it is always 4317
+    extra_hosts:
+      # LLM servers running on your machine (Ollama, LM Studio, vLLM started
+      # outside compose) → base URL http://host.docker.internal:11434/v1 etc.
+      - "host.docker.internal:host-gateway"
     volumes:
       - brain-data:/app/data   # SQLite memory + LLM settings (API keys) live here
+    init: true
     restart: unless-stopped
 
   # Optional local LLM. After it starts, pick "vLLM" in Settings and set the

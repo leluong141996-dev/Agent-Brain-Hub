@@ -24,7 +24,7 @@ docker compose up -d                 # → http://localhost:4317 · dữ liệu 
 docker compose --profile vllm up -d  # thêm Qwen3-4B chạy local qua vLLM (cần GPU NVIDIA)
 ```
 
-Cấu hình (tuỳ chọn): `cp .env.example .env` rồi điền `BRAIN_ADMIN_TOKEN`, API key của nhà cung cấp LLM… Khi dùng profile `vllm`, vào **Cài đặt → vLLM** và đặt base URL là `http://vllm:8000/v1`.
+Cấu hình (tuỳ chọn): `cp .env.example .env` rồi điền `PORT`, `BRAIN_ADMIN_TOKEN`, API key của nhà cung cấp LLM… Khi dùng profile `vllm`, vào **Cài đặt → vLLM** và đặt base URL là `http://vllm:8000/v1`. Nếu LLM đang chạy sẵn trên máy bạn (Ollama, LM Studio, vLLM), từ trong container hãy dùng `http://host.docker.internal:<cổng>/v1`, ví dụ `http://host.docker.internal:11434/v1` cho Ollama.
 
 Không cần cấu hình gì vẫn chạy được (chế độ offline: luật + template). Muốn có LLM thật, xem [LLM](#llm-chọn-nhà-cung-cấp-ngay-trên-giao-diện).
 
@@ -291,7 +291,7 @@ examples/           connected-agent.mjs: agent bên ngoài dùng LLM riêng + b�
 public/             app.js (khung + màn hình bộ não), views/ (agents, value, audit, settings), i18n.js, icons.js, brain.js, styles.css (design tokens sáng/tối)
 scripts/            start-vllm.sh, e2e.mjs
 Dockerfile, docker-compose.yml, .env.example   chạy bằng một lệnh (volume dữ liệu, health check /healthz, profile vllm)
-.github/            CI (test Node 18/20/22 + build Docker + e2e), mẫu issue/PR
+.github/            CI (test Node 18/22/24 + build Docker + e2e), mẫu issue/PR
 test/               brain.test.js (bộ não, QA nghiệm thu), llm.test.js (nhà cung cấp LLM), store.test.js (SQLite)
 data/               (tự tạo, đã gitignore) brain.db = bộ nhớ SQLite, settings.json = cấu hình LLM + API key
 ```

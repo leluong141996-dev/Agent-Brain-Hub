@@ -5,6 +5,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed
+
+- Docker: setting `PORT` in `.env` made the hub unreachable (the container listened on that port while compose mapped it to 4317). `PORT` now only sets the port on your machine.
+- CI: `npm test` failed on Node 22, which no longer expands a directory passed to `node --test`.
+
+### Added
+
+- Docker: LLM servers running on the host (Ollama, LM Studio, vLLM) are reachable at `http://host.docker.internal:<port>/v1`.
+- `npm run e2e` accepts an admin token (`--token` or `BRAIN_ADMIN_TOKEN`).
+
+### Changed
+
+- Docker image based on Node 24 LTS (Node 20 reached end of life in April 2026), with an init process for clean signal handling.
+- CI tests Node 18, 22 and 24.
+
 ## [0.1.0] - 2026-10-06
 
 First public release.

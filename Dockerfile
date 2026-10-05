@@ -4,7 +4,7 @@
 #   docker run -p 4317:4317 -v brain-data:/app/data agent-brain-hub
 
 # ---- deps: install production dependencies (better-sqlite3 is a native module)
-FROM node:20-bookworm-slim AS deps
+FROM node:24-bookworm-slim AS deps
 WORKDIR /app
 # Build tools are only needed if no prebuilt better-sqlite3 binary matches.
 RUN apt-get update \
@@ -14,7 +14,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 # ---- runtime
-FROM node:20-bookworm-slim
+FROM node:24-bookworm-slim
 ENV NODE_ENV=production \
     PORT=4317 \
     HOST=0.0.0.0 \

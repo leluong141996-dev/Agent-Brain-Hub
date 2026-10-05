@@ -5,6 +5,7 @@
 //   npm run e2e -- --lang en       English scenario
 //   npm run e2e -- --lang ja       Japanese scenario
 //   node scripts/e2e.mjs --url http://localhost:4317 --lang en
+//   BRAIN_ADMIN_TOKEN=... npm run e2e   when the server has an admin token (or --token ...)
 // Uses a fresh customer id, so existing memories are not touched.
 // Note: step 7 advances the brain's simulated clock by 7 days (global).
 
@@ -13,6 +14,7 @@ const arg = (name, def) => {
   return i > 0 ? process.argv[i + 1] : def;
 };
 const BASE = arg('url', process.env.BRAIN_URL || 'http://localhost:4317');
+const TOKEN = arg('token', process.env.BRAIN_ADMIN_TOKEN || '');
 const LANG = ['vi', 'en', 'ja'].includes(arg('lang', process.env.BRAIN_LANG || 'vi')) ? arg('lang', process.env.BRAIN_LANG || 'vi') : 'vi';
 const CUSTOMER = `e2e-${LANG}-${Date.now().toString(36)}`;
 
@@ -82,7 +84,8 @@ const S = {
 
 const results = [];
 async function call(path, body) {
-  const res = await fetch(BASE + path, body === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const headers = TOKEN ? { 'x-admin-token': TOKEN } : {};
+  const res = await fetch(BASE + path, body === undefined ? { headers } : { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const data = await res.json();
   if (!res.ok) throw new Error(`${path}: ${data.error}`);
   return data;
