@@ -1,21 +1,44 @@
 # 🧠 Agent Brain Hub
 
+**English** · [Tiếng Việt](README.vi.md)
+
 ![Agent Brain Hub — live brain view: a request travels through the brain regions, Atlas recalls what Kai learned](docs/demo.gif)
 
-**Bộ não tập trung cho mọi AI agent của doanh nghiệp.** Agent có thể tạo ngay trên giao diện, hoặc là agent đang chạy ở hệ thống khác rồi cắm vào bộ não qua REST API, SDK hay MCP. Tất cả dùng chung **một** bộ nhớ, nên điều một agent học được thì mọi agent khác đều biết. Kết quả: khách không phải kể lại, các agent bàn giao cho nhau liền mạch, và công ty tích luỹ tri thức từ mọi cuộc hội thoại.
+**One shared brain for all of a company's AI agents.** Create agents in the UI, or plug in agents that already run elsewhere through a REST API, an SDK or MCP. They all read and write **one** memory, so what one agent learns, every agent can use. Customers stop repeating themselves, agents hand off to each other without losing context, and the company builds up knowledge from every conversation.
 
-Bộ nhớ được tổ chức theo mô hình bộ não người: 13 vùng não, hai vòng thức/ngủ, theo khung CoALA. Kiến trúc tham khảo từ tài liệu *Vita Cognitive Memory Architecture*. Giao diện cho phép **xem trực tiếp** từng vùng não hoạt động, và hỗ trợ **Tiếng Việt · English · 日本語**.
+The memory is organized like a human brain: 13 regions and a wake/sleep cycle, following the CoALA framework. The architecture draws on the *Vita Cognitive Memory Architecture* document. The UI lets you **watch each brain region work, live**, in **English · Tiếng Việt · 日本語**.
 
-Yêu cầu: **Node.js ≥ 18.18**. Dữ liệu lưu bằng **SQLite** qua `better-sqlite3` (có sẵn bản build cho Linux/macOS/Windows; nếu nền tảng không có bản build sẵn thì `npm install` cần Python, make và trình biên dịch C++). Docker + GPU NVIDIA chỉ cần khi muốn chạy model local qua vLLM.
+### Example
+
+1. A customer tells **Kai**, the repair agent: *"My car is a Honda Civic, it broke down and will be in the shop for 3 days."*
+2. Later they ask **Atlas**, the travel agent: *"I need a flight to Da Nang next week, window seat please."*
+3. Atlas replies: *"I've got the context from Kai. I remember: no car for 3 days, no need to repeat it. I'll look for a suitable flight to Da Nang, window seat preferred. Also: a self-drive rental at the destination, would you like that?"*
+
+Atlas never heard about the car. Kai wrote "car unavailable for 3 days" to **shared** memory, while the repair details stayed **private** to Kai.
+
+## Quick start
+
+With Docker, one command (no Node.js needed):
+
+```bash
+docker compose up -d                 # → http://localhost:4317 · data lives in the brain-data volume
+docker compose --profile vllm up -d  # also runs Qwen3-4B locally on vLLM (NVIDIA GPU required)
+```
+
+Optional configuration: `cp .env.example .env`, then set `BRAIN_ADMIN_TOKEN`, LLM provider keys and so on. With the `vllm` profile, open **Settings → vLLM** and set the base URL to `http://vllm:8000/v1`.
+
+Or with Node.js ≥ 18.18:
 
 ```bash
 npm install
 npm start                      # → http://localhost:4317  (UI)  ·  http://localhost:4317/v1  (Brain API)
-npm test                       # unit test + bộ QA nghiệm thu
-npm run e2e -- --lang vi|en|ja # bài test end-to-end trên server đang chạy
+npm test                       # unit tests + acceptance QA suite
+npm run e2e -- --lang vi|en|ja # end-to-end test against the running server
 ```
 
-Không cần cấu hình gì vẫn chạy được (chế độ offline: luật + template). Muốn có LLM thật, xem [LLM](#llm-chọn-nhà-cung-cấp-ngay-trên-giao-diện).
+Storage is **SQLite** via `better-sqlite3`. Prebuilt binaries exist for Linux, macOS and Windows; on other platforms `npm install` needs Python, make and a C++ compiler. Docker and an NVIDIA GPU are only needed to run a local model on vLLM.
+
+It runs with zero configuration (offline mode: rules + templates). To use a real LLM, see [LLM providers](#llm-pick-a-provider-in-the-ui).
 
 ---
 
@@ -23,276 +46,283 @@ Không cần cấu hình gì vẫn chạy được (chế độ offline: luật 
 
 ```mermaid
 flowchart LR
-  subgraph Native["Agent native (tạo trên UI)"]
+  subgraph Native["Native agents (created in the UI)"]
     M[Mia] & K[Kai] & A[Atlas] & S[Sage] & P[Penny] & N[Nova]
   end
-  subgraph Connected["Agent connected (hệ thống của bạn)"]
+  subgraph Connected["Connected agents (your systems)"]
     W[Web chatbot] -->|REST / SDK| API
     C[Claude / Cursor / framework] -->|MCP| MCP[MCP server] --> API
   end
   Native --> BRAIN
-  API["Brain API /v1<br/>API key riêng từng agent"] --> BRAIN
-  subgraph BRAIN["🧠 Bộ não dùng chung"]
+  API["Brain API /v1<br/>one API key per agent"] --> BRAIN
+  subgraph BRAIN["🧠 Shared brain"]
     direction TB
-    R[Recall: RAS ⇄ Neocortex] --- E[Encode: Hippocampus] --- G[Governance: scope · quyền · audit]
+    R[Recall: RAS ⇄ Neocortex] --- E[Encode: Hippocampus] --- G[Governance: scopes · permissions · audit]
   end
-  BRAIN --> V[📈 Dashboard giá trị] & AU[🛡️ Audit log]
+  BRAIN --> V[📈 Value dashboard] & AU[🛡️ Audit log]
 ```
 
-| Màn hình | Dùng để |
+| Screen | What it's for |
 |---|---|
-| 🧠 **Bộ não** | Xem live tín hiệu chạy qua 13 vùng não cho mỗi câu hỏi, kể cả câu hỏi đến từ agent bên ngoài qua API. Chat với agent native, xem thông tin được lấy từ kho nào, xem working/semantic/episodic/procedural memory. |
-| 🤖 **Agents & tích hợp** | Tạo agent native hoặc connected, bật/tắt quyền đọc/ghi, cấp và xoay API key, lấy đoạn code tích hợp sẵn (cURL, JS, Python, MCP). |
-| 📈 **Giá trị** | Số câu hỏi khách không phải trả lời lại, tri thức tái sử dụng chéo, handoff, tỉ lệ nhận gợi ý, skill tự học, rò rỉ bị chặn, ma trận luồng tri thức giữa các agent. |
-| 🛡️ **Audit** | Mọi lượt đọc/ghi/chặn/gọi API: ai đọc ký ức của ai, cho khách nào, lúc nào. Lọc theo thao tác và tìm kiếm. |
-| ⚙️ **Cài đặt** | Chọn nhà cung cấp LLM (Claude, GPT, Gemini, DeepSeek, model local…), tải danh sách model, kiểm tra kết nối, áp dụng ngay. Xem thông tin lưu trữ (file SQLite, dung lượng, số dòng). |
+| 🧠 **Live brain** | Watch the signal travel through the 13 brain regions for every message, including messages from external agents over the API. Chat with native agents, see which store each piece of information came from, and inspect working, semantic, episodic and procedural memory. |
+| 🤖 **Agents** | Create native or connected agents, toggle read/write permissions, issue and rotate API keys, and copy ready-made integration code (cURL, JS, Python, MCP). |
+| 📈 **Business value** | Questions customers didn't have to answer again, cross-agent knowledge reuse, handoffs, suggestion acceptance rate, learned skills, blocked leaks, and a matrix of knowledge flowing between agents. |
+| 🛡️ **Audit log** | Every read, write, block and API call: who read whose memory, for which customer, and when. Filter by operation and search. |
+| ⚙️ **Settings** | Pick an LLM provider (Claude, GPT, Gemini, DeepSeek, local models…), fetch the model list, test the connection and apply it immediately. See storage details (SQLite file, size, row counts). |
 
-Sidebar bên trái chứa điều hướng, trạng thái mô hình, bộ chọn **ngôn ngữ** và **giao diện sáng/tối/theo hệ thống**. Màn hình Bộ não có bộ chọn **khách hàng** (bộ não nhớ riêng cho từng khách). Giao diện dùng hệ token màu cho cả hai chế độ, bộ icon SVG đồng bộ, và responsive tới màn hình điện thoại.
+The left sidebar holds navigation, model status, the **language** picker and the **light / dark / system** theme switch. The Live brain screen has a **customer** picker (the brain keeps a separate memory per customer). The UI uses color tokens for both themes, one consistent SVG icon set, and works down to phone width.
 
-## Ba cách kết nối một agent
+## Three ways to connect an agent
 
-### 1. Native: tạo trên giao diện
-Vào **Agents & tích hợp → Tạo agent → Native**, chọn lĩnh vực và persona. Bộ não sẽ tự trả lời bằng LLM của hub, và chat được ngay ở màn hình Bộ não.
+### 1. Native: create it in the UI
+Go to **Agents → Create agent → Native**, pick a domain and a persona. The brain answers with the hub's LLM, and you can chat with the agent right away on the Live brain screen.
 
-### 2. Connected qua REST API / SDK
-Tạo agent loại **Connected**. Hệ thống cấp API key, chỉ hiển thị một lần và lưu dạng hash. Agent của bạn vẫn dùng LLM riêng, theo vòng lặp:
+### 2. Connected via REST API / SDK
+Create an agent of type **Connected**. It gets an API key, shown only once and stored as a hash. Your agent keeps using its own LLM, in this loop:
 
 ```
-recall (lấy ngữ cảnh) → agent trả lời bằng LLM của mình với promptBlock → remember (gửi lại để bộ não học)
+recall (get context) → your agent answers with its own LLM using promptBlock → remember (send the turn back so the brain learns)
 ```
 
 ```js
 import { BrainClient } from './sdk/brain-client.js';
 const brain = new BrainClient({ url: 'http://localhost:4317', apiKey: process.env.BRAIN_API_KEY });
 
-const ctx = await brain.recall({ customerId: 'kh-001', text: userMessage, lang: 'ja' });
+const ctx = await brain.recall({ customerId: 'kh-001', text: userMessage, lang: 'en' });
 const reply = await myLLM({ system: ctx.promptBlock, user: ctx.redactedText });
 await brain.remember({ traceId: ctx.traceId, reply });
 ```
 
-Agent mẫu chạy được ngay (mở UI song song để xem bộ não sáng lên và hội thoại hiện trong chat):
+A sample agent you can run right away (open the UI next to it to watch the brain light up and the conversation appear in the chat):
 
 ```bash
 BRAIN_API_KEY=abk_... npm run example
-# tuỳ chọn: OWN_LLM_URL=http://localhost:8000/v1 OWN_LLM_MODEL=qwen3-4b BRAIN_LANG=ja
+# optional: OWN_LLM_URL=http://localhost:8000/v1 OWN_LLM_MODEL=qwen3-4b BRAIN_LANG=en
 ```
 
-### 3. MCP: cho Claude Desktop/Code, Cursor và các agent framework
-[mcp/server.mjs](mcp/server.mjs) là MCP server qua stdio, không có dependency. Mỗi instance đóng vai một agent connected và cung cấp 4 công cụ: `brain_recall`, `brain_remember`, `brain_profile`, `brain_feedback`.
+### 3. MCP: for Claude Desktop/Code, Cursor and agent frameworks
+[mcp/server.mjs](mcp/server.mjs) is a dependency-free MCP server over stdio. Each instance acts as one connected agent and exposes 4 tools: `brain_recall`, `brain_remember`, `brain_profile`, `brain_feedback`.
 
 ```bash
 claude mcp add agent-brain -e BRAIN_URL=http://localhost:4317 -e BRAIN_API_KEY=abk_... -- node /path/to/repo/mcp/server.mjs
 ```
 
-Màn hình Agents có sẵn cấu hình `mcpServers` cho Claude Desktop/Cursor, với đường dẫn và key đã điền.
+The Agents screen generates the `mcpServers` config for Claude Desktop and Cursor, with the path and key filled in.
 
 ## Brain API (`/v1`, header `Authorization: Bearer <agent key>`)
 
-| Method | Path | Body / query | Trả về |
+| Method | Path | Body / query | Returns |
 |---|---|---|---|
 | GET | `/v1/me` | | agent, domain, kind, permissions |
 | POST | `/v1/recall` | `{customerId, text, lang}` | `traceId, intent, salience, handoff, playbook, memories[], suggestedActions[], promptBlock, redactedText` |
 | POST | `/v1/remember` | `{traceId \| userText, reply, facts?: [{relation, value}], outcome?: {actionId, accepted}, lang}` | `learned[]`, feedback |
-| POST | `/v1/chat` | `{customerId, text, lang}` | bộ não tự trả lời (native qua API) |
-| POST | `/v1/feedback` | `{traceId, actionId, accepted}` | bandit + skill promotion |
-| GET | `/v1/profile` | `?customerId=&lang=` | các fact agent này được phép xem |
+| POST | `/v1/chat` | `{customerId, text, lang}` | the brain answers itself (native mode over the API) |
+| POST | `/v1/feedback` | `{traceId, actionId, accepted}` | bandit update + skill promotion |
+| GET | `/v1/profile` | `?customerId=&lang=` | the facts this agent is allowed to see |
 
-`/v1` bật CORS nên agent chạy trên trình duyệt cũng gọi được. Admin API `/api/*` (dùng cho UI) có thể khoá bằng `BRAIN_ADMIN_TOKEN`.
+`/v1` has CORS enabled, so agents running in a browser can call it too. The admin API `/api/*` (used by the UI) can be locked with `BRAIN_ADMIN_TOKEN`. `GET /healthz` needs no auth and is meant for Docker and load balancers.
 
 ## Governance
 
-- **Phạm vi ký ức:**
-  - `private`: chỉ lĩnh vực sở hữu đọc được, ví dụ sức khoẻ, thu nhập, lỗi thiết bị;
-  - `shared`: mọi agent có quyền đọc;
-  - `global`: chính sách công ty.
-- **Quyền từng agent** (bật/tắt ngay trên dòng của agent ở màn hình Agents):
-  - `readShared`: có được đọc ký ức shared do agent khác ghi hay không;
-  - `write`: có được ghi/học vào bộ não hay không. Agent đối tác có thể để chỉ-đọc.
-- **Single-writer-per-entity:** mỗi relation có đúng một lĩnh vực được ghi. Agent khác ghi thì Corpus callosum uỷ quyền cho owner.
-- **Audit log:** ghi lại mọi `read`, `write`, `blocked` (lượt đọc bị chặn vì private hoặc không có quyền), `recall`, `remember`, `handoff`, `feedback`, kèm agent ghi gốc. Đây cũng là nguồn số liệu cho dashboard giá trị.
-- **Brainstem:** che PII (SĐT VN/JP, email, thẻ, CCCD) trước khi bất cứ thứ gì được ghi nhớ. Có phản xạ khủng hoảng bằng cả 3 ngôn ngữ.
-- **API key:** lưu dạng SHA-256 và so sánh constant-time. Có thể xoay key; key cũ mất hiệu lực ngay.
+- **Memory scopes:**
+  - `private`: only the owning domain can read it, for example health, income or a device fault;
+  - `shared`: every agent with read permission can see it;
+  - `global`: company policy.
+- **Per-agent permissions** (toggle them on the agent's row in the Agents screen):
+  - `readShared`: whether the agent may read shared memories written by other agents;
+  - `write`: whether the agent may write to and learn into the brain. Partner agents can be read-only.
+- **Single writer per entity:** each relation has exactly one domain allowed to write it. When another agent tries, the corpus callosum delegates the write to the owner.
+- **Audit log:** records every `read`, `write`, `blocked` (a read refused because the memory is private or the agent lacks permission), `recall`, `remember`, `handoff` and `feedback`, together with the agent that originally wrote the memory. It is also the data source for the value dashboard.
+- **Brainstem:** redacts PII (Vietnamese and Japanese phone numbers, email, card numbers, Vietnamese ID numbers) before anything is remembered, and has a crisis reflex in all 3 languages.
+- **API keys:** stored as SHA-256 and compared in constant time. Keys can be rotated; the old key stops working immediately.
 
-## Dashboard giá trị — các chỉ số đo thế nào
+## Value dashboard: how the metrics are measured
 
-| Chỉ số | Định nghĩa (tính từ audit log) |
+| Metric | Definition (computed from the audit log) |
 |---|---|
-| **Câu hỏi khách không phải trả lời lại** | Số fact khác nhau mà agent B đọc được từ ký ức do agent A ghi. Thời gian tiết kiệm ước tính với giả định 20 giây/câu, giả định này được hiển thị trên UI. |
-| Tái sử dụng tri thức chéo | Tổng lượt đọc ký ức do agent khác ghi |
-| Handoff liền mạch | Số lần khách chuyển agent mà ngữ cảnh được chuyển theo |
-| Tỉ lệ nhận gợi ý | 👍 / (👍 + 👎) cho next best action |
-| Skill tự học | Skill do Cerebellum promote, kèm số lượt chạy bằng playbook |
-| Rò rỉ bị chặn | Lượt đọc private hoặc không có quyền bị RAS chặn |
-| Luồng tri thức | Ma trận agent ghi × agent đọc. Ô ngoài đường chéo là tri thức được chia sẻ. |
+| **Questions customers didn't have to answer again** | Number of distinct facts that agent B read from memories written by agent A. Time saved is estimated at 20 seconds per question; the UI shows this assumption. |
+| Cross-agent knowledge reuse | Total reads of memories written by another agent |
+| Seamless handoffs | Times a customer switched agents and the context went along |
+| Suggestion acceptance rate | 👍 / (👍 + 👎) for the next best action |
+| Learned skills | Skills promoted by the cerebellum, with the number of runs done from a playbook |
+| Blocked leaks | Private or unauthorized reads blocked by the RAS |
+| Knowledge flow | Writer agent × reader agent matrix. Off-diagonal cells are shared knowledge. |
 
-## Agent có sẵn
+## Built-in agents
 
-| Agent | Lĩnh vực | Lưu ký ức | Phạm vi |
+| Agent | Domain | Memory kept for | Scope |
 |---|---|---|---|
-| **Mia** | Trợ lý cá nhân: hồ sơ, gia đình, lịch hẹn, sở thích | vĩnh viễn | shared |
-| **Kai** | Sửa chữa & bảo dưỡng: xe, laptop, điện thoại, đồ gia dụng | 90 ngày | shared |
-| **Atlas** | Du lịch & di chuyển | 1 năm | shared |
-| **Sage** | Sức khoẻ | 10 năm | 🔒 private |
-| **Penny** | Tài chính cá nhân (ngân sách được chia sẻ có chủ đích, thu nhập thì không) | 5 năm | 🔒 private |
-| **Nova** | Mua sắm & đơn hàng | 180 ngày | shared |
+| **Mia** | Personal assistant: profile, family, schedule, preferences | forever | shared |
+| **Kai** | Repair & maintenance: cars, laptops, phones, home appliances | 90 days | shared |
+| **Atlas** | Travel & transport | 1 year | shared |
+| **Sage** | Health | 10 years | 🔒 private |
+| **Penny** | Personal finance (the budget is deliberately shared, income is not) | 5 years | 🔒 private |
+| **Nova** | Shopping & orders | 180 days | shared |
 
-## Ngôn ngữ
+## Languages
 
-Chọn ở chân sidebar; lựa chọn được lưu trong trình duyệt. Ngôn ngữ áp dụng cho:
-- giao diện và nhãn các vùng não;
-- nhãn từng bước trong trace;
-- câu trả lời của agent (LLM lẫn template; tiếng Nhật dùng kính ngữ), tóm tắt phiên, insight;
-- kịch bản mẫu.
+Pick a language at the bottom of the sidebar; the choice is saved in the browser. It applies to:
+- the UI and brain region labels;
+- the label of every step in the trace;
+- agent replies (both LLM and templates; Japanese uses polite keigo), session summaries and insights;
+- the sample scenarios.
 
-Bộ nhớ thì không phụ thuộc ngôn ngữ:
-- Fact được trích từ câu Việt, Anh hay Nhật đều được (luật riêng cho tiếng Nhật, không cần dấu cách).
-- Embedding chứa nhãn của cả 3 ngôn ngữ.
-- Một fact ghi bằng tiếng Việt vẫn hiển thị với nhãn tiếng Nhật khi chọn 日本語.
+The memory itself is language-independent:
+- Facts are extracted from Vietnamese, English or Japanese sentences (Japanese has its own rules, since it has no spaces).
+- Embeddings include the labels in all 3 languages.
+- A fact recorded in Vietnamese shows up with its Japanese label when 日本語 is selected.
 
-API nhận tham số `lang: "vi" | "en" | "ja"`.
+The API takes a `lang: "vi" | "en" | "ja"` parameter.
 
-## Kiến trúc memory (13 vùng não)
+## Memory architecture (13 brain regions)
 
-| Vùng não | Service | File |
+| Region | Service | File |
 |---|---|---|
-| Thalamus | Context Gateway: session, phát hiện chuyển agent, định tuyến | [thalamus.js](server/brain/thalamus.js) |
-| Brainstem | Guardrail: PII, phản xạ khủng hoảng, kiểm duyệt đầu ra | [brainstem.js](server/brain/brainstem.js) |
-| Amygdala | Salience: sentiment, urgency, churn, VIP → priority | [amygdala.js](server/brain/amygdala.js) |
-| Corpus callosum | Handoff giữa các agent, uỷ quyền ghi | [corpusCallosum.js](server/brain/corpusCallosum.js) |
-| Prefrontal cortex | Working memory + executive loop, gọi LLM | [prefrontal.js](server/brain/prefrontal.js), [respond.js](server/brain/respond.js) |
-| Cerebellum | Playbook, skill promotion có version | [cerebellum.js](server/brain/cerebellum.js) |
-| RAS | Retrieval: quyền → TTL → hybrid scoring → re-rank → token budget | [ras.js](server/brain/ras.js) |
-| Neocortex | Episodic + semantic, tier hot/warm/cold, mâu thuẫn, phân quyền | [neocortex.js](server/brain/neocortex.js), [ontology.js](server/brain/ontology.js) |
-| Basal ganglia | Next best action (bandit Thompson), học từ feedback | [basalGanglia.js](server/brain/basalGanglia.js) |
-| Hippocampus | Trích fact (luật + LLM + fact tường minh từ API), consolidate | [hippocampus.js](server/brain/hippocampus.js) |
-| Synaptic pruning | Quên: TTL, thay thế, suy giảm | [forgetting.js](server/brain/forgetting.js) |
-| Default mode network | Phản tư: insight, rà soát skill | [dmn.js](server/brain/dmn.js) |
-| Audit | Ai đọc/ghi gì | [audit.js](server/brain/audit.js) |
+| Thalamus | Context gateway: sessions, agent-switch detection, routing | [thalamus.js](server/brain/thalamus.js) |
+| Brainstem | Guardrails: PII, crisis reflex, output compliance | [brainstem.js](server/brain/brainstem.js) |
+| Amygdala | Salience: sentiment, urgency, churn risk, VIP → priority | [amygdala.js](server/brain/amygdala.js) |
+| Corpus callosum | Handoff between agents, write delegation | [corpusCallosum.js](server/brain/corpusCallosum.js) |
+| Prefrontal cortex | Working memory + executive loop, LLM calls | [prefrontal.js](server/brain/prefrontal.js), [respond.js](server/brain/respond.js) |
+| Cerebellum | Playbooks, versioned skill promotion | [cerebellum.js](server/brain/cerebellum.js) |
+| RAS | Retrieval: permissions → TTL → hybrid scoring → re-rank → token budget | [ras.js](server/brain/ras.js) |
+| Neocortex | Episodic + semantic memory, hot/warm/cold tiers, contradictions, scoping | [neocortex.js](server/brain/neocortex.js), [ontology.js](server/brain/ontology.js) |
+| Basal ganglia | Next best action (Thompson-sampling bandit), learns from feedback | [basalGanglia.js](server/brain/basalGanglia.js) |
+| Hippocampus | Fact extraction (rules + LLM + explicit facts from the API), consolidation | [hippocampus.js](server/brain/hippocampus.js) |
+| Synaptic pruning | Forgetting: TTL, replacement, decay | [forgetting.js](server/brain/forgetting.js) |
+| Default mode network | Reflection: insights, skill review | [dmn.js](server/brain/dmn.js) |
+| Audit | Who read or wrote what | [audit.js](server/brain/audit.js) |
 
-Bộ điều phối [server/brain/index.js](server/brain/index.js) có ba lối vào dùng chung phase `perceive` (Thalamus → … → Basal ganglia):
+The orchestrator [server/brain/index.js](server/brain/index.js) has three entry points that share the `perceive` phase (Thalamus → … → Basal ganglia):
 
-- `think()`: agent native, bộ não sinh câu trả lời.
-- `recall()`: agent connected lấy gói ngữ cảnh.
-- `remember()`: agent connected gửi lượt hội thoại để bộ não học.
+- `think()`: native agents; the brain generates the reply.
+- `recall()`: a connected agent fetches its context package.
+- `remember()`: a connected agent sends the turn back so the brain can learn.
 
-Vòng ngủ (`sleep()`) chạy Hippocampus → Forgetting → DMN → Cerebellum.
+The sleep loop (`sleep()`) runs Hippocampus → Forgetting → DMN → Cerebellum.
 
-## Lưu trữ: SQLite
+## Storage: SQLite
 
-Toàn bộ bộ não nằm trong **một file SQLite** `data/brain.db` (chế độ WAL), tạo tự động ở lần chạy đầu.
+The whole brain lives in **one SQLite file**, `data/brain.db` (WAL mode), created automatically on first run.
 
-| Bảng | Nội dung |
+| Table | Contents |
 |---|---|
-| `facts` | Semantic memory. Có cột `customer_id`, `relation`, `status`, `scope`, `owner_domain`, `source_agent_id`, `valid_until` (đánh index) và `embedding` (BLOB Float32). |
-| `episodes` | Episodic memory. Có cột `customer_id`, `kind`, `scope`, `agent_id`, `created_at`, `expires_at` và `embedding`. |
-| `audit` | Audit log append-only, **không bị cắt**. Dashboard giá trị tính bằng SQL trên toàn bộ lịch sử. |
-| `agents`, `customers`, `working`, `skills`, `patterns`, `bandit`, `insights`, `traces` | Các phần còn lại của bộ não, mỗi dòng là một JSON. |
-| `meta` | Phiên bản schema, đồng hồ mô phỏng, bộ đếm id, thống kê sử dụng. |
+| `facts` | Semantic memory. Indexed columns `customer_id`, `relation`, `status`, `scope`, `owner_domain`, `source_agent_id`, `valid_until`, plus `embedding` (Float32 BLOB). |
+| `episodes` | Episodic memory. Columns `customer_id`, `kind`, `scope`, `agent_id`, `created_at`, `expires_at` and `embedding`. |
+| `audit` | Append-only audit log, **never truncated**. The value dashboard is computed in SQL over the full history. |
+| `agents`, `customers`, `working`, `skills`, `patterns`, `bandit`, `insights`, `traces` | The rest of the brain, one JSON document per row. |
+| `meta` | Schema version, simulated clock, id counters, usage stats. |
 
-**Cách hoạt động:**
-- Khi khởi động, trạng thái được nạp vào RAM; RAM đóng vai cache.
-- Sau mỗi thay đổi (gộp trong 300 ms), server **chỉ ghi các dòng đã đổi**, trong một transaction.
-- Khi nhận SIGINT/SIGTERM, server ghi nốt rồi đóng database gọn gàng.
-- Với 20.000 episode: lần ghi đầu khoảng 0,2 giây, mỗi lượt chat sau đó chỉ ghi khoảng 10 dòng; nạp lại khi khởi động khoảng 0,2 giây.
+**How it works:**
+- On startup the state is loaded into memory, which acts as a cache.
+- After each change (batched over 300 ms), the server **writes only the rows that changed**, in one transaction.
+- On SIGINT/SIGTERM the server flushes pending writes and closes the database cleanly.
+- With 20,000 episodes: the first write takes about 0.2 s, each chat turn afterwards writes about 10 rows, and reloading on startup takes about 0.2 s.
 
-**Truy vấn trực tiếp** được, ví dụ:
+You can **query it directly**, for example:
 ```bash
 sqlite3 data/brain.db "SELECT relation, json_extract(data,'$.value'), scope FROM facts WHERE customer_id='kh-001'"
 sqlite3 data/brain.db "SELECT source_agent_id, agent_id, COUNT(*) FROM audit WHERE op='read' GROUP BY 1,2"
 ```
 
-**Sao lưu:** `sqlite3 data/brain.db ".backup backup.db"` (an toàn cả khi server đang chạy). Đổi đường dẫn bằng biến `BRAIN_DB`.
+**Backup:** `sqlite3 data/brain.db ".backup backup.db"` (safe while the server is running). Change the path with `BRAIN_DB`.
 
-**Nâng cấp từ bản cũ:** nếu có `data/brain.json` (schema v3), dữ liệu được nhập vào SQLite ở lần chạy đầu, rồi file gốc được đổi tên thành `brain.imported.bak.json`. Đường dẫn file JSON cũ đổi bằng `BRAIN_DATA`.
+**Upgrading from older versions:** if `data/brain.json` (schema v3) exists, it is imported into SQLite on first run and the original file is renamed to `brain.imported.bak.json`. Change the legacy JSON path with `BRAIN_DATA`.
 
-**Giới hạn hiện tại:**
-- Chỉ chạy được **một tiến trình** server, vì trạng thái được cache trong RAM.
-- Tìm kiếm vector vẫn quét tuần tự trong RAM.
+**Current limits:**
+- Only **one server process** can run, because state is cached in memory.
+- Vector search is still a linear scan in memory.
 
-Hai giới hạn này sẽ được giải quyết khi chuyển sang PostgreSQL + pgvector (xem [Hướng lên production](#hướng-lên-production)).
+Both go away with the move to PostgreSQL + pgvector (see [Roadmap to production](#roadmap-to-production)).
 
-## LLM: chọn nhà cung cấp ngay trên giao diện
+## LLM: pick a provider in the UI
 
-Vào **Cài đặt → Mô hình ngôn ngữ**. Ở đó bạn:
-1. chọn nhà cung cấp;
-2. nhập API key (key chỉ lưu trên server trong `data/settings.json` với quyền 0600, không bao giờ gửi về trình duyệt);
-3. bấm **Tải danh sách model** để lấy tên model trực tiếp từ nhà cung cấp, rồi **Kiểm tra kết nối** và **Lưu & áp dụng**.
+Open **Settings → Language model**. There you:
+1. choose a provider;
+2. enter the API key (it is stored only on the server, in `data/settings.json` with mode 0600, and never sent back to the browser);
+3. click **Fetch models** to get model names straight from the provider, then **Test connection** and **Save & apply**.
 
-Thay đổi có hiệu lực ngay, không cần khởi động lại.
+Changes take effect immediately, with no restart.
 
-| Nhà cung cấp | Giao thức | Base URL mặc định | Biến môi trường cho key |
+| Provider | Protocol | Default base URL | Key environment variable |
 |---|---|---|---|
-| **Claude** (Anthropic) | Anthropic SDK chính thức | — | `ANTHROPIC_API_KEY` |
+| **Claude** (Anthropic) | Official Anthropic SDK | — | `ANTHROPIC_API_KEY` |
 | **GPT** (OpenAI) | OpenAI Chat Completions | `https://api.openai.com/v1` | `OPENAI_API_KEY` |
-| **Gemini** (Google) | Endpoint tương thích OpenAI | `https://generativelanguage.googleapis.com/v1beta/openai` | `GEMINI_API_KEY` |
-| **DeepSeek** | Tương thích OpenAI | `https://api.deepseek.com/v1` | `DEEPSEEK_API_KEY` |
-| **Mistral** | Tương thích OpenAI | `https://api.mistral.ai/v1` | `MISTRAL_API_KEY` |
-| **Groq** | Tương thích OpenAI | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` |
-| **Grok** (xAI) | Tương thích OpenAI | `https://api.x.ai/v1` | `XAI_API_KEY` |
-| **OpenRouter** (hàng trăm model) | Tương thích OpenAI | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` |
-| **Together** | Tương thích OpenAI | `https://api.together.xyz/v1` | `TOGETHER_API_KEY` |
-| **Ollama / vLLM / LM Studio** (local) | Tương thích OpenAI | `localhost:11434` / `:8000` / `:1234` | không cần |
-| **Tuỳ chỉnh** | Mọi endpoint tương thích OpenAI | tự nhập | `BRAIN_LLM_API_KEY` |
-| **Offline** | Luật + template | — | — |
+| **Gemini** (Google) | OpenAI-compatible endpoint | `https://generativelanguage.googleapis.com/v1beta/openai` | `GEMINI_API_KEY` |
+| **DeepSeek** | OpenAI-compatible | `https://api.deepseek.com/v1` | `DEEPSEEK_API_KEY` |
+| **Mistral** | OpenAI-compatible | `https://api.mistral.ai/v1` | `MISTRAL_API_KEY` |
+| **Groq** | OpenAI-compatible | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` |
+| **Grok** (xAI) | OpenAI-compatible | `https://api.x.ai/v1` | `XAI_API_KEY` |
+| **OpenRouter** (hundreds of models) | OpenAI-compatible | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` |
+| **Together** | OpenAI-compatible | `https://api.together.xyz/v1` | `TOGETHER_API_KEY` |
+| **Ollama / vLLM / LM Studio** (local) | OpenAI-compatible | `localhost:11434` / `:8000` / `:1234` | not needed |
+| **Custom** | Any OpenAI-compatible endpoint | your own | `BRAIN_LLM_API_KEY` |
+| **Offline** | Rules + templates | — | — |
 
-- **Model chính** dùng để trả lời khách. **Model phụ** (tuỳ chọn) dùng cho trích fact, tóm tắt phiên và phản tư, nên chọn model rẻ và nhanh để tiết kiệm chi phí.
-- **Tự thích nghi với từng nhà cung cấp:** khi bị từ chối tham số (lỗi 400/422), hệ thống tự điều chỉnh rồi gửi lại, và nhớ cho các lần sau:
-  - `max_tokens` → `max_completion_tokens` (các model GPT dạng reasoning);
-  - bỏ `temperature`;
-  - bỏ JSON mode;
-  - bỏ các tham số riêng của server local.
-- **Không bao giờ gián đoạn:** nếu LLM lỗi, bộ não tự chuyển sang luật + template.
-- **Biến môi trường** chỉ là cấu hình mặc định khi chưa lưu gì trên giao diện:
+- The **main model** answers customers. The optional **utility model** handles fact extraction, session summaries and reflection; pick a cheap, fast one to save cost.
+- **Adapts to each provider:** when a parameter is rejected (HTTP 400/422), the client adjusts and retries, and remembers it for next time:
+  - `max_tokens` → `max_completion_tokens` (GPT reasoning models);
+  - drop `temperature`;
+  - drop JSON mode;
+  - drop parameters specific to local servers.
+- **Never goes down:** if the LLM fails, the brain falls back to rules + templates.
+- **Environment variables** are only defaults until something is saved in the UI:
   - `BRAIN_LLM_PROVIDER`, `BRAIN_LLM_MODEL`, `BRAIN_LLM_BASE_URL`, `BRAIN_LLM_API_KEY`;
-  - hoặc chỉ cần có key của một nhà cung cấp, ví dụ `OPENAI_API_KEY`, là hệ thống tự chọn nhà cung cấp đó;
-  - `BRAIN_OFFLINE=1` tắt mọi lời gọi LLM;
-  - `BRAIN_SETTINGS` đổi đường dẫn file cài đặt.
+  - or just set one provider's key, for example `OPENAI_API_KEY`, and that provider is selected automatically;
+  - `BRAIN_OFFLINE=1` disables all LLM calls;
+  - `BRAIN_SETTINGS` changes the settings file path.
 
-Chạy model local qua vLLM (Qwen3-4B, vừa GPU 12GB): `scripts/start-vllm.sh`, rồi chọn **vLLM** trong Cài đặt.
+Run a local model on vLLM (Qwen3-4B fits a 12 GB GPU): `scripts/start-vllm.sh` (or `docker compose --profile vllm up -d`), then pick **vLLM** in Settings.
 
-Ghi chú về vLLM:
-- Image `latest` cần driver ≥ 575. Đổi bằng `VLLM_IMAGE=…`.
-- Request JSON dùng `temperature 0.1` để né lỗi CUDA của vLLM 0.10.2 khi gộp batch.
+Notes on vLLM:
+- The `latest` image needs NVIDIA driver ≥ 575. Override with `VLLM_IMAGE=…`.
+- JSON requests use `temperature 0.1` to avoid a CUDA error in vLLM 0.10.2 when requests are batched together.
 
-## Test
+## Tests
 
-- `npm test`: 32 unit test, gồm:
-  - bộ QA nghiệm thu của tài liệu: amnesia, contradiction, staleness, skill promotion, load 20k episode;
-  - phân quyền và rò rỉ prompt;
-  - tiếng Anh, tiếng Nhật;
-  - agent connected (recall/remember), governance, xoay key, báo cáo giá trị;
-  - lớp LLM: danh mục nhà cung cấp, tự thích nghi với một server giả lập khó tính kiểu OpenAI, lưu/ẩn key, tải danh sách model;
-  - lưu trữ SQLite: mở lại thì dữ liệu còn nguyên (kể cả embedding), chỉ ghi các dòng thay đổi, audit không bị cắt và số liệu SQL khớp với cách tính trong bộ nhớ, nhập từ JSON cũ, reset.
-- `npm run e2e -- --lang vi|en|ja`: 11 bước chạy trên server đang chạy, với bất kỳ cấu hình LLM nào (offline, Claude, GPT, model local…). Bao gồm cả agent connected qua SDK và MCP server qua stdio. Bài test dùng một khách hàng mới nên không đụng dữ liệu đang có, nhưng tua đồng hồ mô phỏng thêm 7 ngày.
+- `npm test`: 32 unit tests, covering:
+  - the acceptance QA suite from the architecture document: amnesia, contradiction, staleness, skill promotion, 20k-episode load;
+  - permissions and prompt leakage;
+  - English and Japanese;
+  - connected agents (recall/remember), governance, key rotation, the value report;
+  - the LLM layer: provider catalog, adapting to a strict mock OpenAI-style server, storing and masking keys, fetching model lists;
+  - SQLite storage: data survives a reopen (embeddings included), only changed rows are written, the audit log is never truncated and SQL metrics match the in-memory computation, legacy JSON import, reset.
+- `npm run e2e -- --lang vi|en|ja`: 11 steps against a running server, with any LLM configuration (offline, Claude, GPT, local models…). Includes a connected agent through the SDK and the MCP server over stdio. The test uses a new customer so existing data is left alone, but it advances the simulated clock by 7 days.
 
-## Cấu trúc
+## Project structure
 
 ```
 server/
-  index.js          HTTP: admin API /api, Brain API /v1 (API key), SSE, static UI
-  brain/            13 vùng não, audit, bộ điều phối (think / recall / remember / sleep)
-  agents.js         6 lĩnh vực, intent vi/en/ja, hành động NBA, quyền mặc định
-  store.js          lưu trữ SQLite (cache trong RAM + ghi theo dòng thay đổi, audit, nhập JSON cũ)
+  index.js          HTTP: admin API /api, Brain API /v1 (API keys), SSE, static UI, /healthz
+  brain/            13 brain regions, audit, orchestrator (think / recall / remember / sleep)
+  agents.js         6 domains, vi/en/ja intents, next-best-action catalog, default permissions
+  store.js          SQLite storage (in-memory cache + row-level writes, audit, legacy JSON import)
   i18n.js llm.js embed.js bus.js clock.js text.js
-sdk/brain-client.js JS client cho agent connected (không dependency)
+sdk/brain-client.js JS client for connected agents (no dependencies)
 mcp/server.mjs      MCP server (stdio)
-examples/           connected-agent.mjs: agent bên ngoài dùng LLM riêng + bộ não chung
-public/             app.js (khung + màn hình bộ não), views/ (agents, value, audit, settings), i18n.js, icons.js, brain.js, styles.css (design tokens sáng/tối)
+examples/           connected-agent.mjs: an external agent with its own LLM + the shared brain
+public/             app.js (shell + brain screen), views/ (agents, value, audit, settings), i18n.js, icons.js, brain.js, styles.css (light/dark design tokens)
 scripts/            start-vllm.sh, e2e.mjs
-test/               brain.test.js (bộ não, QA nghiệm thu), llm.test.js (nhà cung cấp LLM), store.test.js (SQLite)
-data/               (tự tạo, đã gitignore) brain.db = bộ nhớ SQLite, settings.json = cấu hình LLM + API key
+Dockerfile, docker-compose.yml, .env.example   one-command setup (data volume, /healthz health check, vllm profile)
+.github/            CI (tests on Node 18/20/22 + Docker build + e2e), issue/PR templates
+test/               brain.test.js (brain, acceptance QA), llm.test.js (LLM providers), store.test.js (SQLite)
+data/               (created at runtime, gitignored) brain.db = SQLite memory, settings.json = LLM config + API keys
 ```
 
+## Data & security when deploying
 
-## Dữ liệu & bảo mật khi triển khai
+- All memory lives in `data/brain.db` (with Docker: the `brain-data` volume, mounted at `/app/data`); the LLM configuration and API keys live in `data/settings.json` (mode 0600). The whole `data/` folder is gitignored. **Don't commit it.**
+- Without `BRAIN_ADMIN_TOKEN`, the admin UI and `/api/*` are **open to anyone who can reach the port**. Outside your own machine, set it (the UI asks for the token once) and put the server behind a reverse proxy with HTTPS.
+- External agents can only use `/v1/*` with their own API key, and their reads and writes are limited by that agent's permissions.
 
-- Toàn bộ bộ nhớ nằm trong `data/brain.db`; cấu hình LLM và API key nằm trong `data/settings.json` (quyền 0600). Cả thư mục `data/` đã được gitignore — **đừng commit nó**.
-- Admin UI và `/api/*` **mở cho bất kỳ ai truy cập được cổng** nếu không đặt `BRAIN_ADMIN_TOKEN`. Khi chạy ngoài máy cá nhân, hãy đặt biến này (UI sẽ hỏi token một lần) và để server sau reverse proxy có HTTPS.
-- Agent bên ngoài chỉ dùng được `/v1/*` bằng API key của chính nó; quyền đọc/ghi bị giới hạn theo cấu hình của agent.
+## Roadmap to production
 
-## Hướng lên production
+- **Storage:** ✅ moved to SQLite. Next: PostgreSQL + pgvector for multiple processes and a real vector index (`store.js` is a separate layer, so the brain regions don't change). Then: working memory in Redis, the event bus on Kafka/NATS, and a real embedding API instead of feature hashing.
+- **Auth:** replace the admin token with SSO/RBAC. Add scopes and expiry to API keys, plus per-agent rate limits.
+- **Operations:** run the sleep loop from a worker/cron instead of a button. Multi-tenancy per company.
+- **Data integration:** a one-way connection to the data warehouse to enrich facts.
 
-- **Lưu trữ:** ✅ đã chuyển sang SQLite. Bước tiếp theo: PostgreSQL + pgvector để chạy nhiều tiến trình và có index vector thật (lớp `store.js` đã tách riêng nên các vùng não không phải đổi). Sau đó: working memory sang Redis, event bus sang Kafka/NATS, embedding API thật thay cho feature hashing.
-- **Xác thực:** thay admin token bằng SSO/RBAC. Bổ sung scope và hạn dùng cho API key, cùng rate limit theo agent.
-- **Vận hành:** vòng ngủ chạy bằng worker/cron thay vì nút bấm. Multi-tenant theo công ty.
-- **Tích hợp dữ liệu:** kết nối một chiều với data warehouse để làm giàu fact.
+## Contributing
+
+Contributions of all kinds are welcome: docs, translations, code. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to run the project and the PR process. Issues labelled [`good first issue`](https://github.com/leluong141996-dev/Agent-Brain-Hub/labels/good%20first%20issue) are a good place to start; questions and ideas go to [Discussions](https://github.com/leluong141996-dev/Agent-Brain-Hub/discussions). Release history: [CHANGELOG.md](CHANGELOG.md).
+
+License: [MIT](LICENSE).

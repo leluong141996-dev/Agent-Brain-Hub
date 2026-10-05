@@ -1,0 +1,10 @@
+node_modules
+data
+media
+docs
+.git
+.github
+*.pdf
+*.db
+*.db-*
+.env

@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build and start
+        run: docker compose up -d --build
+      - name: Wait for health check
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:4317/healthz && exit 0
+            sleep 2
+          done
+          docker compose logs
+          exit 1
+      - name: End-to-end
+        run: node scripts/e2e.mjs --url http://localhost:4317 --lang en
+      - if: always()
+        run: docker compose down -v

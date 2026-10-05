@@ -1,0 +1,39 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Agent Kai, customer kh-001
+        2. Send "..."
+        3. ...
+  - type: dropdown
+    id: run
+    attributes:
+      label: How do you run it?
+      options: ["npm start", "docker compose", "other"]
+  - type: input
+    id: llm
+    attributes:
+      label: LLM provider and model
+      placeholder: "offline / Claude claude-opus-5-5 / vLLM qwen3-4b / ..."
+  - type: input
+    id: env
+    attributes:
+      label: Version, Node.js version and OS
+      placeholder: "v0.1.0, Node 20.11, Ubuntu 24.04"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Please remove API keys and personal data first.

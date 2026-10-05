@@ -14,6 +14,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(here, '..');
 const PUBLIC = path.join(ROOT, 'public');
 const PORT = Number(process.env.PORT || 4317);
+const HOST = process.env.HOST || '0.0.0.0';
+const VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
 const ADMIN_TOKEN = process.env.BRAIN_ADMIN_TOKEN || '';
 
 const DB_FILE = process.env.BRAIN_DB || path.join(ROOT, 'data', 'brain.db');
@@ -140,6 +142,11 @@ const v1 = {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   try {
+    // --- Health check (no auth; used by Docker / load balancers) ---
+    if (url.pathname === '/healthz') {
+      return send(res, 200, { ok: true, version: VERSION, storage: store.backend, llm: llm.available ? llm.provider : 'offline' });
+    }
+
     // --- Brain API for external agents ---
     if (url.pathname.startsWith('/v1/')) {
       if (req.method === 'OPTIONS') {
@@ -199,8 +206,8 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`🧠 Agent Brain Hub → http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`🧠 Agent Brain Hub v${VERSION} → http://localhost:${PORT}`);
   console.log(`   Brain API for external agents → http://localhost:${PORT}/v1`);
   console.log(llm.available ? `   LLM: ${llm.label} (${llm.source})` : '   LLM: offline — pick a provider in the UI: Settings → Language model');
   console.log(`   Storage: SQLite ${DB_FILE}`);

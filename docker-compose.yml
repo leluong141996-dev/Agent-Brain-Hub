@@ -1,0 +1,44 @@
+# Agent Brain Hub
+#   docker compose up -d                      → http://localhost:4317
+#   docker compose --profile vllm up -d       → + a local Qwen3-4B on vLLM (NVIDIA GPU)
+# Configuration: copy .env.example to .env (optional). The LLM provider can
+# also be chosen later in the UI: Settings → Language model.
+services:
+  brain:
+    build: .
+    image: agent-brain-hub:latest
+    ports:
+      - "${PORT:-4317}:4317"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - brain-data:/app/data   # SQLite memory + LLM settings (API keys) live here
+    restart: unless-stopped
+
+  # Optional local LLM. After it starts, pick "vLLM" in Settings and set the
+  # base URL to http://vllm:8000/v1 (model name: qwen3-4b).
+  vllm:
+    profiles: ["vllm"]
+    image: ${VLLM_IMAGE:-vllm/vllm-openai:v0.10.2}
+    command: >
+      --model ${VLLM_MODEL:-Qwen/Qwen3-4B-Instruct-2507-FP8}
+      --served-model-name qwen3-4b
+      --max-model-len ${VLLM_MAX_LEN:-8192}
+      --gpu-memory-utilization ${VLLM_GPU_UTIL:-0.85}
+    ipc: host
+    volumes:
+      - ${HOME}/.cache/huggingface:/root/.cache/huggingface
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  brain-data:
