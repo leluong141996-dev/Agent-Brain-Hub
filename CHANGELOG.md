@@ -5,10 +5,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-07
+
 ### Added
 
 - **Automatic sleep cycle.** The brain now sleeps on its own: after a customer has been quiet for 30 minutes (idle), as soon as 24 turns are waiting (pressure), and once a night at 03:00 server time. Configure it in **Settings → Sleep cycle**, which also shows who is waiting and the recent runs with their trigger, or with `BRAIN_SLEEP_*` environment variables. The **Run sleep cycle** button still works; manual and automatic runs are queued so they never overlap. Automatic runs appear live in the brain view.
 - `GET /api/settings/sleep` and `PUT /api/settings/sleep`.
+- A security policy (`SECURITY.md`) with private vulnerability reporting, a code of conduct, and weekly Dependabot updates for npm, Docker and GitHub Actions.
 
 ### Fixed
 
@@ -53,6 +56,7 @@ First public release.
 - README in English (`README.md`) and Vietnamese (`README.vi.md`), `CONTRIBUTING.md`, issue and PR templates, and a CI workflow (tests on Node 18/20/22, Docker build, end-to-end run).
 - 32 unit tests (including the acceptance QA suite: amnesia, contradiction, staleness, skill promotion, 20k-episode load) and an 11-step end-to-end script (`npm run e2e -- --lang vi|en|ja`).
 
-[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/releases/tag/v0.1.0
