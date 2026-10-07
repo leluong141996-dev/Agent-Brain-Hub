@@ -46,4 +46,8 @@ No LLM is needed for development: the hub runs offline with rules and templates.
 
 ## Reporting security issues
 
-Please don't open a public issue for vulnerabilities (for example a way to read another agent's private memory or an API key). Use GitHub's **Report a vulnerability** button on the Security tab instead.
+Please don't open a public issue for vulnerabilities (for example a way to read another agent's private memory or an API key). See [SECURITY.md](SECURITY.md) for how to report them privately.
+
+## Code of conduct
+
+By taking part you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).

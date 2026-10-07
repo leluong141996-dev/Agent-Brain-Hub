@@ -7,3 +7,5 @@ data/
 *.db-shm
 # social-media assets (not part of the repo)
 media/
+# local Claude Code settings
+.claude/

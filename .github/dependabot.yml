@@ -1,0 +1,25 @@
+# Weekly dependency update PRs. Minor and patch npm updates are grouped into one PR;
+# major updates (like better-sqlite3 11 → 13) come one by one so they can be tested.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      # Stay on the Node LTS line; moving to the next LTS is a deliberate change.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
