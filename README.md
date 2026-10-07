@@ -206,6 +206,18 @@ The orchestrator [server/brain/index.js](server/brain/index.js) has three entry 
 
 The sleep loop (`sleep()`) runs Hippocampus → Forgetting → DMN → Cerebellum.
 
+### When the brain sleeps
+
+Besides the **Run sleep cycle** button, the brain sleeps on its own ([sleepScheduler.js](server/brain/sleepScheduler.js)):
+
+| Trigger | When | Default |
+|---|---|---|
+| **Idle** | A customer has been quiet long enough for the session to count as over, and turns are waiting | 30 min (the same gap that starts a new session) |
+| **Pressure** | This many turns are waiting. Working memory keeps only the last 40, so without this, older turns would be dropped before reaching long-term memory | 24 turns |
+| **Nightly** | Once a day, for every customer active since the previous night | 03:00 server time |
+
+Change them in **Settings → Sleep cycle**, which also lists who is waiting to sleep and the recent runs with their trigger. Automatic runs show up live in the brain view like any other trace. Manual and automatic runs share one queue, so they never overlap. Environment variables set the defaults (`BRAIN_SLEEP_AUTO`, `BRAIN_SLEEP_IDLE_MINUTES`, `BRAIN_SLEEP_MAX_PENDING`, `BRAIN_SLEEP_NIGHTLY_AT`, see [.env.example](.env.example)). The Docker image runs in UTC: set `TZ`, for example `TZ=Asia/Ho_Chi_Minh`, so "03:00" means your night.
+
 ## Storage: SQLite
 
 The whole brain lives in **one SQLite file**, `data/brain.db` (WAL mode), created automatically on first run.

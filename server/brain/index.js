@@ -22,6 +22,7 @@ import { handoff } from './corpusCallosum.js';
 import { encodeOnline, encodeOutcome, consolidate, describeReason } from './hippocampus.js';
 import { forget } from './forgetting.js';
 import { reflect } from './dmn.js';
+import { emptySleepState, recordSleep } from './sleepScheduler.js';
 import { seedGlobal, resolveConflict } from './neocortex.js';
 import { extractFactsRuleBased, factToText, factValue, RELATIONS } from './ontology.js';
 import { templateReply, buildPrompt, contextBlock, memoryInstructions } from './respond.js';
@@ -43,6 +44,8 @@ export class Brain {
     this.llm = llm;
     this.deterministic = deterministic;
     this.clock = new Clock(store.state.clockOffsetMs || 0);
+    store.state.sleep ||= emptySleepState(); // states imported from older versions
+    this._sleepQueue = Promise.resolve();
     seedGlobal(this);
     seedSkills(this);
     for (const a of this.state.agents) {
@@ -347,17 +350,38 @@ export class Brain {
   }
 
   // ---------------- Sleep loop ----------------
-  async sleep({ customerId = 'kh-001', lang } = {}) {
+  // Manual and automatic runs share one queue, so two sleeps never interleave.
+  sleep(opts = {}) {
+    const run = () => this._sleep(opts);
+    const p = this._sleepQueue.then(run, run);
+    this._sleepQueue = p.catch(() => {});
+    return p;
+  }
+
+  async _sleep({ customerId = 'kh-001', lang, trigger = 'manual' } = {}) {
     lang = normLang(lang);
-    const t = this.bus.trace('sleep', { customerId, lang });
+    const started = performance.now();
+    const t = this.bus.trace('sleep', { customerId, lang, trigger });
     const episodes = await consolidate(this, t, { customerId });
     const forgotten = forget(this, t);
     const reflection = await reflect(this, t, { customerId });
     this.count(null, 'sleeps');
+    recordSleep(this, {
+      at: Date.now(),
+      trigger,
+      customerId,
+      traceId: t.id,
+      consolidated: episodes.length,
+      forgotten: forgotten.expiredFacts.length + forgotten.expiredEpisodes + forgotten.prunedSuperseded + forgotten.prunedWeak,
+      insights: reflection.insights.length,
+      ms: Math.round(performance.now() - started),
+    });
     this.store.save();
     t.end();
     return {
       traceId: t.id,
+      trigger,
+      customerId,
       consolidated: episodes.length,
       forgotten,
       insights: reflection.insights.map((e) => e.text),

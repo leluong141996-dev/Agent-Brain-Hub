@@ -131,6 +131,7 @@ function renderShell() {
   ms.innerHTML = `<span class="pulse"></span><div><b>${esc(t('model'))}</b><span>${esc(s.llm.available ? s.llm.label : t('model_offline'))}</span></div>`;
   ms.title = s.llm.lastError ? t('model_err', { err: s.llm.lastError.slice(0, 160) }) : '';
   $('#navAgentCount').textContent = s.agents.length;
+  $('#sleepBtn').title = s.autoSleep?.enabled ? t('sleep_btn_auto') : '';
   const sel = $('#customerSelect');
   if (!s.customers.some((c) => c.id === ui.customerId) && s.customers[0]) ui.customerId = s.customers[0].id;
   sel.innerHTML = s.customers.map((c) => `<option value="${esc(c.id)}" ${c.id === ui.customerId ? 'selected' : ''}>${esc(c.name)}${c.vip ? ' ★' : ''}</option>`).join('');
@@ -324,6 +325,11 @@ function connect() {
     const d = JSON.parse(e.data);
     ui.seen.add(d.traceId);
     enqueue({ type: 'start', traceId: d.traceId, kind: d.kind });
+    const why = d.kind === 'sleep' && d.meta?.trigger;
+    if (why && why !== 'manual') {
+      const customer = ui.snap?.customers?.find((c) => c.id === d.meta.customerId)?.name || d.meta.customerId;
+      toast(esc(t('auto_slept', { why: t('trig_' + why), customer })), 'info', icon('moon'));
+    }
   });
   es.addEventListener('step', (e) => enqueue(JSON.parse(e.data)));
   es.addEventListener('trace-end', (e) => enqueue({ type: 'end', ...JSON.parse(e.data) }));

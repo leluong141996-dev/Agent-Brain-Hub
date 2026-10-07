@@ -5,6 +5,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+
+- **Automatic sleep cycle.** The brain now sleeps on its own: after a customer has been quiet for 30 minutes (idle), as soon as 24 turns are waiting (pressure), and once a night at 03:00 server time. Configure it in **Settings → Sleep cycle**, which also shows who is waiting and the recent runs with their trigger, or with `BRAIN_SLEEP_*` environment variables. The **Run sleep cycle** button still works; manual and automatic runs are queued so they never overlap. Automatic runs appear live in the brain view.
+- `GET /api/settings/sleep` and `PUT /api/settings/sleep`.
+
+### Fixed
+
+- Long conversations lost turns: working memory keeps only the last 40 turns, so anything older was dropped before it was ever consolidated unless someone pressed **Run sleep cycle**. The pressure trigger consolidates before that happens.
+
 ## [0.1.1] - 2026-10-07
 
 ### Fixed

@@ -266,6 +266,11 @@ code, kbd, .mono { font-family: var(--mono); font-size: 0.9em; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field > span { font-size: 12.5px; font-weight: 500; color: var(--text); }
 .field small { font-size: 12px; color: var(--text-3); }
+/* A switch with its label and hint, e.g. Settings → Sleep cycle */
+.switch-row { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.switch-row input.switch { margin-top: 2px; }
+.switch-row > span { display: flex; flex-direction: column; gap: 3px; font-size: 13px; min-width: 0; }
+.switch-row small { font-size: 12px; color: var(--text-3); }
 .search { position: relative; display: inline-flex; align-items: center; }
 .search .ico { position: absolute; left: 10px; color: var(--text-3); }
 .search .input { padding-left: 32px; width: 280px; height: 34px; }

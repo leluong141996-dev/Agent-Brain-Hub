@@ -194,6 +194,18 @@ Bộ điều phối [server/brain/index.js](server/brain/index.js) có ba lối 
 
 Vòng ngủ (`sleep()`) chạy Hippocampus → Forgetting → DMN → Cerebellum.
 
+### Khi nào bộ não ngủ
+
+Ngoài nút **Chạy vòng ngủ**, bộ não tự ngủ theo ba cách ([sleepScheduler.js](server/brain/sleepScheduler.js)):
+
+| Kích hoạt | Khi nào | Mặc định |
+|---|---|---|
+| **Im lặng** | Khách im lặng đủ lâu để coi như phiên đã kết thúc, và còn lượt hội thoại chưa hợp nhất | 30 phút (bằng ngưỡng mở phiên mới) |
+| **Áp lực** | Số lượt chờ chạm ngưỡng. Working memory chỉ giữ 40 lượt gần nhất, nên nếu không ngủ sớm, các lượt cũ sẽ bị xoá trước khi vào bộ nhớ dài hạn | 24 lượt |
+| **Ban đêm** | Mỗi ngày một lần, cho các khách có hoạt động từ đêm trước | 03:00 giờ máy chủ |
+
+Chỉnh trong **Cài đặt → Vòng ngủ**; ở đó cũng có danh sách khách đang chờ ngủ và các lần ngủ gần đây kèm lý do. Lần ngủ tự động hiện trực tiếp trên màn hình bộ não như mọi trace khác. Ngủ thủ công và tự động dùng chung một hàng đợi nên không bao giờ chồng lên nhau. Biến môi trường đặt giá trị mặc định (`BRAIN_SLEEP_AUTO`, `BRAIN_SLEEP_IDLE_MINUTES`, `BRAIN_SLEEP_MAX_PENDING`, `BRAIN_SLEEP_NIGHTLY_AT`, xem [.env.example](.env.example)). Image Docker chạy theo giờ UTC: hãy đặt `TZ`, ví dụ `TZ=Asia/Ho_Chi_Minh`, để "03:00" đúng là ban đêm của bạn.
+
 ## Lưu trữ: SQLite
 
 Toàn bộ bộ não nằm trong **một file SQLite** `data/brain.db` (chế độ WAL), tạo tự động ở lần chạy đầu.

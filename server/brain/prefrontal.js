@@ -5,7 +5,7 @@ import { includesAny, truncate } from '../text.js';
 import { tr } from '../i18n.js';
 
 const HOT_TURNS = 3;
-const MAX_TURNS = 40;
+export const MAX_TURNS = 40;
 
 export function ensureWorking(B, customerId) {
   let wm = B.state.working[customerId];

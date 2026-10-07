@@ -17,6 +17,7 @@ const BASE = arg('url', process.env.BRAIN_URL || 'http://localhost:4317');
 const TOKEN = arg('token', process.env.BRAIN_ADMIN_TOKEN || '');
 const LANG = ['vi', 'en', 'ja'].includes(arg('lang', process.env.BRAIN_LANG || 'vi')) ? arg('lang', process.env.BRAIN_LANG || 'vi') : 'vi';
 const CUSTOMER = `e2e-${LANG}-${Date.now().toString(36)}`;
+const STARTED = Date.now();
 
 // Scenario text and the facts we expect the brain to extract, per language.
 const S = {
@@ -215,8 +216,13 @@ await step('9. Sleep loop — consolidate, forget, reflect', async () => {
   const r = await call('/api/sleep', { customerId: CUSTOMER, lang: LANG });
   const s = await snapshot();
   for (const i of r.insights) console.log(`   💡 ${i.slice(0, 160)}`);
+  // The hub may already have slept on its own (automatic sleep) during this run.
+  const auto = await call('/api/settings/sleep')
+    .then((st) => st.history.filter((h) => h.customerId === CUSTOMER && h.trigger !== 'manual' && h.at >= STARTED).reduce((n, h) => n + h.consolidated, 0))
+    .catch(() => 0);
+  const consolidated = r.consolidated + auto;
   return [
-    ['Sessions consolidated into episodes', r.consolidated >= 3, `${r.consolidated} episodes`],
+    ['Sessions consolidated into episodes', consolidated >= 3, `${consolidated} episodes${auto ? ` (${auto} by automatic sleep)` : ''}`],
     ['Forgetting really deletes the expired fact', !s.facts.some((f) => S.noCar.test(f.value)), r.forgotten.expiredFacts.join('; ')],
     ['hippocampus → forgetting → dmn → cerebellum all ran', ['hippocampus', 'forgetting', 'dmn', 'cerebellum'].every((x) => r.steps.some((st) => st.region === x))],
     ['Shared insights hold no health data', !has(r.insights, S.allergyRe)],

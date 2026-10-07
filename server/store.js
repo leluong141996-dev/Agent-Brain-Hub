@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { DEFAULT_AGENTS } from './agents.js';
+import { emptySleepState } from './brain/sleepScheduler.js';
 
 // Bump when the schema changes incompatibly; older stores are backed up and replaced.
 export const STATE_VERSION = 3;
@@ -33,6 +34,7 @@ export function emptyState() {
     traces: {}, // traceId → decision record (for feedback)
     audit: [], // memory backend only — SQLite keeps it in the `audit` table
     stats: { totals: {}, byAgent: {}, daily: {} }, // usage counters
+    sleep: emptySleepState(), // automatic sleep: settings, nightly bookkeeping, recent runs
     seq: 0,
   };
 }
@@ -187,6 +189,7 @@ export class Store {
     s.clockOffsetMs = Number(this.meta('clockOffsetMs') || 0);
     s.seq = Number(this.meta('seq') || 0);
     s.stats = JSON.parse(this.meta('stats') || '{"totals":{},"byAgent":{},"daily":{}}');
+    s.sleep = { ...emptySleepState(), ...JSON.parse(this.meta('sleep') || '{}') };
     s.audit = [];
     this.state = s;
   }
@@ -258,13 +261,17 @@ export class Store {
       this.stmt.setMeta.run('clockOffsetMs', String(this.state.clockOffsetMs || 0));
       this.stmt.setMeta.run('seq', String(this.state.seq || 0));
       this.stmt.setMeta.run('stats', JSON.stringify(this.state.stats || {}));
+      this.stmt.setMeta.run('sleep', JSON.stringify(this.state.sleep || emptySleepState()));
     })();
     this.lastFlush = { upserts, deletes, ms: +(performance.now() - t0).toFixed(1) };
     return this.lastFlush;
   }
 
   reset() {
+    // Data is wiped; the automatic-sleep settings are configuration, so they stay.
+    const sleepConfig = this.state.sleep?.config || null;
     this.state = emptyState();
+    this.state.sleep.config = sleepConfig;
     if (this.backend !== 'sqlite') return;
     this.db.transaction(() => {
       for (const c of COLLECTIONS) this.db.prepare(`DELETE FROM ${c.table}`).run();

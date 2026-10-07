@@ -9,6 +9,7 @@ import { Brain } from './brain/index.js';
 import { Store } from './store.js';
 import { NeuralBus } from './bus.js';
 import { LLM } from './llm.js';
+import { SleepScheduler, sleepDefaultsFromEnv } from './brain/sleepScheduler.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(here, '..');
@@ -25,6 +26,8 @@ const store = new Store(DB_FILE, { importFrom: LEGACY_JSON });
 const bus = new NeuralBus();
 const llm = new LLM({ settingsFile: SETTINGS_FILE });
 let brain = new Brain({ store, bus, llm });
+// Automatic sleep (idle / pressure / nightly). Reads `brain` on every pass: reset replaces it.
+const sleeper = new SleepScheduler(() => brain, { defaults: sleepDefaultsFromEnv(), intervalMs: Number(process.env.BRAIN_SLEEP_CHECK_SECONDS || 60) * 1000 });
 
 const clients = new Set();
 for (const ev of ['step', 'trace-start', 'trace-end', 'bus', 'conversation']) {
@@ -64,7 +67,7 @@ const q = (url, k) => url.searchParams.get(k);
 
 // ---------- Admin API (hub UI) ----------
 const admin = {
-  'GET /api/state': (req, url) => ({ ...brain.snapshot(q(url, 'customerId') || 'kh-001', q(url, 'lang')), hubRoot: ROOT }),
+  'GET /api/state': (req, url) => ({ ...brain.snapshot(q(url, 'customerId') || 'kh-001', q(url, 'lang')), hubRoot: ROOT, autoSleep: { enabled: sleeper.config.enabled, nextNightly: sleeper.nextNightly() } }),
   'GET /api/value': (req, url) => brain.valueReport(q(url, 'lang')),
   'GET /api/audit': (req, url) => brain.auditLog(Math.min(5000, Number(q(url, 'limit') || 100))),
   'GET /api/storage': () => store.info(),
@@ -73,7 +76,12 @@ const admin = {
     return brain.think({ agentId: b.agentId, customerId: b.customerId || 'kh-001', text: b.text, lang: b.lang });
   },
   'POST /api/feedback': async (req) => brain.feedback(await readBody(req)),
-  'POST /api/sleep': async (req) => brain.sleep(await readBody(req)),
+  'POST /api/sleep': async (req) => {
+    const b = await readBody(req);
+    return brain.sleep({ customerId: b.customerId, lang: b.lang, trigger: 'manual' });
+  },
+  'GET /api/settings/sleep': () => sleeper.status(),
+  'PUT /api/settings/sleep': async (req) => sleeper.configure(await readBody(req)),
   'POST /api/clock': async (req) => {
     const { days = 1 } = await readBody(req);
     return { now: brain.advanceClock(Number(days)) };
@@ -212,10 +220,14 @@ server.listen(PORT, HOST, () => {
   console.log(llm.available ? `   LLM: ${llm.label} (${llm.source})` : '   LLM: offline — pick a provider in the UI: Settings → Language model');
   console.log(`   Storage: SQLite ${DB_FILE}`);
   if (ADMIN_TOKEN) console.log('   Admin API protected by BRAIN_ADMIN_TOKEN');
+  const sc = sleeper.config;
+  console.log(sc.enabled ? `   Auto sleep: after ${sc.idleMinutes} min idle or ${sc.maxPendingTurns} pending turns${sc.nightly ? `, nightly at ${sc.nightlyAt} (${sleeper.status().timeZone})` : ''}` : '   Auto sleep: off (Settings → Sleep cycle)');
+  sleeper.start();
 });
 
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, () => {
+    sleeper.stop();
     store.close();
     process.exit(0);
   });

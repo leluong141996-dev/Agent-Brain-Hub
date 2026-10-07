@@ -1,8 +1,9 @@
 // View: Settings — choose the LLM provider (Claude, GPT, Gemini, DeepSeek,
 // Mistral, Groq, Grok, OpenRouter, local servers…), test it and apply it live.
-import { $, $$, esc, api, pageHead, toast } from '../util.js';
+// Also: when the brain sleeps on its own, and where the memory is stored.
+import { $, $$, esc, api, pageHead, toast, fmtNum, LOCALES } from '../util.js';
 import { icon } from '../icons.js';
-import { t } from '../i18n.js';
+import { t, lang } from '../i18n.js';
 
 const BRAND = {
   anthropic: '#d97757', openai: '#10a37f', gemini: '#4285f4', deepseek: '#4d6bfe', mistral: '#fa520f', groq: '#f55036', xai: '#64748b',
@@ -18,7 +19,7 @@ let form = null; // unsaved form state
 let models = [];
 
 export async function render(root, ctx) {
-  const [{ config, providers }, storage] = await Promise.all([api('/api/settings/llm'), api('/api/storage')]);
+  const [{ config, providers }, storage, sleep] = await Promise.all([api('/api/settings/llm'), api('/api/storage'), api('/api/settings/sleep')]);
   const byId = Object.fromEntries(providers.map((p) => [p.id, p]));
   if (!form || form.saved !== config.provider + config.model) {
     form = { ...config, apiKey: '', saved: config.provider + config.model };
@@ -68,9 +69,12 @@ export async function render(root, ctx) {
         <div class="card-body"><div class="callout">${icon('shield', 15)}<span>${t('fallback_note')}</span></div></div>
       </div>
 
+      <div class="card" id="sleepCard"></div>
+
       ${storageCard(storage)}
     </div>`;
 
+  drawSleep($('#sleepCard', root), sleep);
   drawForm(root, byId, config);
   $$('.prov-tile', root).forEach((b) => {
     b.onclick = () => {
@@ -185,6 +189,70 @@ async function runTest(root) {
   } else {
     out.innerHTML = `<span class="fail">${icon('xCircle', 15)}${esc(t('test_fail'))}</span><span class="muted small err">${esc(r.error || '')}</span>`;
   }
+}
+
+// ---------------- Sleep cycle ----------------
+const TRIGGER_BADGE = { manual: '', idle: 'info', pressure: 'warning', nightly: 'violet' };
+const when = (ts) => new Date(ts).toLocaleString(LOCALES[lang()], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+const trig = (k) => `<span class="badge ${TRIGGER_BADGE[k] ?? ''}">${esc(t('trig_' + k))}</span>`;
+
+function drawSleep(box, st) {
+  const c = st.config;
+  const on = c.enabled;
+  const pending = st.pending.length
+    ? `<table class="table"><thead><tr><th>${t('sl_customer')}</th><th>${t('sl_turns')}</th><th>${t('sl_idle_for')}</th><th>${t('sl_next')}</th></tr></thead><tbody>
+        ${st.pending.map((p) => `<tr><td>${esc(p.name)}</td><td class="mono">${p.turns}</td><td class="mono">${t('sl_minutes', { n: fmtNum(p.idleMinutes, lang()) })}</td>
+          <td>${!on ? '—' : p.trigger ? trig(p.trigger) : esc(t('sl_after', { n: Math.max(0, c.idleMinutes - p.idleMinutes) }))}</td></tr>`).join('')}
+      </tbody></table>`
+    : `<p class="muted small">${t('sl_nothing_pending')}</p>`;
+  const history = st.history.length
+    ? `<table class="table"><thead><tr><th>${t('sl_when')}</th><th>${t('sl_trigger')}</th><th>${t('sl_customer')}</th><th>${t('sl_result')}</th></tr></thead><tbody>
+        ${st.history.slice(0, 8).map((h) => `<tr><td class="mono small">${esc(when(h.at))}</td><td>${trig(h.trigger)}</td><td>${esc(h.name || h.customerId)}</td>
+          <td class="small">${esc(t('sl_result_v', { c: h.consolidated, i: h.insights, f: h.forgotten }))} <span class="muted">· ${h.ms} ms</span></td></tr>`).join('')}
+      </tbody></table>`
+    : `<p class="muted small">${t('sl_no_history')}</p>`;
+  box.innerHTML = `
+    <div class="card-head">
+      <div class="ico-tile">${icon('moon', 18)}</div>
+      <div style="flex:1;min-width:0"><div class="card-title">${t('sl_title')}</div><div class="card-sub">${t('sl_sub')}</div></div>
+      <span class="badge ${on ? 'success' : ''}">${on ? t('sl_on') : t('sl_off')}</span>
+    </div>
+    <div class="card-body settings-body">
+      <label class="switch-row"><input type="checkbox" class="switch" id="slEnabled" ${on ? 'checked' : ''} /><span><b>${t('sl_enabled')}</b><small>${t('sl_enabled_hint')}</small></span></label>
+      <div class="grid2">
+        <label class="field"><span>${t('sl_idle')}</span><input id="slIdle" type="number" min="5" max="1440" step="5" value="${c.idleMinutes}" /><small>${t('sl_idle_hint')}</small></label>
+        <label class="field"><span>${t('sl_pressure')}</span><input id="slPressure" type="number" min="6" max="38" step="1" value="${c.maxPendingTurns}" /><small>${t('sl_pressure_hint')}</small></label>
+      </div>
+      <div class="grid2">
+        <label class="switch-row"><input type="checkbox" class="switch" id="slNightly" ${c.nightly ? 'checked' : ''} /><span><b>${t('sl_nightly')}</b><small>${t('sl_nightly_hint')}</small></span></label>
+        <label class="field"><span>${t('sl_nightly_at')}</span><input id="slAt" type="time" value="${esc(c.nightlyAt)}" />
+          <small>${esc(t('sl_tz', { tz: st.timeZone }))}${st.nextNightly ? ` · ${esc(t('sl_next_night', { at: when(st.nextNightly) }))}` : ''}</small></label>
+      </div>
+      <div class="section-label" style="margin-top:4px">${t('sl_pending')}</div>
+      ${pending}
+      <div class="section-label" style="margin-top:4px">${t('sl_history')}</div>
+      ${history}
+    </div>
+    <div class="dialog-foot settings-foot">
+      <div class="test-result" id="slMsg"></div>
+      <button class="btn primary" id="slSave">${icon('check')}<span>${t('btn_save')}</span></button>
+    </div>`;
+  $('#slSave', box).onclick = async () => {
+    const body = {
+      enabled: $('#slEnabled', box).checked,
+      nightly: $('#slNightly', box).checked,
+      idleMinutes: $('#slIdle', box).value,
+      maxPendingTurns: $('#slPressure', box).value,
+      nightlyAt: $('#slAt', box).value,
+    };
+    try {
+      const next = await api('/api/settings/sleep', body, 'PUT');
+      toast(esc(t('sl_saved')), 'success', icon('moon'));
+      drawSleep(box, next);
+    } catch (e) {
+      $('#slMsg', box).innerHTML = `<span class="fail">${icon('xCircle', 15)}${esc(e.message)}</span>`;
+    }
+  };
 }
 
 function storageCard(st) {
