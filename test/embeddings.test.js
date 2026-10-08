@@ -11,6 +11,7 @@ import { Store } from '../server/store.js';
 import { NeuralBus } from '../server/bus.js';
 import { LLM } from '../server/llm.js';
 import { Embedder, embedConfigFromEnv } from '../server/embeddings.js';
+import { addEpisode } from '../server/brain/neocortex.js';
 
 // A deterministic OpenAI-compatible /embeddings server. Words map to concepts,
 // so paraphrases ("car" / "vehicle" / "drive") land close together.
@@ -219,4 +220,19 @@ test('embeddings: recall is async and reports which similarity was used', async 
   const r = await p;
   const ras = r.steps.filter((s) => s.region === 'ras');
   assert.match(JSON.stringify(ras.map((s) => s.detail)), /custom:mock/);
+});
+
+test('embeddings: hybrid retrieval keeps exact matches the model vector blurs', async () => {
+  // The mock model ignores digits, so all twelve orders get the same model
+  // vector: only the lexical (hashing) signal can tell ORD-48207 apart.
+  const b = makeBrain({ embedder: mockEmbedder() });
+  for (let i = 0; i < 12; i++) {
+    addEpisode(b, { customerId: 'kh-001', agentId: 'nova', ownerDomain: 'shopping', scope: 'shared', kind: 'session', text: `[Nova] My order ORD-482${String(i).padStart(2, '0')} for a snack box has not arrived` });
+  }
+  await b.embedQueue.drain();
+  const r = await b.recall({ agentId: 'mia', text: 'what is going on with order 48207', lang: 'en' });
+  const episodes = r.memories.filter((m) => m.kind === 'episodic');
+  // Without fusion all twelve tie on the model score and the order is luck;
+  // with it, the exact match ranks first.
+  assert.match(episodes[0]?.text || '', /ORD-48207/, episodes.map((m) => `${m.text.match(/ORD-\d+/)} ${m.score}`).join(' | '));
 });

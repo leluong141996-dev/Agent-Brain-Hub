@@ -43,12 +43,18 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
   const lang = t.lang;
   const q = embed(query);
   let byModel = 0;
+  // Hybrid (CombSUM): a model vector finds paraphrases but blurs exact tokens
+  // (order numbers, model names); the hashing vector matches those. Adding the
+  // two lets an item that matches in meaning *and* wording rise above items that
+  // are merely on the same topic. The sum is never below either signal, so an
+  // item found by meaning alone keeps the score it had.
   const similarity = (x) => {
+    const lexical = Math.max(0, cosine(q, x.embedding)); // hashed embeddings can go negative
     if (qvec?.vec && x.vec && x.vecModel === qvec.model) {
       byModel += 1;
-      return Math.max(0, dot(qvec.vec, x.vec));
+      return Math.max(0, dot(qvec.vec, x.vec)) + lexical;
     }
-    return Math.max(0, cosine(q, x.embedding)); // hashed embeddings can go negative
+    return lexical;
   };
   const wanted = new Set(INTENT_RELATIONS[intent] || []);
   t.step('ras', t.L('Lập kế hoạch truy vấn', 'Planning the query', '検索プランを作成'), {
@@ -161,7 +167,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
   t.step('ras', t.L(`Re-rank: chọn ${selected.length} mẩu ký ức (${used} tokens)`, `Re-rank: picked ${selected.length} memories (${used} tokens)`, `再ランク：記憶を${selected.length}件選択（${used}トークン）`), {
     selected: selected.map((s) => ({ kind: s.kind, tier: s.tier, scope: s.scope, from: s.source, score: s.score, text: truncate(s.text, 90) })),
     excludedCount: excluded.length,
-    similarity: qvec?.vec ? `${qvec.model}: ${byModel} items by model vector, the rest by hashing` : 'hashing',
+    similarity: qvec?.vec ? `hybrid — ${qvec.model} + hashing: ${byModel} items with a model vector, the rest by hashing only` : 'hashing',
     tokens: used,
     ms,
   });

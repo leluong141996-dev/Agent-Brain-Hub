@@ -1,0 +1,59 @@
+{
+  "id": "exact-model-name",
+  "category": "exact_match",
+  "lang": "en",
+  "description": "A product model name must find the conversation about that exact device, not just any battery problem.",
+  "steps": [
+    {
+      "agent": "kai",
+      "say": "The battery on my Sony WH-1000XM5 headphones drains too fast"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "kai",
+      "say": "The battery on my Dell XPS 13 laptop drains too fast"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "kai",
+      "say": "The battery on my iPhone 15 Pro drains too fast"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "kai",
+      "say": "The battery on my Kindle Paperwhite drains too fast"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "kai",
+      "say": "The battery on my Garmin Forerunner 265 watch drains too fast"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "kai",
+      "say": "The battery on my Nintendo Switch OLED drains too fast"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "penny",
+      "recall": "Is the WH-1000XM5 still under warranty?",
+      "expect": {
+        "remembers": [
+          "WH-1000XM5"
+        ]
+      }
+    }
+  ]
+}

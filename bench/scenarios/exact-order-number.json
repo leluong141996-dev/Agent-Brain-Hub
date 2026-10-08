@@ -1,0 +1,110 @@
+{
+  "id": "exact-order-number",
+  "category": "exact_match",
+  "lang": "en",
+  "description": "Twelve order conversations whose numbers differ by one or two digits; the question's order number must pull up that exact order, with or without the ORD- prefix.",
+  "steps": [
+    {
+      "agent": "nova",
+      "say": "My order ORD-48200 for a blue backpack hasn't arrived yet"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "say": "My order ORD-48201 for running shoes hasn't arrived yet"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "say": "My order ORD-48202 for a desk lamp hasn't arrived yet"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "say": "My order ORD-48203 for a phone case hasn't arrived yet"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "say": "My order ORD-48204 for a yoga mat hasn't arrived yet"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "say": "My order ORD-48205 for a coffee grinder hasn't arrived yet"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "say": "My order ORD-48206 for wireless earbuds hasn't arrived yet"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "say": "My order ORD-48207 for a rain jacket hasn't arrived yet"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "say": "My order ORD-48208 for a tent hasn't arrived yet"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "say": "My order ORD-48209 for a kettle hasn't arrived yet"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "say": "My order ORD-48210 for a bike helmet hasn't arrived yet"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "say": "My order ORD-48211 for a water bottle hasn't arrived yet"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "mia",
+      "recall": "Has ORD-48211 shipped yet?",
+      "expect": {
+        "remembers": [
+          "ORD-48211"
+        ]
+      }
+    },
+    {
+      "agent": "mia",
+      "recall": "what is going on with order 48207",
+      "expect": {
+        "remembers": [
+          "ORD-48207"
+        ]
+      }
+    }
+  ]
+}

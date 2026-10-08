@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const CATEGORIES = ['cross_agent', 'stale', 'contradiction', 'leakage', 'multi_hop', 'long_conversation'];
+export const CATEGORIES = ['cross_agent', 'stale', 'contradiction', 'leakage', 'multi_hop', 'long_conversation', 'exact_match'];
 const LANGS = ['vi', 'en', 'ja'];
 const KINDS = ['say', 'recall', 'advance', 'sleep'];
 const RECALL_CHECKS = ['remembers', 'private', 'stale', 'conflict'];
