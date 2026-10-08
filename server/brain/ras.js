@@ -68,7 +68,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
       : t.L('agent không có quyền đọc shared', 'agent has no shared-read permission', '共有メモリの閲覧権限なし');
 
   // --- Episodic search ---
-  const mine = B.state.episodes.filter((e) => e.customerId === customerId);
+  const mine = B.memoryIndex.episodes(customerId);
   const recent = new Set([...mine].sort((a, b) => b.createdAt - a.createdAt).slice(0, 3).map((e) => e.id));
   const epCands = [];
   for (const e of mine) {
@@ -97,7 +97,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
   }, { from: 'ras' });
 
   // --- Semantic search ---
-  const facts = B.state.facts.filter((f) => f.customerId === customerId || f.customerId === '*');
+  const facts = B.memoryIndex.facts(customerId);
   const fCands = [];
   for (const f of facts) {
     const text = factToText(f, lang);
@@ -151,7 +151,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
   for (const c of fCands.filter((x) => !relevant(x))) excluded.push({ kind: c.kind, id: c.id, text: c.text, reason: t.L('dưới ngưỡng liên quan', 'below relevance threshold', '関連度のしきい値未満') });
 
   const sel = new Set(selected.map((s) => s.id));
-  for (const e of B.state.episodes) {
+  for (const e of mine) {
     if (sel.has(e.id)) {
       e.accessCount += 1;
       e.lastAccess = now;

@@ -24,6 +24,7 @@ import { forget } from './forgetting.js';
 import { reflect } from './dmn.js';
 import { emptySleepState, recordSleep } from './sleepScheduler.js';
 import { EmbedQueue } from './embedQueue.js';
+import { MemoryIndex } from './memoryIndex.js';
 import { seedGlobal, resolveConflict } from './neocortex.js';
 import { extractFactsRuleBased, factToText, factValue, RELATIONS } from './ontology.js';
 import { templateReply, buildPrompt, contextBlock, memoryInstructions } from './respond.js';
@@ -45,6 +46,7 @@ export class Brain {
     this.llm = llm;
     this.embedder = embedder;
     this.embedQueue = embedder ? new EmbedQueue(this, embedder) : null;
+    this.memoryIndex = new MemoryIndex(this);
     this.deterministic = deterministic;
     this.clock = new Clock(store.state.clockOffsetMs || 0);
     store.state.sleep ||= emptySleepState(); // states imported from older versions
