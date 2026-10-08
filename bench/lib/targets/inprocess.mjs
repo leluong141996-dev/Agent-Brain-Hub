@@ -45,7 +45,7 @@ export class InProcessTarget {
   // timing a step, so latency figures don't include it.
   async settle() {
     await this.scheduler.tick();
-    if (this.brain.embedder?.available) await this.brain.embedQueue.drain();
+    if (this.brain.embedder?.available) await this.brain.embedQueue.drain({ throwOnError: true });
   }
 
   close() {

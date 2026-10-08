@@ -17,6 +17,10 @@ export class EmbedQueue {
     this.backoff = MIN_BACKOFF;
     this.lastError = null;
     this.waiters = [];
+    // Long texts on a CPU model can make big batches time out while single
+    // items succeed: the batch size halves on a timeout and stays there.
+    this.batchSize = BATCH;
+    this.timeoutMs = 120_000; // background work: generous, unlike query embedding
   }
 
   // Facts use the same multilingual text as their hashing vector.
@@ -60,10 +64,10 @@ export class EmbedQueue {
   async run() {
     for (;;) {
       const model = this.embedder.modelId;
-      const batch = this.pending().slice(0, BATCH);
+      const batch = this.pending().slice(0, this.batchSize);
       if (!model || !batch.length) break;
       try {
-        const vecs = await this.embedder.embedBatch(batch.map(EmbedQueue.textOf));
+        const vecs = await this.embedder.embedBatch(batch.map(EmbedQueue.textOf), { timeoutMs: this.timeoutMs });
         if (this.embedder.modelId !== model) continue; // model changed mid-flight: redo
         batch.forEach((x, i) => {
           x.vec = Array.from(vecs[i]);
@@ -73,6 +77,10 @@ export class EmbedQueue {
         this.backoff = MIN_BACKOFF;
         this.brain.store.save();
       } catch (e) {
+        if (this.batchSize > 1 && (e.name === 'TimeoutError' || /timeout|aborted/i.test(e.message))) {
+          this.batchSize = Math.max(1, this.batchSize >> 1);
+          continue;
+        }
         this.lastError = e.message;
         this.retryTimer = setTimeout(() => {
           this.retryTimer = null;
@@ -90,19 +98,26 @@ export class EmbedQueue {
   settle(errored = false) {
     const keep = [];
     for (const w of this.waiters) {
-      if (!this.pending().length || (errored && w.untilError)) w.resolve();
+      if (!this.pending().length) w.resolve();
+      else if (errored && w.throwOnError) w.reject(new Error(`embedding backfill failed: ${this.lastError}`));
+      else if (errored && w.untilError) w.resolve();
       else keep.push(w);
     }
     this.waiters = keep;
   }
 
-  // Resolves when every item has a vector for the current model (or, with
-  // untilError, when the queue hits an error). Used by tests and the benchmark.
-  drain({ untilError = false } = {}) {
+  // Resolves when every item has a vector for the current model. With
+  // untilError it also resolves on an error; with throwOnError it rejects, so
+  // a script fails loudly instead of waiting on a retry. Used by tests and the
+  // benchmark.
+  drain({ untilError = false, throwOnError = false } = {}) {
     if (!this.embedder.available || !this.pending().length) return Promise.resolve();
-    if (untilError && this.lastError && this.retryTimer) return Promise.resolve(); // already failing
-    return new Promise((resolve) => {
-      this.waiters.push({ resolve, untilError });
+    if (this.lastError && this.retryTimer) {
+      if (throwOnError) return Promise.reject(new Error(`embedding backfill failed: ${this.lastError}`));
+      if (untilError) return Promise.resolve(); // already failing
+    }
+    return new Promise((resolve, reject) => {
+      this.waiters.push({ resolve, reject, untilError, throwOnError });
       this.kick();
     });
   }

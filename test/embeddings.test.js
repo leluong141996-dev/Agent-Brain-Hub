@@ -45,6 +45,8 @@ before(async () => {
       calls.auth.push(req.headers.authorization || null);
       const j = JSON.parse(body || '{}');
       if (j.model === 'slow') await new Promise((r) => setTimeout(r, 800));
+      // Like a CPU model with long texts: big batches are much slower than small ones.
+      if (j.model === 'slow-batches' && Array.isArray(j.input) && j.input.length > 2) await new Promise((r) => setTimeout(r, 400));
       if (j.model === 'broken') {
         res.writeHead(500, { 'content-type': 'application/json' });
         return res.end(JSON.stringify({ error: { message: 'model crashed' } }));
@@ -235,4 +237,22 @@ test('embeddings: hybrid retrieval keeps exact matches the model vector blurs', 
   // Without fusion all twelve tie on the model score and the order is luck;
   // with it, the exact match ranks first.
   assert.match(episodes[0]?.text || '', /ORD-48207/, episodes.map((m) => `${m.text.match(/ORD-\d+/)} ${m.score}`).join(' | '));
+});
+
+test('embeddings: backfill shrinks its batch when a provider times out on big batches', async () => {
+  const b = makeBrain({ embedder: mockEmbedder('slow-batches') });
+  b.embedQueue.timeoutMs = 200; // batches of more than 2 take 400 ms
+  for (let i = 0; i < 9; i++) addEpisode(b, { customerId: 'kh-001', agentId: 'mia', ownerDomain: 'personal', scope: 'shared', kind: 'session', text: `session ${i} about snacks` });
+  await b.embedQueue.drain();
+  const st = b.embedQueue.status();
+  assert.equal(st.done, st.total, 'everything indexed');
+  assert.ok(b.embedQueue.batchSize <= 2, `batch size shrank to ${b.embedQueue.batchSize}`);
+  assert.equal(st.lastError, null);
+});
+
+test('embeddings: drain() rejects instead of hanging when the provider keeps failing', async () => {
+  const b = makeBrain({ embedder: mockEmbedder('broken') });
+  addEpisode(b, { customerId: 'kh-001', agentId: 'mia', ownerDomain: 'personal', scope: 'shared', kind: 'session', text: 'hello' });
+  await assert.rejects(() => b.embedQueue.drain({ throwOnError: true }), /model crashed|500/);
+  b.embedQueue.stop();
 });
