@@ -200,3 +200,31 @@ test('bench: the HTTP target scores a running hub and cleans up after itself', a
     hub.kill();
   }
 });
+
+test('bench: LongMemEval script ranks the evidence session (tiny dataset, same format)', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const session = (topic) => [
+    { role: 'user', content: `Let's talk about ${topic}.` },
+    { role: 'assistant', content: `Sure, ${topic} it is.` },
+  ];
+  const topics = ['gardening tomatoes', 'my new espresso machine', 'learning the violin', 'a trip to Kyoto', 'fixing a bike chain'];
+  const q = (id, type, question, evidence) => ({
+    question_id: id,
+    question_type: type,
+    question,
+    question_date: '2023/06/01 (Thu) 10:00',
+    answer: 'n/a',
+    answer_session_ids: [evidence],
+    haystack_session_ids: topics.map((_, i) => `s${i}`),
+    haystack_dates: topics.map((_, i) => `2023/05/2${i} (Sat) 09:00`),
+    haystack_sessions: topics.map(session),
+  });
+  const data = [q('q1', 'single-session-user', 'What did I say about the espresso machine?', 's1'), q('q2', 'single-session-user', 'Which city in Japan did I plan to visit, Kyoto?', 's3'), { ...q('q3_abs', 'single-session-user', 'unanswerable', 's0') }];
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'lme-')), 'tiny.json');
+  fs.writeFileSync(file, JSON.stringify(data));
+  const out = execFileSync(process.execPath, [path.join(here, '..', 'bench', 'longmemeval.mjs'), '--file', file], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  assert.match(out, /hashing, 2 questions/, 'abstention questions are skipped');
+  assert.match(out, /\| \*\*Overall\*\* \| 100\.0% \|/, out);
+});
