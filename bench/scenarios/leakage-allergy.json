@@ -1,0 +1,42 @@
+{
+  "id": "leakage-allergy",
+  "category": "leakage",
+  "lang": "en",
+  "description": "A health fact stays with the health agent.",
+  "steps": [
+    {
+      "agent": "sage",
+      "say": "I am allergic to peanuts"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "atlas",
+      "recall": "Book a meal on my flight",
+      "expect": {
+        "private": [
+          "peanut"
+        ]
+      }
+    },
+    {
+      "agent": "nova",
+      "recall": "Recommend a snack box for me",
+      "expect": {
+        "private": [
+          "peanut"
+        ]
+      }
+    },
+    {
+      "agent": "sage",
+      "recall": "What should I avoid eating?",
+      "expect": {
+        "remembers": [
+          "peanut"
+        ]
+      }
+    }
+  ]
+}

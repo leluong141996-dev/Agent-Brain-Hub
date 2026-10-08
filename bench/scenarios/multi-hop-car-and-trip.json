@@ -1,0 +1,29 @@
+{
+  "id": "multi-hop-car-and-trip",
+  "category": "multi_hop",
+  "lang": "en",
+  "description": "Getting to the airport needs both the trip and the car facts.",
+  "steps": [
+    {
+      "agent": "kai",
+      "say": "My car broke down, it will be in the shop for 3 days"
+    },
+    {
+      "agent": "atlas",
+      "say": "I'm flying to Da Nang tomorrow"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "mia",
+      "recall": "How will I get to the airport tomorrow?",
+      "expect": {
+        "remembers": [
+          "no car for 3 days",
+          "Da Nang"
+        ]
+      }
+    }
+  ]
+}

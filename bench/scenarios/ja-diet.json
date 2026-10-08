@@ -1,0 +1,24 @@
+{
+  "id": "ja-diet",
+  "category": "cross_agent",
+  "lang": "ja",
+  "description": "日本語: 食事制限が買い物エージェントに伝わる。",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "私はベジタリアンです"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "nova",
+      "recall": "おすすめのお菓子はありますか",
+      "expect": {
+        "remembers": [
+          "ベジタリアン"
+        ]
+      }
+    }
+  ]
+}

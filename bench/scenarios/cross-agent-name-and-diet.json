@@ -1,0 +1,34 @@
+{
+  "id": "cross-agent-name-and-diet",
+  "category": "cross_agent",
+  "lang": "en",
+  "description": "What Mia learns about the customer reaches the shopping and travel agents.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "My name is Linh and I am vegetarian"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "nova",
+      "recall": "Recommend a snack box for me",
+      "expect": {
+        "remembers": [
+          "vegetarian"
+        ]
+      }
+    },
+    {
+      "agent": "atlas",
+      "recall": "Book a meal on my flight",
+      "expect": {
+        "remembers": [
+          "vegetarian",
+          "Linh"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "id": "contradiction-like-to-dislike",
+  "category": "contradiction",
+  "lang": "en",
+  "description": "A changed preference replaces the old one.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "I love spicy food"
+    },
+    {
+      "advance": "5d"
+    },
+    {
+      "agent": "mia",
+      "say": "I don't like spicy food anymore"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "recall": "Suggest some snacks for me",
+      "expect": {
+        "remembers": [
+          "/^dislikes:? spicy/i"
+        ],
+        "stale": [
+          "/^likes:? spicy/i"
+        ]
+      }
+    }
+  ]
+}

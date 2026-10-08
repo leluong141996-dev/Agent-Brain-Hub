@@ -1,0 +1,153 @@
+{
+  "id": "long-conversation-early-detail",
+  "category": "long_conversation",
+  "lang": "en",
+  "description": "A detail from the first message is still remembered after 30 more turns.",
+  "steps": [
+    {
+      "agent": "atlas",
+      "say": "My name is Minh and I prefer an aisle seat"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 1?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 2?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 3?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 4?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 5?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 6?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 7?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 8?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 9?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 10?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 11?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 12?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 13?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 14?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 15?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 16?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 17?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 18?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 19?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 20?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 21?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 22?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 23?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 24?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 25?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 26?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 27?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 28?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 29?"
+    },
+    {
+      "agent": "atlas",
+      "say": "What about flight option 30?"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "atlas",
+      "recall": "Please book my seat",
+      "expect": {
+        "remembers": [
+          "aisle"
+        ]
+      }
+    },
+    {
+      "agent": "nova",
+      "recall": "Hi, what's new?",
+      "expect": {
+        "remembers": [
+          "Minh"
+        ]
+      }
+    }
+  ]
+}

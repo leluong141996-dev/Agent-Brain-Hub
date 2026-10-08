@@ -297,13 +297,15 @@ Notes on vLLM:
 
 ## Tests
 
-- `npm test`: 32 unit tests, covering:
+- `npm test`: 51 unit tests, covering:
   - the acceptance QA suite from the architecture document: amnesia, contradiction, staleness, skill promotion, 20k-episode load;
   - permissions and prompt leakage;
   - English and Japanese;
   - connected agents (recall/remember), governance, key rotation, the value report;
   - the LLM layer: provider catalog, adapting to a strict mock OpenAI-style server, storing and masking keys, fetching model lists;
-  - SQLite storage: data survives a reopen (embeddings included), only changed rows are written, the audit log is never truncated and SQL metrics match the in-memory computation, legacy JSON import, reset.
+  - SQLite storage: data survives a reopen (embeddings included), only changed rows are written, the audit log is never truncated and SQL metrics match the in-memory computation, legacy JSON import, reset;
+  - the automatic sleep cycle (idle, pressure, nightly), fact provenance in prompts, and the benchmark harness itself.
+- `npm run bench`: the memory benchmark. 20 multi-agent scenarios (cross-agent recall, stale facts, contradictions, leakage, multi-hop, long conversations) scored offline in about a second. See [bench/README.md](bench/README.md); adding a scenario is one JSON file.
 - `npm run e2e -- --lang vi|en|ja`: 11 steps against a running server, with any LLM configuration (offline, Claude, GPT, local models…). Includes a connected agent through the SDK and the MCP server over stdio. The test uses a new customer so existing data is left alone, but it advances the simulated clock by 7 days.
 
 ## Project structure
@@ -320,6 +322,7 @@ mcp/server.mjs      MCP server (stdio)
 examples/           connected-agent.mjs: an external agent with its own LLM + the shared brain
 public/             app.js (shell + brain screen), views/ (agents, value, audit, settings), i18n.js, icons.js, brain.js, styles.css (light/dark design tokens)
 scripts/            start-vllm.sh, e2e.mjs
+bench/              memory benchmark: scenarios/*.json, runner, report, results/ (baselines per version)
 Dockerfile, docker-compose.yml, .env.example   one-command setup (data volume, /healthz health check, vllm profile)
 .github/            CI (tests on Node 22/24 + Docker build + e2e), issue/PR templates
 test/               brain.test.js (brain, acceptance QA), llm.test.js (LLM providers), store.test.js (SQLite)

@@ -1,0 +1,24 @@
+{
+  "id": "cross-agent-trip-to-personal",
+  "category": "cross_agent",
+  "lang": "en",
+  "description": "A trip booked with Atlas is known to the personal assistant.",
+  "steps": [
+    {
+      "agent": "atlas",
+      "say": "I'm flying to Tokyo next week, window seat please"
+    },
+    {
+      "advance": "3h"
+    },
+    {
+      "agent": "mia",
+      "recall": "Remind me what I have coming up",
+      "expect": {
+        "remembers": [
+          "Tokyo"
+        ]
+      }
+    }
+  ]
+}

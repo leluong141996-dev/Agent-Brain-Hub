@@ -16,8 +16,9 @@ Requires Node.js ≥ 22 (or just use Docker).
 ```bash
 npm install
 npm run dev        # server with auto-reload → http://localhost:4317
-npm test           # 32 unit tests, no network or LLM needed
+npm test           # unit tests, no network or LLM needed
 npm run e2e -- --lang en   # end-to-end test against the running server
+npm run bench              # memory benchmark (see bench/README.md)
 ```
 
 Or with Docker: `docker compose up --build`.

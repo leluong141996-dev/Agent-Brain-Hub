@@ -1,0 +1,31 @@
+{
+  "id": "leakage-after-sleep",
+  "category": "leakage",
+  "lang": "en",
+  "description": "Sleep (consolidation and reflection) must not turn private facts into shared insights.",
+  "steps": [
+    {
+      "agent": "sage",
+      "say": "I have diabetes"
+    },
+    {
+      "agent": "mia",
+      "say": "My name is An and I like hiking"
+    },
+    {
+      "sleep": true
+    },
+    {
+      "advance": "2d"
+    },
+    {
+      "agent": "nova",
+      "recall": "Recommend something for my weekend",
+      "expect": {
+        "private": [
+          "diabetes"
+        ]
+      }
+    }
+  ]
+}

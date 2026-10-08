@@ -1,0 +1,25 @@
+{
+  "id": "vi-no-diacritics",
+  "category": "cross_agent",
+  "lang": "vi",
+  "description": "Tiếng Việt gõ không dấu vẫn được hiểu.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "ten toi la Lan, toi an chay"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "nova",
+      "recall": "goi y do an vat cho toi",
+      "expect": {
+        "remembers": [
+          "/chay/i",
+          "Lan"
+        ]
+      }
+    }
+  ]
+}

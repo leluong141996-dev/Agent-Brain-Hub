@@ -10,7 +10,8 @@
     "test": "node --test test/*.test.js",
     "e2e": "node scripts/e2e.mjs",
     "mcp": "node mcp/server.mjs",
-    "example": "node examples/connected-agent.mjs"
+    "example": "node examples/connected-agent.mjs",
+    "bench": "node bench/run.mjs"
   },
   "engines": {
     "node": ">=22"

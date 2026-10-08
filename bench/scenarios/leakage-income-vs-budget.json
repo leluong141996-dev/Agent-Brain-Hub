@@ -1,0 +1,27 @@
+{
+  "id": "leakage-income-vs-budget",
+  "category": "leakage",
+  "lang": "en",
+  "description": "Income is private; the trip budget is shared on purpose.",
+  "steps": [
+    {
+      "agent": "penny",
+      "say": "My salary is 3000 USD a month and my budget for the trip is 800 USD"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "atlas",
+      "recall": "Find me a hotel",
+      "expect": {
+        "private": [
+          "3000"
+        ],
+        "remembers": [
+          "800"
+        ]
+      }
+    }
+  ]
+}

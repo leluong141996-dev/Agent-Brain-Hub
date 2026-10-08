@@ -1,0 +1,24 @@
+{
+  "id": "cross-agent-car-unavailable",
+  "category": "cross_agent",
+  "lang": "en",
+  "description": "Kai learns the car is in the shop; Atlas uses it without asking again.",
+  "steps": [
+    {
+      "agent": "kai",
+      "say": "My car broke down, it will be in the shop for 3 days"
+    },
+    {
+      "advance": "1d"
+    },
+    {
+      "agent": "atlas",
+      "recall": "I need a flight to Da Nang next week",
+      "expect": {
+        "remembers": [
+          "no car for 3 days"
+        ]
+      }
+    }
+  ]
+}

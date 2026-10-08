@@ -1,0 +1,24 @@
+{
+  "id": "stale-name-persists",
+  "category": "stale",
+  "lang": "en",
+  "description": "Stable facts like a name do not expire.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "My name is John"
+    },
+    {
+      "advance": "200d"
+    },
+    {
+      "agent": "nova",
+      "recall": "Hello again, any recommendations?",
+      "expect": {
+        "remembers": [
+          "John"
+        ]
+      }
+    }
+  ]
+}

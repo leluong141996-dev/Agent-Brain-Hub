@@ -1,0 +1,24 @@
+{
+  "id": "vi-window-seat",
+  "category": "cross_agent",
+  "lang": "vi",
+  "description": "Tiếng Việt: \"cửa sổ\" là ghế cạnh cửa sổ, không phải nỗi sợ.",
+  "steps": [
+    {
+      "agent": "atlas",
+      "say": "Tôi muốn đặt vé đi Đà Nẵng, ghế cạnh cửa sổ nhé"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "mia",
+      "recall": "Nhắc tôi về chuyến đi sắp tới",
+      "expect": {
+        "remembers": [
+          "cửa sổ"
+        ]
+      }
+    }
+  ]
+}

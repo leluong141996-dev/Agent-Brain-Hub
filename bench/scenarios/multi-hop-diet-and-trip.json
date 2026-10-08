@@ -1,0 +1,29 @@
+{
+  "id": "multi-hop-diet-and-trip",
+  "category": "multi_hop",
+  "lang": "en",
+  "description": "Packing snacks for a trip needs the diet and the destination.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "I am vegetarian"
+    },
+    {
+      "agent": "atlas",
+      "say": "I'm flying to Tokyo next week"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "recall": "Pack some snacks for my trip",
+      "expect": {
+        "remembers": [
+          "vegetarian",
+          "Tokyo"
+        ]
+      }
+    }
+  ]
+}

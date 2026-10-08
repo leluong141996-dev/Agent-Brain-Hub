@@ -1,0 +1,24 @@
+{
+  "id": "ja-car-unavailable",
+  "category": "cross_agent",
+  "lang": "ja",
+  "description": "日本語: 車が使えないことが別のエージェントに伝わる。",
+  "steps": [
+    {
+      "agent": "kai",
+      "say": "車が故障して、3日間使えません"
+    },
+    {
+      "advance": "1d"
+    },
+    {
+      "agent": "atlas",
+      "recall": "来週の出張の航空券を取りたいです",
+      "expect": {
+        "remembers": [
+          "3日間"
+        ]
+      }
+    }
+  ]
+}

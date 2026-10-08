@@ -1,0 +1,36 @@
+{
+  "id": "stale-trip-destination",
+  "category": "stale",
+  "lang": "en",
+  "description": "A trip destination is relevant for weeks, not forever.",
+  "steps": [
+    {
+      "agent": "atlas",
+      "say": "I'm flying to Tokyo next week"
+    },
+    {
+      "advance": "1d"
+    },
+    {
+      "agent": "mia",
+      "recall": "What trips do I have planned?",
+      "expect": {
+        "remembers": [
+          "Tokyo"
+        ]
+      }
+    },
+    {
+      "advance": "45d"
+    },
+    {
+      "agent": "mia",
+      "recall": "What trips do I have planned?",
+      "expect": {
+        "stale": [
+          "/trip to:? tokyo/i"
+        ]
+      }
+    }
+  ]
+}

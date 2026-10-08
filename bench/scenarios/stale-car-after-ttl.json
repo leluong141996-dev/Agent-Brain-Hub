@@ -1,0 +1,36 @@
+{
+  "id": "stale-car-after-ttl",
+  "category": "stale",
+  "lang": "en",
+  "description": "A temporary fact must not be used after it expires.",
+  "steps": [
+    {
+      "agent": "kai",
+      "say": "My car broke down, it will be in the shop for 3 days"
+    },
+    {
+      "advance": "1d"
+    },
+    {
+      "agent": "atlas",
+      "recall": "I need a taxi to the airport",
+      "expect": {
+        "remembers": [
+          "no car for 3 days"
+        ]
+      }
+    },
+    {
+      "advance": "5d"
+    },
+    {
+      "agent": "atlas",
+      "recall": "I need a taxi to the airport",
+      "expect": {
+        "stale": [
+          "no car for 3 days"
+        ]
+      }
+    }
+  ]
+}

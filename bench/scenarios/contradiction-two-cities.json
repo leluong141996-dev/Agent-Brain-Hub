@@ -1,0 +1,32 @@
+{
+  "id": "contradiction-two-cities",
+  "category": "contradiction",
+  "lang": "en",
+  "description": "Two different cities without an explicit move: flag it, don't pick one.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "I live in Hanoi"
+    },
+    {
+      "advance": "1d"
+    },
+    {
+      "agent": "mia",
+      "say": "I live in Da Nang"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "atlas",
+      "recall": "Book a taxi from my home to the airport",
+      "expect": {
+        "conflict": [
+          "Hanoi",
+          "Da Nang"
+        ]
+      }
+    }
+  ]
+}

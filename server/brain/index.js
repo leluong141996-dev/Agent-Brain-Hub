@@ -225,7 +225,9 @@ export class Brain {
   }
 
   // ---------------- recall(): context package for a connected agent ----------------
-  recall({ agentId, customerId = 'kh-001', text, lang }) {
+  // diagnostics: in-process callers only (the benchmark). The /v1 route never
+  // passes it, because excluded items include other agents' private memories.
+  recall({ agentId, customerId = 'kh-001', text, lang, diagnostics = false }) {
     lang = normLang(lang);
     text = String(text || '').trim();
     if (!text) throw err('text is required', 400);
@@ -264,6 +266,7 @@ export class Brain {
       promptBlock,
       steps: t.steps,
       ms: end.ms,
+      ...(diagnostics ? { diagnostics: { excluded: retrieval.excluded } } : {}),
     };
   }
 

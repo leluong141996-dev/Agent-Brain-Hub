@@ -9,3 +9,4 @@ data/
 media/
 # local Claude Code settings
 .claude/
+docs/superpowers/
