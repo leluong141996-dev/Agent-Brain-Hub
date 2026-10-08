@@ -107,3 +107,30 @@ export function markdown(summary, base = null) {
   }
   return lines.join('\n');
 }
+
+// CI gate: quality metrics must not get worse than the baseline. Latency and
+// prompt tokens depend on the machine and on deliberate trade-offs, so they're
+// reported but not gated. A tiny tolerance absorbs floating-point noise.
+const GATED = [
+  ['scenarioPassRate', 'Scenario pass rate', true],
+  ['recallAccuracy', 'Recall accuracy', true],
+  ['staleUseRate', 'Stale-use rate', false],
+  ['conflictHandling', 'Conflict handling', true],
+  ['replyAccuracy', 'Reply accuracy', true],
+];
+const EPS = 1e-9;
+
+export function gate(summary, base) {
+  const m = summary.metrics;
+  const b = base.metrics;
+  const out = [];
+  if (m.leakRate !== null && m.leakRate > 0) {
+    out.push({ metric: 'leakRate', message: `Leak rate must be 0, got ${pct(m.leakRate)}: private data reached an agent that must not see it.` });
+  }
+  for (const [key, label, higherIsBetter] of GATED) {
+    if (m[key] === null || m[key] === undefined || b[key] === null || b[key] === undefined) continue;
+    const worse = higherIsBetter ? m[key] < b[key] - EPS : m[key] > b[key] + EPS;
+    if (worse) out.push({ metric: key, message: `${label} ${higherIsBetter ? 'dropped' : 'rose'} from ${pct(b[key])} to ${pct(m[key])}.` });
+  }
+  return out;
+}

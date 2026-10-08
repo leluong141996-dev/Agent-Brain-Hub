@@ -8,7 +8,10 @@ npm run bench -- --filter leakage                     # one category, or one sce
 npm run bench -- --compare bench/results/0.2.0.json   # adds a delta column
 npm run bench -- --llm                                # with the configured LLM (UI settings or BRAIN_LLM_* env)
 npm run bench -- --save                               # writes bench/results/<version>.json
+npm run bench -- --gate bench/results/0.3.0.json      # what CI runs: exit 1 if a quality metric got worse
 ```
+
+**The CI gate** fails a PR if scenario pass rate, recall accuracy, stale-use rate, conflict handling or reply accuracy gets worse than the committed baseline, or if anything leaks. Latency and prompt tokens are reported but not gated. If a change is meant to move a number (for example, a new scenario that the current memory fails), re-save the baseline with `--save` in the same PR and say why in the description.
 
 ## Metrics
 

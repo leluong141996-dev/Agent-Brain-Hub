@@ -4,6 +4,7 @@
 //   npm run bench -- --filter leakage --compare bench/results/0.2.0.json
 //   npm run bench -- --llm --save
 //   npm run bench -- --embed          (configured embedding model; Settings → Semantic search or BRAIN_EMBED_*)
+//   npm run bench -- --gate bench/results/0.3.0.json   (CI: exit 1 if a quality metric got worse)
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
@@ -14,7 +15,7 @@ import { Embedder } from '../server/embeddings.js';
 import { loadScenarios } from './lib/validate.mjs';
 import { runScenario } from './lib/runner.mjs';
 import { InProcessTarget } from './lib/targets/inprocess.mjs';
-import { summarize, markdown } from './lib/report.mjs';
+import { summarize, markdown, gate } from './lib/report.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -94,6 +95,28 @@ const compare = opt('compare');
 const base = compare ? JSON.parse(fs.readFileSync(path.resolve(compare), 'utf8')) : null;
 console.log(markdown(summary, base));
 if (llm) console.log(`\nLLM: ${usage.calls} calls, ${(usage.ms / 1000).toFixed(1)} s`);
+
+const gateFile = opt('gate');
+if (gateFile) {
+  const baseline = JSON.parse(fs.readFileSync(path.resolve(gateFile), 'utf8'));
+  if (baseline.mode !== summary.mode) {
+    console.error(`\n--gate: ${gateFile} was measured in mode "${baseline.mode}", this run is "${summary.mode}". Compare like with like.`);
+    process.exit(1);
+  }
+  if (filter) {
+    console.error('\n--gate needs the full scenario set; drop --filter.');
+    process.exit(1);
+  }
+  const violations = gate(summary, baseline);
+  if (violations.length) {
+    console.error(`\n✗ Benchmark gate failed against ${baseline.version} (${path.relative(root, path.resolve(gateFile))}):`);
+    for (const v of violations) console.error(`  - ${v.message}`);
+    console.error('\nIf the change is intended (for example a scenario that now expects better behaviour), re-save the baseline with --save and explain it in the PR.');
+    process.exitCode = 1;
+  } else {
+    console.log(`\n✓ Benchmark gate passed against ${baseline.version}.`);
+  }
+}
 
 if (flag('save')) {
   const suffix = `${llm ? '-llm' : ''}${embedder ? `-embed-${embedder.modelId.replace(/[^a-z0-9.]+/gi, '-')}` : ''}`;

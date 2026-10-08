@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-09
+
+The memory is now **measured** and **retrieves by meaning**. See the benchmark table in the README.
+
 ### Added
 
 - **Semantic search with real embedding models** ([#17](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/17)). Pick OpenAI, Gemini, Ollama, vLLM, LM Studio or any OpenAI-compatible `/embeddings` endpoint in **Settings → Semantic search**, or with `BRAIN_EMBED_*`. Opt-in: local feature hashing stays the default, and a provider key alone doesn't enable it. Writes never wait on the network: a background queue adds model vectors and re-indexes when the model changes. Queries fall back to hashing after 1.5 s. Only redacted text is embedded. On the memory benchmark (23 scenarios):
@@ -18,8 +22,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 - `npm run bench -- --embed` runs the benchmark with the configured embedding model; three paraphrase scenarios were added (questions that share no words with the memory).
 - Failed benchmark checks explain facts dropped below the relevance threshold.
-- **Memory benchmark** (`npm run bench`, [#12](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/12)): 20 multi-agent scenarios across six categories (cross-agent recall, stale facts, contradictions, leakage, multi-hop, long conversations), in English plus Vietnamese and Japanese cases. Reports recall accuracy, leak rate, stale-use rate, conflict handling, latency and prompt tokens, offline and deterministic; `--llm` also scores replies. Scenarios are JSON files, so adding one needs no code. Baseline: `bench/results/0.2.0.json`.
+- **CI benchmark gate** ([#16](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/16)): CI runs the benchmark and fails if scenario pass rate, recall accuracy, stale-use rate, conflict handling or reply accuracy gets worse than the committed baseline (`npm run bench -- --gate bench/results/0.3.0.json`), or if anything leaks. Results appear in the job summary. Benchmark results table in the README.
+- **Memory benchmark** (`npm run bench`, [#12](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/12)): multi-agent scenarios across six categories (cross-agent recall, stale facts, contradictions, leakage, multi-hop, long conversations), in English plus Vietnamese and Japanese cases. Reports recall accuracy, leak rate, stale-use rate, conflict handling, latency and prompt tokens, offline and deterministic; `--llm` also scores replies. Scenarios are JSON files, so adding one needs no code. Results per version in `bench/results/`.
 - **Every memory says who wrote it and how old it is.** The prompt block now reads `availability: no car for 3 days (from Kai, 2 days ago, expires in 2 days)` instead of just the fact, and the model is told to prefer recent facts and confirm old ones that matter. `/v1/recall` returns `updatedAt` and `validUntil` for each memory, so connected agents can make the same call. ([#11](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/11))
+
+### Changed
+
+- `Brain.recall()` is now async (it may wait for a query embedding). The REST API, SDK and MCP server are unaffected; in-process callers need `await`.
 
 ### Fixed
 
@@ -76,7 +85,8 @@ First public release.
 - README in English (`README.md`) and Vietnamese (`README.vi.md`), `CONTRIBUTING.md`, issue and PR templates, and a CI workflow (tests on Node 18/20/22, Docker build, end-to-end run).
 - 32 unit tests (including the acceptance QA suite: amnesia, contradiction, staleness, skill promotion, 20k-episode load) and an 11-step end-to-end script (`npm run e2e -- --lang vi|en|ja`).
 
-[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/releases/tag/v0.1.0

@@ -6,23 +6,24 @@ Most memory libraries are built for one agent. When several agents share one mem
 
 It's a plan, not a promise. Priorities change with feedback: comment on the milestone issues or open a [Discussion](https://github.com/leluong141996-dev/Agent-Brain-Hub/discussions).
 
-## Where we are (v0.2)
+## Where we are (v0.3)
 
 **Solid today**
 - Shared memory with governance: private / shared / global scopes, one writer domain per relation, per-agent permissions, append-only audit log.
 - Every request traced live through 13 brain regions; facts carry their source, age and expiry into the prompt.
 - Automatic sleep cycle (idle, pressure, nightly), TTL-based forgetting, contradiction flagging, skill promotion.
 - Runs offline with zero configuration, or with any LLM. REST, JS SDK and MCP. English, Vietnamese, Japanese.
+- Measured: a 23-scenario memory benchmark with a CI gate. Optional semantic search with real embedding models (recall 88.5% → 100% with `bge-m3`).
 
 **Still basic**
 
 | Limitation | Today |
 |---|---|
 | Closed schema | 19 predefined relations and 35 regex rules. LLM extraction is limited to the same list, so anything outside it (say, a favourite colour) is not remembered. |
-| Lexical retrieval | Feature-hashing embeddings (256 dims) and a linear scan over a customer's memories. |
+| Retrieval at scale | Hashing by default, embedding models opt-in, but every query still scans a customer's memories linearly; no keyword index for exact names and codes. |
 | Coarse time | A fact has a TTL and is deleted when it expires. There's no way to ask what the brain believed at a given moment. |
 | No graph | Facts hang off a customer. No relations between entities, no entity resolution. |
-| Not measured | No benchmark for recall accuracy, stale-fact use or leakage. The value dashboard's "time saved" is an estimate (20 s per question). |
+| Own scenarios only | The benchmark uses our own 23 scenarios; there's no public-dataset number yet. The value dashboard's "time saved" is an estimate (20 s per question). |
 | Single process | State lives in memory; SQLite is the persistence layer. |
 
 ## Principles
@@ -37,26 +38,25 @@ These hold for every milestone:
 
 ## Milestones
 
-### v0.3: Measure, then retrieve better
+### v0.3: Measure, then retrieve better ✅ released
 
 *Goal: know how good the memory is, and make retrieval semantic.*
 
-- [x] **Memory benchmark** (`npm run bench`, [#12](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/12)) with multi-agent scenarios:
-  - cross-agent recall;
-  - acting on stale facts;
-  - contradictions;
-  - private-data leakage;
-  - multi-hop questions;
-  - long conversations.
-
-  Metrics: accuracy, leak rate, latency, prompt tokens, cost.
-- [ ] A public long-term-memory dataset in the same harness (LongMemEval-style), so results compare with other systems.
-- [ ] Run the benchmark through [Argus](https://github.com/leluong141996-dev/Argus), the agent evaluation platform.
+- [x] **Memory benchmark** (`npm run bench`, [#12](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/12)) with multi-agent scenarios: cross-agent recall, stale facts, contradictions, private-data leakage, multi-hop questions, long conversations. Metrics: accuracy, leak rate, latency, prompt tokens.
 - [x] Pluggable embeddings: OpenAI, Gemini, Ollama, vLLM, LM Studio or any OpenAI-compatible endpoint (e.g. bge-m3, which handles Vietnamese and Japanese). Feature hashing stays as the offline fallback. ([#17](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/17))
-- [ ] Hybrid retrieval: keyword (SQLite FTS5) + vector (sqlite-vec) + recency, fused with Reciprocal Rank Fusion; optional reranker.
-- [ ] Benchmark results table in the README; CI fails if a tracked metric regresses.
+- [x] Benchmark results table in the README; CI fails if a tracked metric regresses. ([#16](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/16))
 
-**Done when** the README shows benchmark numbers for v0.2 vs v0.3, measured by the same harness.
+**Result:** with `bge-m3`, recall accuracy went from 88.5% to 100% and scenario pass rate from 82.6% to 95.7%, with no leaks (see the README).
+
+### Next: hybrid retrieval and external benchmarks
+
+*Goal: fast retrieval at scale, exact matches for names and codes, and numbers that compare with other systems.* Moved out of v0.3 to keep releases small.
+
+- [ ] Hybrid retrieval: keyword (SQLite FTS5) + vector (sqlite-vec) + recency, fused with Reciprocal Rank Fusion; optional reranker. ([#13](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/13)) Needs new scenarios for large memories and exact names or codes, since recall is already 100% on the current set.
+- [ ] A public long-term-memory dataset in the same harness (LongMemEval-style), so results compare with other systems. Offline, measure whether the evidence sessions are retrieved; answer accuracy needs an LLM. ([#14](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/14))
+- [ ] Run the benchmark through [Argus](https://github.com/leluong141996-dev/Argus), the agent evaluation platform. ([#15](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/15))
+
+**Done when** retrieval latency at 20k episodes is lower than today with equal or better accuracy, and the README reports a public-dataset number.
 
 ### v0.4: A temporal knowledge graph
 

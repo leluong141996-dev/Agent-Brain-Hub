@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { matches, scoreRecall, scoreSay } from '../bench/lib/score.mjs';
 import { validateScenario, loadScenarios, parseDuration } from '../bench/lib/validate.mjs';
 import { runScenario } from '../bench/lib/runner.mjs';
+import { gate } from '../bench/lib/report.mjs';
 import { InProcessTarget } from '../bench/lib/targets/inprocess.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -142,4 +143,17 @@ test('bench: a step that throws marks the scenario as an error and fails its che
   assert.match(r.error, /step 2: kaput/);
   assert.equal(r.checks.length, 2);
   assert.ok(r.checks.every((c) => !c.passed));
+});
+
+test('bench: the CI gate fails on regressions and passes otherwise', () => {
+  const m = (x = {}) => ({ metrics: { scenarioPassRate: 0.9, recallAccuracy: 0.9, leakRate: 0, staleUseRate: 0.25, conflictHandling: 1, recallP50: 0.5, promptTokens: 400, ...x } });
+  assert.deepEqual(gate(m(), m()), [], 'same numbers pass');
+  assert.deepEqual(gate(m({ recallAccuracy: 0.95, recallP50: 9, promptTokens: 900 }), m()), [], 'better numbers pass; latency and tokens are not gated');
+  const v = gate(m({ recallAccuracy: 0.85, staleUseRate: 0.3, conflictHandling: 0.5 }), m());
+  assert.deepEqual(v.map((x) => x.metric), ['recallAccuracy', 'staleUseRate', 'conflictHandling']);
+  assert.match(v[0].message, /Recall accuracy dropped from 90\.0% to 85\.0%/);
+  const leak = gate(m({ leakRate: 0.01 }), m());
+  assert.equal(leak[0].metric, 'leakRate');
+  assert.match(leak[0].message, /Leak rate must be 0/);
+  assert.deepEqual(gate(m({ conflictHandling: null }), m({ conflictHandling: null })), [], 'metrics with no checks are skipped');
 });

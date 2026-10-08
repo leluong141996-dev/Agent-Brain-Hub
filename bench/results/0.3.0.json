@@ -1,37 +1,37 @@
 {
-  "version": "0.2.0",
-  "commit": "d6174c5",
-  "date": "2026-10-08T17:14:08.933Z",
-  "mode": "offline, embeddings: ollama:bge-m3-cpu",
+  "version": "0.3.0",
+  "commit": "13071d7",
+  "date": "2026-10-08T17:26:18.932Z",
+  "mode": "offline, hashing",
   "node": "v22.23.3",
   "metrics": {
     "scenarios": 23,
-    "scenarioPassRate": 0.9565217391304348,
-    "recallAccuracy": 1,
+    "scenarioPassRate": 0.8260869565217391,
+    "recallAccuracy": 0.8846153846153846,
     "leakRate": 0,
     "staleUseRate": 0.25,
     "conflictHandling": 1,
     "replyAccuracy": null,
-    "sayP50": 94.78106499999967,
-    "sayP95": 283.8708820000029,
-    "recallP50": 94.54985099999976,
-    "recallP95": 123.35085299999992,
-    "promptTokens": 499.7931034482759
+    "sayP50": 0.3335400000000277,
+    "sayP95": 35.45450299999999,
+    "recallP50": 0.4190980000000195,
+    "recallP95": 7.833247,
+    "promptTokens": 417.0344827586207
   },
   "categories": {
     "cross_agent": {
       "scenarios": 10,
-      "scenarioPassRate": 1,
-      "recallAccuracy": 1,
+      "scenarioPassRate": 0.8,
+      "recallAccuracy": 0.8461538461538461,
       "leakRate": null,
       "staleUseRate": null,
       "conflictHandling": null,
       "replyAccuracy": null,
-      "sayP50": 252.1950999999999,
-      "sayP95": 307.87420399999974,
-      "recallP50": 94.88777899999968,
-      "recallP95": 161.38936599999943,
-      "promptTokens": 496.3636363636364
+      "sayP50": 0.8410750000000178,
+      "sayP95": 35.45450299999999,
+      "recallP50": 0.42609499999997524,
+      "recallP95": 59.865786000000014,
+      "promptTokens": 410
     },
     "stale": {
       "scenarios": 3,
@@ -41,11 +41,11 @@
       "staleUseRate": 0,
       "conflictHandling": null,
       "replyAccuracy": null,
-      "sayP50": 244.9874729999974,
-      "sayP95": 257.7277099999992,
-      "recallP50": 91.60087699999713,
-      "recallP95": 102.17213300000003,
-      "promptTokens": 466.4
+      "sayP50": 0.31891600000000153,
+      "sayP95": 0.3230500000000234,
+      "recallP50": 0.2692700000000059,
+      "recallP95": 0.40701100000001134,
+      "promptTokens": 385.4
     },
     "contradiction": {
       "scenarios": 3,
@@ -55,11 +55,11 @@
       "staleUseRate": 0.5,
       "conflictHandling": 1,
       "replyAccuracy": null,
-      "sayP50": 238.31847199999993,
-      "sayP95": 292.05985699999997,
-      "recallP50": 99.26609000000008,
-      "recallP95": 101.18448899999976,
-      "promptTokens": 549.3333333333334
+      "sayP50": 14.334834999999998,
+      "sayP95": 47.360292000000015,
+      "recallP50": 0.6622590000000059,
+      "recallP95": 5.146873999999997,
+      "promptTokens": 451.3333333333333
     },
     "leakage": {
       "scenarios": 4,
@@ -69,25 +69,25 @@
       "staleUseRate": null,
       "conflictHandling": null,
       "replyAccuracy": null,
-      "sayP50": 102.80561699999998,
-      "sayP95": 268.9388569999992,
-      "recallP50": 97.81990899999983,
-      "recallP95": 123.35085299999992,
-      "promptTokens": 384.3333333333333
+      "sayP50": 0.49839099999999803,
+      "sayP95": 0.7012249999999938,
+      "recallP50": 0.40313999999995076,
+      "recallP95": 0.5404619999999909,
+      "promptTokens": 312.6666666666667
     },
     "multi_hop": {
       "scenarios": 2,
-      "scenarioPassRate": 1,
-      "recallAccuracy": 1,
+      "scenarioPassRate": 0.5,
+      "recallAccuracy": 0.75,
       "leakRate": null,
       "staleUseRate": null,
       "conflictHandling": null,
       "replyAccuracy": null,
-      "sayP50": 102.33338399999957,
-      "sayP95": 238.01256600000124,
-      "recallP50": 93.76485899999898,
-      "recallP95": 93.76485899999898,
-      "promptTokens": 564
+      "sayP50": 0.3335400000000277,
+      "sayP95": 0.35596299999997427,
+      "recallP50": 0.4532520000000204,
+      "recallP95": 0.4532520000000204,
+      "promptTokens": 468
     },
     "long_conversation": {
       "scenarios": 1,
@@ -97,11 +97,11 @@
       "staleUseRate": null,
       "conflictHandling": null,
       "replyAccuracy": null,
-      "sayP50": 89.340635999999,
-      "sayP95": 100.63546899999892,
-      "recallP50": 95.54626499999904,
-      "recallP95": 95.54626499999904,
-      "promptTokens": 810
+      "sayP50": 0.2924059999999713,
+      "sayP95": 0.565638999999976,
+      "recallP50": 0.4737230000000068,
+      "recallP95": 0.4737230000000068,
+      "promptTokens": 745.5
     }
   },
   "scenarios": [
@@ -387,15 +387,16 @@
       "id": "multi-hop-car-and-trip",
       "category": "multi_hop",
       "lang": "en",
-      "status": "passed",
+      "status": "failed",
       "error": null,
       "checks": [
         {
           "type": "remembers",
           "pattern": "no car for 3 days",
-          "passed": true,
+          "passed": false,
           "counted": true,
-          "step": 4
+          "step": 4,
+          "reason": "below relevance threshold"
         },
         {
           "type": "remembers",
@@ -433,15 +434,16 @@
       "id": "paraphrase-drive-without-car",
       "category": "cross_agent",
       "lang": "en",
-      "status": "passed",
+      "status": "failed",
       "error": null,
       "checks": [
         {
           "type": "remembers",
           "pattern": "no car for 3 days",
-          "passed": true,
+          "passed": false,
           "counted": true,
-          "step": 3
+          "step": 3,
+          "reason": "below relevance threshold"
         }
       ]
     },
@@ -449,15 +451,16 @@
       "id": "paraphrase-spending-budget",
       "category": "cross_agent",
       "lang": "en",
-      "status": "passed",
+      "status": "failed",
       "error": null,
       "checks": [
         {
           "type": "remembers",
           "pattern": "800",
-          "passed": true,
+          "passed": false,
           "counted": true,
-          "step": 3
+          "step": 3,
+          "reason": "private to finance"
         }
       ]
     },

@@ -304,17 +304,33 @@ By default, memories are matched with local feature-hashing vectors: no network,
 - **Retrieval waits up to 1.5 s** for the query embedding, then falls back to hashing. The live trace shows which similarity was used.
 - **Privacy.** Only redacted text is embedded, but *all* memory text, including private scopes, is sent to the provider. Use a local model for sensitive data. Permissions are enforced after retrieval as before, so a similar private memory still never reaches the wrong agent.
 
+## Benchmark
+
+`npm run bench` scores the shared memory on 23 multi-agent scenarios: cross-agent recall, stale facts, contradictions, private-data leakage, multi-hop questions and long conversations, in English with Vietnamese and Japanese cases. It runs offline in about a second, and CI fails any change that makes a quality metric worse ([bench/README.md](bench/README.md)).
+
+| v0.3.0 | Hashing (default, offline) | `bge-m3` embeddings (Ollama, CPU) |
+|---|---|---|
+| Scenario pass rate | 82.6% | **95.7%** |
+| Recall accuracy | 88.5% | **100%** |
+| Leak rate | **0%** | **0%** |
+| Stale-use rate | 25.0% | 25.0% |
+| Conflict handling | 100% | 100% |
+| recall latency (p50) | 0.4 ms | 95 ms |
+| Prompt tokens (mean) | 417 | 497 |
+
+These are our own scenarios, so they compare versions of this project, not other systems; a public dataset is [on the roadmap](ROADMAP.md). The remaining stale-use failure is a known bug ([#22](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/22)).
+
 ## Tests
 
-- `npm test`: 51 unit tests, covering:
+- `npm test`: 63 unit tests, covering:
   - the acceptance QA suite from the architecture document: amnesia, contradiction, staleness, skill promotion, 20k-episode load;
   - permissions and prompt leakage;
   - English and Japanese;
   - connected agents (recall/remember), governance, key rotation, the value report;
   - the LLM layer: provider catalog, adapting to a strict mock OpenAI-style server, storing and masking keys, fetching model lists;
   - SQLite storage: data survives a reopen (embeddings included), only changed rows are written, the audit log is never truncated and SQL metrics match the in-memory computation, legacy JSON import, reset;
-  - the automatic sleep cycle (idle, pressure, nightly), fact provenance in prompts, and the benchmark harness itself.
-- `npm run bench`: the memory benchmark. 20 multi-agent scenarios (cross-agent recall, stale facts, contradictions, leakage, multi-hop, long conversations) scored offline in about a second. See [bench/README.md](bench/README.md); adding a scenario is one JSON file.
+  - the automatic sleep cycle (idle, pressure, nightly), fact provenance in prompts, embedding providers (with a mock server), and the benchmark harness itself.
+- `npm run bench`: the memory benchmark. 23 multi-agent scenarios (cross-agent recall, stale facts, contradictions, leakage, multi-hop, long conversations) scored offline in about a second. See [bench/README.md](bench/README.md); adding a scenario is one JSON file.
 - `npm run e2e -- --lang vi|en|ja`: 11 steps against a running server, with any LLM configuration (offline, Claude, GPT, local models…). Includes a connected agent through the SDK and the MCP server over stdio. The test uses a new customer so existing data is left alone, but it advances the simulated clock by 7 days.
 
 ## Project structure
