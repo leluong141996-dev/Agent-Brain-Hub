@@ -22,6 +22,21 @@ test('Amnesia test — fact told to Auto is remembered by Travel without re-aski
   assert.equal(r.actions[0].id, 'rental_car_bundle', 'basal ganglia proposes a replacement vehicle');
 });
 
+test('Provenance — a reader sees who wrote a fact and how old it is (#11)', async () => {
+  const DAY = 24 * 3600 * 1000;
+  const b = makeBrain();
+  await b.think({ agentId: 'kai', text: 'My car is a Honda Civic, it broke down and will be in the shop for 3 days', lang: 'en' });
+  b.advanceClock(2);
+  const ctx = b.recall({ agentId: 'atlas', text: 'I need a flight to Da Nang next week', lang: 'en' });
+  const line = ctx.promptBlock.split('\n').find((l) => /no car for 3 days/.test(l));
+  assert.ok(line, 'the fact reaches the prompt');
+  assert.match(line, /\(from Kai, 2 days ago, expires in 2 days\)/, 'source, age and expiry are in the prompt');
+  const m = ctx.memories.find((x) => /no car for 3 days/.test(x.text));
+  assert.equal(m.from, 'kai');
+  assert.equal(Math.round((b.clock.now() - m.updatedAt) / DAY), 2, 'connected agents get the timestamp too');
+  assert.ok(m.validUntil > b.clock.now());
+});
+
 test('Scoping — private health facts never reach other agents', async () => {
   const b = makeBrain();
   await b.think({ agentId: 'sage', text: 'Tôi bị dị ứng hải sản' });

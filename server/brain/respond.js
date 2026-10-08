@@ -113,13 +113,13 @@ export function templateReply(ctx) {
 }
 
 export function buildPrompt(ctx) {
-  const { agent, intent, salience, selected, actions, skill, handoffPkg, hot, lang } = ctx;
+  const { agent, intent, salience, selected, actions, skill, handoffPkg, hot, lang, now } = ctx;
   const lines = [
     `You are ${agent.name}, an agent in a multi-agent system that shares one memory ("brain"). Persona: ${tr(agent.persona, lang) || 'a helpful assistant'}.`,
     `Always reply in ${LANGUAGE_NAME[lang]}, concisely (2-4 sentences) and naturally.${lang === 'ja' ? ' Use polite Japanese (です・ます調).' : ''}`,
     ...memoryInstructions(),
     '',
-    contextBlock({ intent, salience, selected, actions, skill, handoffPkg, hot, lang }),
+    contextBlock({ intent, salience, selected, actions, skill, handoffPkg, hot, lang, now }),
   ];
   return lines.join('\n');
 }
@@ -127,15 +127,38 @@ export function buildPrompt(ctx) {
 export function memoryInstructions() {
   return [
     'Use the memories below naturally; NEVER ask again for something already known. If a fact is marked [CONFLICT], ask the customer to confirm instead of picking one.',
+    'Each fact says who recorded it and how long ago. Prefer recent facts; if an old fact matters for the answer, confirm it is still true.',
     'Tokens like [PHONE] or [EMAIL] are redacted data — never guess or repeat them.',
     'You have NO real booking/lookup tools yet: never invent prices, times, hotel or product names, order numbers, or claim something is already booked — say you will search/propose and ask the customer to confirm.',
     'Only use the information in the sections below; do not infer extra facts about the customer.',
   ];
 }
 
+// "a minute", "40 minutes", "5 hours", "2 days": rounded, so 47 hours reads as "2 days".
+const MIN = 60_000;
+function span(ms) {
+  const plural = (n, unit) => `${n} ${unit}${n === 1 ? '' : 's'}`;
+  if (ms < 2 * MIN) return 'a minute';
+  if (ms < 90 * MIN) return plural(Math.round(ms / MIN), 'minute');
+  if (ms < 36 * 60 * MIN) return plural(Math.round(ms / (60 * MIN)), 'hour');
+  return plural(Math.round(ms / (24 * 60 * MIN)), 'day');
+}
+
+// Provenance a reader needs to judge a memory: who wrote it, how old it is,
+// and when it stops being true. Policies are global and timeless.
+function provenance(m, now) {
+  if (m.scope === 'global') return ' (policy)';
+  if (!now) return '';
+  const parts = [];
+  if (m.kind === 'semantic' && m.sourceName) parts.push(`from ${m.sourceName}`);
+  if (m.at) parts.push(`${span(Math.max(0, now - m.at))} ago`);
+  if (m.kind === 'semantic' && m.validUntil && m.validUntil > now) parts.push(`expires in ${span(m.validUntil - now)}`);
+  return parts.length ? ` (${parts.join(', ')})` : '';
+}
+
 // The memory context as a prompt block. Also returned to connected (external)
 // agents by /v1/recall so they can drop it into their own system prompt.
-export function contextBlock({ intent, salience, selected, actions, skill, handoffPkg, hot, lang }) {
+export function contextBlock({ intent, salience, selected, actions, skill, handoffPkg, hot, lang, now }) {
   const facts = selected.filter((s) => s.kind === 'semantic');
   const eps = selected.filter((s) => s.kind === 'episodic');
   const lines = [
@@ -143,8 +166,8 @@ export function contextBlock({ intent, salience, selected, actions, skill, hando
     `## Current intent\n${intent}`,
   ];
   if (handoffPkg) lines.push(`## Handoff package from ${handoffPkg.from}\n${JSON.stringify({ task: handoffPkg.activeTask, lastTurns: handoffPkg.lastTurns })}`);
-  if (facts.length) lines.push('## Semantic memory\n' + facts.map((f) => `- ${f.status === 'conflicted' ? '[CONFLICT] ' : ''}${f.text}${f.scope === 'global' ? ' (policy)' : ''}`).join('\n'));
-  if (eps.length) lines.push('## Episodic memory\n' + eps.map((e) => `- ${e.text}`).join('\n'));
+  if (facts.length) lines.push('## Semantic memory\n' + facts.map((f) => `- ${f.status === 'conflicted' ? '[CONFLICT] ' : ''}${f.text}${provenance(f, now)}`).join('\n'));
+  if (eps.length) lines.push('## Episodic memory\n' + eps.map((e) => `- ${e.text}${provenance(e, now)}`).join('\n'));
   if (hot?.length) lines.push('## Working memory (latest turns)\n' + hot.join('\n'));
   if (skill) lines.push(`## Learned playbook (v${skill.version}) — follow it, don't re-derive\n` + skill.steps.map((s, i) => `${i + 1}. ${labelOf(s, lang)}`).join('\n'));
   if (actions.length) lines.push('## Next best action (Basal Ganglia) — weave in the first one tactfully\n' + actions.map((a) => `- ${a.label}`).join('\n'));

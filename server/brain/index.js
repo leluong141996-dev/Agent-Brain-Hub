@@ -111,7 +111,7 @@ export class Brain {
     this.count(agent.id, 'suggestions', actions.length);
     if (skill) this.count(agent.id, 'playbookRuns');
 
-    const ctx = { agent, lang, intent: intent.intent, salience, selected: retrieval.selected, actions, skill, handoffPkg, utteranceFacts, hot: hotTurns(this, wm, agent).slice(0, -1) };
+    const ctx = { agent, lang, now: this.clock.now(), intent: intent.intent, salience, selected: retrieval.selected, actions, skill, handoffPkg, utteranceFacts, hot: hotTurns(this, wm, agent).slice(0, -1) };
     return { agent, guard, clean, salience, handoffPkg, wm, intent, skill, retrieval, actions, ctx };
   }
 
@@ -259,7 +259,7 @@ export class Brain {
       salience: { priority: salience.priority, sentiment: salience.sentiment, urgency: salience.urgency, churnRisk: salience.churnRisk, vip: salience.vip },
       handoff: p.handoffPkg,
       playbook: skill ? { id: skill.id, name: skillName(skill, lang), version: skill.version, steps: skill.steps.map((s) => labelOf(s, lang)) } : null,
-      memories: retrieval.selected.map((s) => ({ kind: s.kind, text: s.text, relation: s.relation || null, scope: s.scope, from: s.source || null, tier: s.tier, score: s.score, conflicted: s.status === 'conflicted' })),
+      memories: retrieval.selected.map((s) => ({ kind: s.kind, text: s.text, relation: s.relation || null, scope: s.scope, from: s.source || null, updatedAt: s.at || null, validUntil: s.validUntil || null, tier: s.tier, score: s.score, conflicted: s.status === 'conflicted' })),
       suggestedActions: actions.map((a) => ({ id: a.id, label: a.label, score: a.score })),
       promptBlock,
       steps: t.steps,

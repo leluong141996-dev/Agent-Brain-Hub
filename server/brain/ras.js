@@ -74,7 +74,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, budgetTokens 
     const recency = Math.exp(-B.clock.daysSince(e.createdAt) / 30);
     const score = 0.6 * sim + 0.25 * recency + 0.15 * e.importance;
     if (tier === 'cold' && sim < 0.3) continue; // cold store only queried on strong match
-    epCands.push({ kind: 'episodic', id: e.id, text: e.text, tier, scope: e.scope, owner: e.ownerDomain, source: e.agentId, episodeKind: e.kind, score, parts: { sim, recency, importance: e.importance } });
+    epCands.push({ kind: 'episodic', id: e.id, text: e.text, tier, scope: e.scope, owner: e.ownerDomain, source: e.agentId, episodeKind: e.kind, at: e.createdAt, validUntil: e.expiresAt || null, score, parts: { sim, recency, importance: e.importance } });
   }
   t.step('neocortex', t.L(`Episodic: quét ${mine.length} episode`, `Episodic: scanned ${mine.length} episodes`, `エピソード記憶：${mine.length}件を走査`), {
     store: 'episodic (vector)',
@@ -107,7 +107,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, budgetTokens 
     const profile = PROFILE.has(f.relation) ? (ESSENTIAL.has(f.relation) ? 0.35 : 0.15) : 0;
     const global = f.scope === 'global' ? 0.1 : 0;
     const score = 0.5 * sim + entityHit + profile + global + 0.1 * f.confidence;
-    fCands.push({ kind: 'semantic', id: f.id, text, relation: f.relation, value: factValue(f, lang), tier: 'warm', scope: f.scope, owner: f.ownerDomain, source: f.sourceAgentId, status: f.status, score, parts: { sim, entityHit, profile } });
+    fCands.push({ kind: 'semantic', id: f.id, text, relation: f.relation, value: factValue(f, lang), tier: 'warm', scope: f.scope, owner: f.ownerDomain, source: f.sourceAgentId, sourceName: f.sourceAgentId ? B.agentName(f.sourceAgentId) : null, at: f.updatedAt || f.createdAt, validUntil: f.validUntil || null, status: f.status, score, parts: { sim, entityHit, profile } });
   }
   t.step('neocortex', t.L(`Semantic: tra ${facts.length} fact theo entity/query`, `Semantic: looked up ${facts.length} facts by entity/query`, `意味記憶：${facts.length}件をエンティティ/クエリで検索`), {
     store: 'semantic (graph + SQL)',

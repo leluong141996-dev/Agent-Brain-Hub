@@ -120,7 +120,7 @@ The Agents screen generates the `mcpServers` config for Claude Desktop and Curso
 | Method | Path | Body / query | Returns |
 |---|---|---|---|
 | GET | `/v1/me` | | agent, domain, kind, permissions |
-| POST | `/v1/recall` | `{customerId, text, lang}` | `traceId, intent, salience, handoff, playbook, memories[], suggestedActions[], promptBlock, redactedText` |
+| POST | `/v1/recall` | `{customerId, text, lang}` | `traceId, intent, salience, handoff, playbook, memories[]` (each with `from`, `updatedAt`, `validUntil`), `suggestedActions[], promptBlock, redactedText` |
 | POST | `/v1/remember` | `{traceId \| userText, reply, facts?: [{relation, value}], outcome?: {actionId, accepted}, lang}` | `learned[]`, feedback |
 | POST | `/v1/chat` | `{customerId, text, lang}` | the brain answers itself (native mode over the API) |
 | POST | `/v1/feedback` | `{traceId, actionId, accepted}` | bandit update + skill promotion |

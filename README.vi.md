@@ -108,7 +108,7 @@ Màn hình Agents có sẵn cấu hình `mcpServers` cho Claude Desktop/Cursor, 
 | Method | Path | Body / query | Trả về |
 |---|---|---|---|
 | GET | `/v1/me` | | agent, domain, kind, permissions |
-| POST | `/v1/recall` | `{customerId, text, lang}` | `traceId, intent, salience, handoff, playbook, memories[], suggestedActions[], promptBlock, redactedText` |
+| POST | `/v1/recall` | `{customerId, text, lang}` | `traceId, intent, salience, handoff, playbook, memories[]` (mỗi mục có `from`, `updatedAt`, `validUntil`), `suggestedActions[], promptBlock, redactedText` |
 | POST | `/v1/remember` | `{traceId \| userText, reply, facts?: [{relation, value}], outcome?: {actionId, accepted}, lang}` | `learned[]`, feedback |
 | POST | `/v1/chat` | `{customerId, text, lang}` | bộ não tự trả lời (native qua API) |
 | POST | `/v1/feedback` | `{traceId, actionId, accepted}` | bandit + skill promotion |
