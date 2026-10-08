@@ -250,7 +250,7 @@ sqlite3 data/brain.db "SELECT source_agent_id, agent_id, COUNT(*) FROM audit WHE
 - Only **one server process** can run, because state is cached in memory.
 - Vector search is still a linear scan in memory.
 
-Both go away with the move to PostgreSQL + pgvector (see [Roadmap to production](#roadmap-to-production)).
+Both go away with the move to PostgreSQL + pgvector (see the [Roadmap](ROADMAP.md)).
 
 ## LLM: pick a provider in the UI
 
@@ -332,12 +332,18 @@ data/               (created at runtime, gitignored) brain.db = SQLite memory, s
 - Without `BRAIN_ADMIN_TOKEN`, the admin UI and `/api/*` are **open to anyone who can reach the port**. Outside your own machine, set it (the UI asks for the token once) and put the server behind a reverse proxy with HTTPS.
 - External agents can only use `/v1/*` with their own API key, and their reads and writes are limited by that agent's permissions.
 
-## Roadmap to production
+## Roadmap
 
-- **Storage:** ✅ moved to SQLite. Next: PostgreSQL + pgvector for multiple processes and a real vector index (`store.js` is a separate layer, so the brain regions don't change). Then: working memory in Redis, the event bus on Kafka/NATS, and a real embedding API instead of feature hashing.
-- **Auth:** replace the admin token with SSO/RBAC. Add scopes and expiry to API keys, plus per-agent rate limits.
-- **Operations:** run the sleep loop from a worker/cron instead of a button. Multi-tenancy per company.
-- **Data integration:** a one-way connection to the data warehouse to enrich facts.
+The goal: **the memory layer for multi-agent systems — correct over time, governed, and measured.** Next up:
+
+| Version | Focus |
+|---|---|
+| **v0.3** | A memory benchmark first, then pluggable embeddings and hybrid retrieval (FTS5 + sqlite-vec) |
+| **v0.4** | A bi-temporal knowledge graph: point-in-time `recall({ asOf })`, entity resolution, multi-hop retrieval |
+| **v0.5** | Open-schema extraction, write-arbitration policies and agent trust scores |
+| **v0.6** | Policy-as-code governance, PostgreSQL + pgvector, OpenTelemetry, multi-tenancy |
+
+Details, principles and what's not planned: [ROADMAP.md](ROADMAP.md).
 
 ## Contributing
 

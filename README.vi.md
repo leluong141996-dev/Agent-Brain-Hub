@@ -238,7 +238,7 @@ sqlite3 data/brain.db "SELECT source_agent_id, agent_id, COUNT(*) FROM audit WHE
 - Chỉ chạy được **một tiến trình** server, vì trạng thái được cache trong RAM.
 - Tìm kiếm vector vẫn quét tuần tự trong RAM.
 
-Hai giới hạn này sẽ được giải quyết khi chuyển sang PostgreSQL + pgvector (xem [Hướng lên production](#hướng-lên-production)).
+Hai giới hạn này sẽ được giải quyết khi chuyển sang PostgreSQL + pgvector (xem [Lộ trình](ROADMAP.md)).
 
 ## LLM: chọn nhà cung cấp ngay trên giao diện
 
@@ -321,12 +321,18 @@ data/               (tự tạo, đã gitignore) brain.db = bộ nhớ SQLite, s
 - Admin UI và `/api/*` **mở cho bất kỳ ai truy cập được cổng** nếu không đặt `BRAIN_ADMIN_TOKEN`. Khi chạy ngoài máy cá nhân, hãy đặt biến này (UI sẽ hỏi token một lần) và để server sau reverse proxy có HTTPS.
 - Agent bên ngoài chỉ dùng được `/v1/*` bằng API key của chính nó; quyền đọc/ghi bị giới hạn theo cấu hình của agent.
 
-## Hướng lên production
+## Lộ trình
 
-- **Lưu trữ:** ✅ đã chuyển sang SQLite. Bước tiếp theo: PostgreSQL + pgvector để chạy nhiều tiến trình và có index vector thật (lớp `store.js` đã tách riêng nên các vùng não không phải đổi). Sau đó: working memory sang Redis, event bus sang Kafka/NATS, embedding API thật thay cho feature hashing.
-- **Xác thực:** thay admin token bằng SSO/RBAC. Bổ sung scope và hạn dùng cho API key, cùng rate limit theo agent.
-- **Vận hành:** vòng ngủ chạy bằng worker/cron thay vì nút bấm. Multi-tenant theo công ty.
-- **Tích hợp dữ liệu:** kết nối một chiều với data warehouse để làm giàu fact.
+Mục tiêu: **lớp bộ nhớ cho hệ nhiều agent — đúng theo thời gian, có quản trị, và đo được.** Các bước tiếp theo:
+
+| Phiên bản | Trọng tâm |
+|---|---|
+| **v0.3** | Làm bộ benchmark bộ nhớ trước, rồi embedding thay thế được và tìm kiếm lai (FTS5 + sqlite-vec) |
+| **v0.4** | Đồ thị tri thức hai trục thời gian: `recall({ asOf })` theo thời điểm, gộp thực thể, truy xuất nhiều bước |
+| **v0.5** | Trích xuất schema mở, chính sách giải quyết khi ghi trùng, điểm tin cậy cho agent |
+| **v0.6** | Quản trị bằng chính sách khai báo, PostgreSQL + pgvector, OpenTelemetry, multi-tenant |
+
+Chi tiết, nguyên tắc và những gì không nằm trong kế hoạch: [ROADMAP.md](ROADMAP.md) (tiếng Anh).
 
 ## Đóng góp
 

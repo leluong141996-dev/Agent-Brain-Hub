@@ -6,6 +6,7 @@ Thanks for helping! Issues, docs fixes, translations and code are all welcome.
 
 - Issues labelled [`good first issue`](https://github.com/leluong141996-dev/Agent-Brain-Hub/labels/good%20first%20issue) are small and come with pointers to the files involved.
 - Questions, ideas and "show what you built" go to [Discussions](https://github.com/leluong141996-dev/Agent-Brain-Hub/discussions).
+- [ROADMAP.md](ROADMAP.md) shows where the project is heading. Benchmark scenarios from real multi-agent systems are especially welcome.
 - Before starting something large, open an issue or discussion so we can agree on the approach.
 
 ## Development setup
