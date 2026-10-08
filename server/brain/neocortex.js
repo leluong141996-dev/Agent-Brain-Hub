@@ -49,6 +49,7 @@ export function addEpisode(B, ep) {
     ...ep,
   };
   B.state.episodes.push(e);
+  B.embedQueue?.kick(); // model vector is added in the background
   return e;
 }
 
@@ -85,6 +86,7 @@ export function writeFact(B, input, { agent, customerId }) {
     f.text = factToText(f, 'vi');
     f.embedding = embed(factEmbedText(f));
     B.state.facts.push(f);
+    B.embedQueue?.kick();
     return f;
   };
   const live = B.state.facts.filter(

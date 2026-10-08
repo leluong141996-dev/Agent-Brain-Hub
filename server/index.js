@@ -9,6 +9,7 @@ import { Brain } from './brain/index.js';
 import { Store } from './store.js';
 import { NeuralBus } from './bus.js';
 import { LLM } from './llm.js';
+import { Embedder } from './embeddings.js';
 import { SleepScheduler, sleepDefaultsFromEnv } from './brain/sleepScheduler.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -25,7 +26,9 @@ const SETTINGS_FILE = process.env.BRAIN_SETTINGS || path.join(path.dirname(DB_FI
 const store = new Store(DB_FILE, { importFrom: LEGACY_JSON });
 const bus = new NeuralBus();
 const llm = new LLM({ settingsFile: SETTINGS_FILE });
-let brain = new Brain({ store, bus, llm });
+// Semantic search (opt-in). Without it the brain uses local hashing vectors.
+const embedder = new Embedder({ settingsFile: SETTINGS_FILE, llm });
+let brain = new Brain({ store, bus, llm, embedder });
 // Automatic sleep (idle / pressure / nightly). Reads `brain` on every pass: reset replaces it.
 const sleeper = new SleepScheduler(() => brain, { defaults: sleepDefaultsFromEnv(), intervalMs: Number(process.env.BRAIN_SLEEP_CHECK_SECONDS || 60) * 1000 });
 
@@ -101,6 +104,20 @@ const admin = {
   // LLM provider settings (API keys never leave the server)
   'GET /api/settings/llm': () => ({ config: llm.publicConfig(), providers: LLM.catalog() }),
   'PUT /api/settings/llm': async (req) => ({ config: llm.configure(await readBody(req)) }),
+  'GET /api/settings/embeddings': () => ({ config: embedder.publicConfig(), providers: Embedder.catalog(), status: brain.embedQueue.status() }),
+  'PUT /api/settings/embeddings': async (req) => {
+    embedder.configure(await readBody(req));
+    brain.embedQueue.kick(); // (re)index memories for the new model
+    return { config: embedder.publicConfig(), status: brain.embedQueue.status() };
+  },
+  'POST /api/settings/embeddings/test': async (req) => {
+    const b = await readBody(req);
+    // Test the form as typed. The saved key is reused only for the same provider,
+    // so switching provider never sends one vendor's key to another.
+    const sameProvider = !b.provider || b.provider === embedder.provider;
+    const draft = new Embedder({ config: { ...(embedder.cfg || {}), ...b, apiKey: b.apiKey || (sameProvider ? embedder.apiKey : '') }, llm });
+    return draft.test();
+  },
   'POST /api/settings/llm/test': async (req) => {
     const b = await readBody(req);
     return (b.provider ? llm.withConfig(b) : llm).test();
@@ -115,7 +132,8 @@ const admin = {
   },
   'POST /api/reset': async () => {
     store.reset();
-    brain = new Brain({ store, bus, llm });
+    brain.close();
+    brain = new Brain({ store, bus, llm, embedder });
     store.flush();
     return { ok: true };
   },
@@ -127,7 +145,7 @@ const v1 = {
   'GET /v1/profile': (agent, req, url) => ({ customerId: q(url, 'customerId') || 'kh-001', facts: brain.profile(agent, q(url, 'customerId') || 'kh-001', q(url, 'lang')) }),
   'POST /v1/recall': async (agent, req) => {
     const b = await readBody(req);
-    const r = brain.recall({ agentId: agent.id, customerId: b.customerId, text: b.text, lang: b.lang });
+    const r = await brain.recall({ agentId: agent.id, customerId: b.customerId, text: b.text, lang: b.lang });
     return b.includeSteps ? r : { ...r, steps: undefined };
   },
   'POST /v1/remember': async (agent, req) => {
@@ -219,6 +237,8 @@ server.listen(PORT, HOST, () => {
   console.log(`   Brain API for external agents → http://localhost:${PORT}/v1`);
   console.log(llm.available ? `   LLM: ${llm.label} (${llm.source})` : '   LLM: offline — pick a provider in the UI: Settings → Language model');
   console.log(`   Storage: SQLite ${DB_FILE}`);
+  console.log(embedder.available ? `   Embeddings: ${embedder.modelId} (semantic search)` : '   Embeddings: local hashing — pick a model in Settings → Semantic search');
+  brain.embedQueue.kick(); // index memories written before this model was configured
   if (ADMIN_TOKEN) console.log('   Admin API protected by BRAIN_ADMIN_TOKEN');
   const sc = sleeper.config;
   console.log(sc.enabled ? `   Auto sleep: after ${sc.idleMinutes} min idle or ${sc.maxPendingTurns} pending turns${sc.nightly ? `, nightly at ${sc.nightlyAt} (${sleeper.status().timeZone})` : ''}` : '   Auto sleep: off (Settings → Sleep cycle)');
@@ -228,6 +248,7 @@ server.listen(PORT, HOST, () => {
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, () => {
     sleeper.stop();
+    brain.close();
     store.close();
     process.exit(0);
   });

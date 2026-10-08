@@ -295,6 +295,15 @@ Notes on vLLM:
 - The `latest` image needs NVIDIA driver ≥ 575. Override with `VLLM_IMAGE=…`.
 - JSON requests use `temperature 0.1` to avoid a CUDA error in vLLM 0.10.2 when requests are batched together.
 
+### Semantic search (embeddings)
+
+By default, memories are matched with local feature-hashing vectors: no network, no setup, but only shared words count. To also find paraphrases ("Can I drive to the airport?" → "no car for 3 days"), pick an embedding model in **Settings → Semantic search**: OpenAI, Gemini, Ollama, vLLM, LM Studio or any OpenAI-compatible `/embeddings` endpoint. For Vietnamese and Japanese, `bge-m3` on Ollama is a good local choice.
+
+- **Opt-in.** A provider key in the environment does not turn embeddings on; choose a provider in the UI or set `BRAIN_EMBED_PROVIDER` (plus `BRAIN_EMBED_MODEL`, `BRAIN_EMBED_BASE_URL`, `BRAIN_EMBED_API_KEY`).
+- **Writes never wait on the network.** Every memory keeps its hashing vector; a background queue adds the model vector and re-indexes everything when you change the model. Settings shows the progress.
+- **Retrieval waits up to 1.5 s** for the query embedding, then falls back to hashing. The live trace shows which similarity was used.
+- **Privacy.** Only redacted text is embedded, but *all* memory text, including private scopes, is sent to the provider. Use a local model for sensitive data. Permissions are enforced after retrieval as before, so a similar private memory still never reaches the wrong agent.
+
 ## Tests
 
 - `npm test`: 51 unit tests, covering:
@@ -316,6 +325,7 @@ server/
   brain/            13 brain regions, audit, orchestrator (think / recall / remember / sleep)
   agents.js         6 domains, vi/en/ja intents, next-best-action catalog, default permissions
   store.js          SQLite storage (in-memory cache + row-level writes, audit, legacy JSON import)
+  embeddings.js     embedding providers (OpenAI-compatible /embeddings), opt-in
   i18n.js llm.js embed.js bus.js clock.js text.js
 sdk/brain-client.js JS client for connected agents (no dependencies)
 mcp/server.mjs      MCP server (stdio)

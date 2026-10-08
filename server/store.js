@@ -52,12 +52,12 @@ CREATE TABLE IF NOT EXISTS insights (id TEXT PRIMARY KEY, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS traces (id TEXT PRIMARY KEY, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS facts (
   id TEXT PRIMARY KEY, customer_id TEXT, relation TEXT, status TEXT, scope TEXT,
-  owner_domain TEXT, source_agent_id TEXT, valid_until INTEGER, data TEXT NOT NULL, embedding BLOB
+  owner_domain TEXT, source_agent_id TEXT, valid_until INTEGER, data TEXT NOT NULL, embedding BLOB, vec BLOB
 );
 CREATE INDEX IF NOT EXISTS facts_customer ON facts(customer_id, relation);
 CREATE TABLE IF NOT EXISTS episodes (
   id TEXT PRIMARY KEY, customer_id TEXT, kind TEXT, scope TEXT, agent_id TEXT,
-  created_at INTEGER, expires_at INTEGER, data TEXT NOT NULL, embedding BLOB
+  created_at INTEGER, expires_at INTEGER, data TEXT NOT NULL, embedding BLOB, vec BLOB
 );
 CREATE INDEX IF NOT EXISTS episodes_customer ON episodes(customer_id, created_at);
 CREATE TABLE IF NOT EXISTS audit (
@@ -68,7 +68,8 @@ CREATE INDEX IF NOT EXISTS audit_op ON audit(op);
 CREATE INDEX IF NOT EXISTS audit_agents ON audit(source_agent_id, agent_id);
 `;
 
-const noEmbedding = (k, v) => (k === 'embedding' ? undefined : v);
+// Vectors live in BLOB columns, not in the JSON `data`.
+const noEmbedding = (k, v) => (k === 'embedding' || k === 'vec' ? undefined : v);
 const toBlob = (vec) => (vec ? Buffer.from(new Float32Array(vec).buffer) : null);
 const fromBlob = (buf) => (buf ? Array.from(new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4), (x) => Math.round(x * 1e4) / 1e4) : undefined);
 
@@ -140,6 +141,12 @@ export class Store {
     db.pragma('journal_size_limit = 16777216'); // truncate the WAL back to ≤16 MB after checkpoints
     db.pragma('foreign_keys = ON');
     db.exec(SCHEMA);
+    // Columns added after a release are added in place: changing STATE_VERSION
+    // would move the whole database aside.
+    for (const table of ['facts', 'episodes']) {
+      const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+      if (!cols.includes('vec')) db.exec(`ALTER TABLE ${table} ADD COLUMN vec BLOB`);
+    }
     return db;
   }
 
@@ -153,8 +160,9 @@ export class Store {
     };
     for (const c of COLLECTIONS) {
       const cols = c.cols || [];
-      const all = ['id', ...cols, 'data', ...(c.embedding ? ['embedding'] : [])];
-      const update = [...cols, 'data'].map((x) => `${x} = excluded.${x}`).join(', ');
+      const vecCols = c.embedding ? ['embedding', 'vec'] : [];
+      const all = ['id', ...cols, 'data', ...vecCols];
+      const update = [...cols, 'data', ...vecCols].map((x) => `${x} = excluded.${x}`).join(', ');
       c.upsert = db.prepare(`INSERT INTO ${c.table} (${all.join(', ')}) VALUES (${all.map(() => '?').join(', ')}) ON CONFLICT(id) DO UPDATE SET ${update}`);
       c.del = db.prepare(`DELETE FROM ${c.table} WHERE id = ?`);
       c.select = db.prepare(`SELECT * FROM ${c.table} ORDER BY rowid`);
@@ -171,7 +179,10 @@ export class Store {
     const read = (c) =>
       c.select.all().map((row) => {
         const obj = JSON.parse(row.data);
-        if (c.embedding) obj.embedding = fromBlob(row.embedding);
+        if (c.embedding) {
+          obj.embedding = fromBlob(row.embedding);
+          if (row.vec) obj.vec = fromBlob(row.vec);
+        }
         this.snap.get(c.table).set(row.id, row.data);
         return obj;
       });
@@ -245,7 +256,7 @@ export class Store {
           const json = JSON.stringify(row, noEmbedding);
           if (snap.get(id) === json) continue;
           const args = [id, ...(c.values ? c.values(row) : []), json];
-          if (c.embedding) args.push(toBlob(row.embedding));
+          if (c.embedding) args.push(toBlob(row.embedding), toBlob(row.vec));
           c.upsert.run(...args);
           snap.set(id, json);
           upserts += 1;

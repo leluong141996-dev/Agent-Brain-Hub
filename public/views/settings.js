@@ -19,7 +19,7 @@ let form = null; // unsaved form state
 let models = [];
 
 export async function render(root, ctx) {
-  const [{ config, providers }, storage, sleep] = await Promise.all([api('/api/settings/llm'), api('/api/storage'), api('/api/settings/sleep')]);
+  const [{ config, providers }, storage, sleep, emb] = await Promise.all([api('/api/settings/llm'), api('/api/storage'), api('/api/settings/sleep'), api('/api/settings/embeddings')]);
   const byId = Object.fromEntries(providers.map((p) => [p.id, p]));
   if (!form || form.saved !== config.provider + config.model) {
     form = { ...config, apiKey: '', saved: config.provider + config.model };
@@ -69,11 +69,14 @@ export async function render(root, ctx) {
         <div class="card-body"><div class="callout">${icon('shield', 15)}<span>${t('fallback_note')}</span></div></div>
       </div>
 
+      <div class="card" id="embCard"></div>
+
       <div class="card" id="sleepCard"></div>
 
       ${storageCard(storage)}
     </div>`;
 
+  drawEmbeddings($('#embCard', root), emb);
   drawSleep($('#sleepCard', root), sleep);
   drawForm(root, byId, config);
   $$('.prov-tile', root).forEach((b) => {
@@ -188,6 +191,94 @@ async function runTest(root) {
     out.innerHTML = `<span class="ok">${icon('checkCircle', 15)}${esc(t('test_ok', { ms: r.ms, model: r.model }))}</span>${adjusted.length ? `<span class="muted small">${esc(t('adapted', { list: adjusted.join(', ') }))}</span>` : ''}`;
   } else {
     out.innerHTML = `<span class="fail">${icon('xCircle', 15)}${esc(t('test_fail'))}</span><span class="muted small err">${esc(r.error || '')}</span>`;
+  }
+}
+
+// ---------------- Semantic search (embeddings) ----------------
+let embForm = null; // unsaved form state
+
+function drawEmbeddings(box, data) {
+  const { config: c, providers, status } = data;
+  if (!embForm || embForm.saved !== c.provider + c.model) embForm = { provider: c.provider, baseUrl: c.baseUrl, model: c.model, apiKey: '', saved: c.provider + c.model };
+  const byId = Object.fromEntries(providers.map((p) => [p.id, p]));
+  const p = byId[embForm.provider];
+  const on = c.available;
+  const pctDone = status.total ? Math.round((status.done / status.total) * 100) : 0;
+  const statusLine = !on
+    ? `<span class="muted small">${t('emb_status_off')}</span>`
+    : `<div class="emb-status"><span class="small"><b>${esc(c.modelId)}</b> · ${esc(t('emb_indexed', { done: fmtNum(status.done, lang()), total: fmtNum(status.total, lang()) }))}</span>
+        <div class="bar" role="progressbar" aria-valuenow="${pctDone}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pctDone}%"></i></div>
+        ${status.lastError ? `<span class="small" style="color:var(--danger)">${esc(t('emb_error', { err: status.lastError }))}</span>` : ''}</div>`;
+  box.innerHTML = `
+    <div class="card-head">
+      <div class="ico-tile">${icon('search', 18)}</div>
+      <div style="flex:1;min-width:0"><div class="card-title">${t('emb_title')}</div><div class="card-sub">${t('emb_sub')}</div></div>
+      <span class="badge ${on ? 'success' : ''}">${on ? esc(c.label) : t('emb_off')}</span>
+    </div>
+    <div class="card-body settings-body">
+      <div class="grid2">
+        <label class="field"><span>${t('emb_provider')}</span>
+          <select id="eProvider">
+            <option value="off" ${embForm.provider === 'off' ? 'selected' : ''}>${t('emb_off')}</option>
+            ${providers.map((x) => `<option value="${x.id}" ${embForm.provider === x.id ? 'selected' : ''}>${esc(x.label)}${x.local ? ` · ${t('prov_local')}` : ''}</option>`).join('')}
+          </select></label>
+        ${p ? `<label class="field"><span>${t('emb_model')}</span><input id="eModel" value="${esc(embForm.model || '')}" placeholder="${esc(p.model || 'model-id')}" spellcheck="false" /><small>${t('emb_model_hint')}</small></label>` : '<div></div>'}
+      </div>
+      ${p ? `<div class="grid2">
+        <label class="field"><span>${t('f_base_url')}</span><input id="eBase" value="${esc(embForm.baseUrl || '')}" placeholder="${esc(p.baseUrl || 'https://…/v1')}" spellcheck="false" /></label>
+        <label class="field"><span>${t('f_api_key')}</span><input id="eKey" type="password" autocomplete="off" spellcheck="false" placeholder="${esc(embForm.provider === c.provider && c.hasKey ? c.keyHint : p.needsKey ? 'sk-…' : t('key_not_needed'))}" value="${esc(embForm.apiKey || '')}" /></label>
+      </div>
+      <div class="callout warning">${icon('shield', 15)}<span>${t('emb_privacy')}</span></div>` : `<div class="callout">${icon('info', 15)}<span>${t('emb_off_desc')}</span></div>`}
+      ${statusLine}
+    </div>
+    <div class="dialog-foot settings-foot">
+      <div class="test-result" id="eResult"></div>
+      ${p ? `<button class="btn" id="eTest">${icon('activity')}<span>${t('btn_test')}</span></button>` : ''}
+      <button class="btn primary" id="eSave">${icon('check')}<span>${t('btn_save')}</span></button>
+    </div>`;
+  const read = () => {
+    embForm.provider = $('#eProvider', box).value;
+    if ($('#eModel', box)) {
+      embForm.model = $('#eModel', box).value.trim();
+      embForm.baseUrl = $('#eBase', box).value.trim();
+      embForm.apiKey = $('#eKey', box).value;
+    }
+  };
+  const payload = () => (embForm.provider === 'off' ? { provider: 'off' } : { provider: embForm.provider, model: embForm.model, baseUrl: embForm.baseUrl, apiKey: embForm.apiKey });
+  $('#eProvider', box).onchange = () => {
+    const id = $('#eProvider', box).value;
+    const x = byId[id];
+    embForm = { ...embForm, provider: id, model: id === c.provider ? c.model : x?.model || '', baseUrl: id === c.provider ? c.baseUrl : x?.baseUrl || '', apiKey: '' };
+    drawEmbeddings(box, data);
+  };
+  const out = $('#eResult', box);
+  if ($('#eTest', box))
+    $('#eTest', box).onclick = async () => {
+      read();
+      out.innerHTML = `<span class="muted small">${t('testing')}</span>`;
+      const r = await api('/api/settings/embeddings/test', payload());
+      out.innerHTML = r.ok
+        ? `<span class="ok">${icon('checkCircle', 15)}${esc(t('emb_test_ok', { dims: r.dims, ms: r.ms, sim: r.similarity, hash: r.hashing }))}</span>`
+        : `<span class="fail">${icon('xCircle', 15)}${esc(t('test_fail'))}</span><span class="muted small err">${esc(r.error || '')}</span>`;
+    };
+  $('#eSave', box).onclick = async () => {
+    read();
+    try {
+      const r = await api('/api/settings/embeddings', payload(), 'PUT');
+      embForm = null;
+      toast(esc(t('emb_saved', { label: r.config.available ? r.config.modelId : t('emb_off') })), 'success', icon('search'));
+      drawEmbeddings(box, { ...data, config: r.config, status: r.status });
+    } catch (e) {
+      out.innerHTML = `<span class="fail">${icon('xCircle', 15)}${esc(e.message)}</span>`;
+    }
+  };
+  // While memories are being indexed, refresh the progress every 2 s.
+  if (on && status.done < status.total) {
+    setTimeout(async () => {
+      if (!box.isConnected) return;
+      const next = await api('/api/settings/embeddings');
+      if (box.isConnected) drawEmbeddings(box, next);
+    }, 2000);
   }
 }
 

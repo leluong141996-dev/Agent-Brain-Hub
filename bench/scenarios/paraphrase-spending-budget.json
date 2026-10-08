@@ -1,0 +1,24 @@
+{
+  "id": "paraphrase-spending-budget",
+  "category": "cross_agent",
+  "lang": "en",
+  "description": "\"How much can I spend\" should find the trip budget told to the finance agent.",
+  "steps": [
+    {
+      "agent": "penny",
+      "say": "My budget for the trip is 800 USD"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "nova",
+      "recall": "How much can I spend on souvenirs?",
+      "expect": {
+        "remembers": [
+          "800"
+        ]
+      }
+    }
+  ]
+}

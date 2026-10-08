@@ -3,6 +3,7 @@
 // filter → hybrid scoring (similarity + recency + importance) → re-rank →
 // token budget. Items hidden by scope are reported as `blocked` for the audit.
 import { embed, cosine } from '../embed.js';
+import { dot } from '../embeddings.js';
 import { estimateTokens, truncate } from '../text.js';
 import { visible, hiddenReason, episodeTier } from './neocortex.js';
 import { factToText, factValue } from './ontology.js';
@@ -33,11 +34,22 @@ const PROFILE = new Set(['name', 'lives_in', 'prefers', 'dislikes', 'occupation'
 const ESSENTIAL = new Set(['name']);
 const TIER_LATENCY = { hot: '0ms', warm: '100–500ms', cold: '1–5s' };
 
-export function retrieve(B, t, { customerId, agent, query, intent, budgetTokens = 700, maxEpisodes = 4, maxFacts = 10 }) {
+// qvec: the query embedded by the configured model ({ vec, model, status }), or
+// null. Items that have a vector from that model are compared with it; all
+// others fall back to the local hashing vectors.
+export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, budgetTokens = 700, maxEpisodes = 4, maxFacts = 10 }) {
   const t0 = performance.now();
   const now = B.clock.now();
   const lang = t.lang;
   const q = embed(query);
+  let byModel = 0;
+  const similarity = (x) => {
+    if (qvec?.vec && x.vec && x.vecModel === qvec.model) {
+      byModel += 1;
+      return Math.max(0, dot(qvec.vec, x.vec));
+    }
+    return Math.max(0, cosine(q, x.embedding)); // hashed embeddings can go negative
+  };
   const wanted = new Set(INTENT_RELATIONS[intent] || []);
   t.step('ras', t.L('Lập kế hoạch truy vấn', 'Planning the query', '検索プランを作成'), {
     query: truncate(query, 80),
@@ -45,6 +57,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, budgetTokens 
     entityRelations: [...wanted],
     budgetTokens,
     order: ['procedural ✓', 'episodic', 'semantic'],
+    similarity: qvec?.vec ? qvec.model : qvec?.model ? `hashing — ${qvec.model} ${qvec.status}` : 'hashing',
   });
 
   const excluded = [];
@@ -70,7 +83,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, budgetTokens 
       continue;
     }
     const tier = episodeTier(B, e, recent);
-    const sim = Math.max(0, cosine(q, e.embedding)); // hashed embeddings can go negative
+    const sim = similarity(e);
     const recency = Math.exp(-B.clock.daysSince(e.createdAt) / 30);
     const score = 0.6 * sim + 0.25 * recency + 0.15 * e.importance;
     if (tier === 'cold' && sim < 0.3) continue; // cold store only queried on strong match
@@ -102,7 +115,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, budgetTokens 
       excluded.push({ kind: 'semantic', id: f.id, text, reason: t.L('hết hạn (stale)', 'expired (stale)', '期限切れ（stale）') });
       continue;
     }
-    const sim = Math.max(0, cosine(q, f.embedding));
+    const sim = similarity(f);
     const entityHit = wanted.has(f.relation) ? 0.45 : 0;
     const profile = PROFILE.has(f.relation) ? (ESSENTIAL.has(f.relation) ? 0.35 : 0.15) : 0;
     const global = f.scope === 'global' ? 0.1 : 0;
@@ -131,9 +144,11 @@ export function retrieve(B, t, { customerId, agent, query, intent, budgetTokens 
     used += cost;
     selected.push({ ...c, score: +c.score.toFixed(3), latency: TIER_LATENCY[c.tier], parts: roundParts(c.parts) });
   };
-  fCands.filter((c) => c.score >= 0.2 || c.status === 'conflicted').slice(0, maxFacts).forEach(take);
+  const relevant = (c) => c.score >= 0.2 || c.status === 'conflicted';
+  fCands.filter(relevant).slice(0, maxFacts).forEach(take);
   epCands.filter((c) => c.score >= 0.25).slice(0, maxEpisodes).forEach(take);
-  for (const c of fCands.slice(maxFacts)) excluded.push({ kind: c.kind, id: c.id, text: c.text, reason: t.L('điểm thấp', 'low score', 'スコア不足') });
+  for (const c of fCands.filter(relevant).slice(maxFacts)) excluded.push({ kind: c.kind, id: c.id, text: c.text, reason: t.L('điểm thấp', 'low score', 'スコア不足') });
+  for (const c of fCands.filter((x) => !relevant(x))) excluded.push({ kind: c.kind, id: c.id, text: c.text, reason: t.L('dưới ngưỡng liên quan', 'below relevance threshold', '関連度のしきい値未満') });
 
   const sel = new Set(selected.map((s) => s.id));
   for (const e of B.state.episodes) {
@@ -146,6 +161,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, budgetTokens 
   t.step('ras', t.L(`Re-rank: chọn ${selected.length} mẩu ký ức (${used} tokens)`, `Re-rank: picked ${selected.length} memories (${used} tokens)`, `再ランク：記憶を${selected.length}件選択（${used}トークン）`), {
     selected: selected.map((s) => ({ kind: s.kind, tier: s.tier, scope: s.scope, from: s.source, score: s.score, text: truncate(s.text, 90) })),
     excludedCount: excluded.length,
+    similarity: qvec?.vec ? `${qvec.model}: ${byModel} items by model vector, the rest by hashing` : 'hashing',
     tokens: used,
     ms,
   });

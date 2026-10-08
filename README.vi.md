@@ -283,6 +283,15 @@ Ghi chú về vLLM:
 - Image `latest` cần driver ≥ 575. Đổi bằng `VLLM_IMAGE=…`.
 - Request JSON dùng `temperature 0.1` để né lỗi CUDA của vLLM 0.10.2 khi gộp batch.
 
+### Tìm kiếm theo ngữ nghĩa (embeddings)
+
+Mặc định, ký ức được so khớp bằng vector feature hashing chạy local: không cần mạng, không cần cài đặt, nhưng chỉ bắt được từ trùng nhau. Muốn tìm được cả câu diễn đạt khác ("Mai tôi tự lái ra sân bay được không?" → "không có xe 3 ngày"), hãy chọn model embedding trong **Cài đặt → Tìm kiếm theo ngữ nghĩa**: OpenAI, Gemini, Ollama, vLLM, LM Studio hoặc bất kỳ endpoint `/embeddings` tương thích OpenAI nào. Với tiếng Việt và tiếng Nhật, `bge-m3` chạy qua Ollama là lựa chọn local tốt.
+
+- **Người dùng tự bật.** Chỉ có key nhà cung cấp trong biến môi trường thì không tự bật; hãy chọn trên giao diện hoặc đặt `BRAIN_EMBED_PROVIDER` (kèm `BRAIN_EMBED_MODEL`, `BRAIN_EMBED_BASE_URL`, `BRAIN_EMBED_API_KEY`).
+- **Ghi không bao giờ chờ mạng.** Mọi ký ức luôn có vector hashing; một hàng đợi trong nền thêm vector của model, và tính lại toàn bộ khi đổi model. Cài đặt hiện tiến độ.
+- **Truy xuất chờ tối đa 1,5 giây** để nhúng câu hỏi, quá thời gian thì dùng hashing. Live trace ghi rõ đang dùng cách so khớp nào.
+- **Riêng tư.** Chỉ văn bản đã che PII được gửi đi, nhưng *toàn bộ* nội dung bộ nhớ, kể cả phạm vi private, đều được gửi tới nhà cung cấp. Với dữ liệu nhạy cảm, hãy dùng model local. Quyền đọc vẫn được kiểm tra sau bước truy xuất như trước, nên ký ức private dù giống đến đâu cũng không tới tay agent không được phép.
+
 ## Test
 
 - `npm test`: 51 unit test, gồm:
@@ -304,6 +313,7 @@ server/
   brain/            13 vùng não, audit, bộ điều phối (think / recall / remember / sleep)
   agents.js         6 lĩnh vực, intent vi/en/ja, hành động NBA, quyền mặc định
   store.js          lưu trữ SQLite (cache trong RAM + ghi theo dòng thay đổi, audit, nhập JSON cũ)
+  embeddings.js     nhà cung cấp embedding (endpoint /embeddings tương thích OpenAI), tự bật
   i18n.js llm.js embed.js bus.js clock.js text.js
 sdk/brain-client.js JS client cho agent connected (không dependency)
 mcp/server.mjs      MCP server (stdio)

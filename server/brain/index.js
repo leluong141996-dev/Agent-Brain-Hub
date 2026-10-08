@@ -23,6 +23,7 @@ import { encodeOnline, encodeOutcome, consolidate, describeReason } from './hipp
 import { forget } from './forgetting.js';
 import { reflect } from './dmn.js';
 import { emptySleepState, recordSleep } from './sleepScheduler.js';
+import { EmbedQueue } from './embedQueue.js';
 import { seedGlobal, resolveConflict } from './neocortex.js';
 import { extractFactsRuleBased, factToText, factValue, RELATIONS } from './ontology.js';
 import { templateReply, buildPrompt, contextBlock, memoryInstructions } from './respond.js';
@@ -38,10 +39,12 @@ const newKey = () => `abk_${crypto.randomBytes(18).toString('hex')}`;
 const dayOf = (ts) => new Date(ts).toISOString().slice(0, 10);
 
 export class Brain {
-  constructor({ store, bus, llm, deterministic = false }) {
+  constructor({ store, bus, llm, deterministic = false, embedder = null }) {
     this.store = store;
     this.bus = bus;
     this.llm = llm;
+    this.embedder = embedder;
+    this.embedQueue = embedder ? new EmbedQueue(this, embedder) : null;
     this.deterministic = deterministic;
     this.clock = new Clock(store.state.clockOffsetMs || 0);
     store.state.sleep ||= emptySleepState(); // states imported from older versions
@@ -86,7 +89,18 @@ export class Brain {
   }
 
   // ---------------- Shared perception: Thalamus → … → Basal ganglia ----------------
-  perceive(t, { agentId, customerId, text, lang }) {
+  // The query embedded by the configured model — redacted first, so raw PII
+  // never reaches the embedding provider. null when embeddings are off.
+  async queryVector(text) {
+    if (!this.embedder?.available) return null;
+    return this.embedder.embedQuery(redact(text).text);
+  }
+
+  close() {
+    this.embedQueue?.stop();
+  }
+
+  perceive(t, { agentId, customerId, text, lang, qvec = null }) {
     const { agent, newSession, switchedFrom } = thalamus(this, t, { agentId, customerId, text });
     const guard = brainstemIn(this, t, text);
     const clean = guard.text;
@@ -101,7 +115,7 @@ export class Brain {
 
     // Executive loop: procedural → episodic → semantic.
     const skill = matchSkill(this, t, { agent, intent: intent.intent });
-    const retrieval = retrieve(this, t, { customerId, agent, query: clean, intent: intent.intent });
+    const retrieval = retrieve(this, t, { customerId, agent, query: clean, intent: intent.intent, qvec });
     auditRetrieval(this, { agent, customerId, traceId: t.id, selected: retrieval.selected, blocked: retrieval.blocked });
     const utteranceFacts = extractFactsRuleBased(clean);
     const factSignals = new Map();
@@ -155,8 +169,9 @@ export class Brain {
     lang = normLang(lang);
     text = String(text || '').trim();
     if (!text) throw err('text is required', 400);
+    const qvec = await this.queryVector(text);
     const t = this.bus.trace('awake', { agentId, customerId, lang });
-    const p = this.perceive(t, { agentId, customerId, text, lang });
+    const p = this.perceive(t, { agentId, customerId, text, lang, qvec });
     const { agent, guard, clean, salience, wm, intent, skill, retrieval, actions, ctx } = p;
     // Start LLM fact extraction now; Hippocampus awaits it after the reply.
     const llmFactsPromise = this.llm.available && agent.permissions?.write !== false ? this.llm.extractFacts(clean) : null;
@@ -227,12 +242,13 @@ export class Brain {
   // ---------------- recall(): context package for a connected agent ----------------
   // diagnostics: in-process callers only (the benchmark). The /v1 route never
   // passes it, because excluded items include other agents' private memories.
-  recall({ agentId, customerId = 'kh-001', text, lang, diagnostics = false }) {
+  async recall({ agentId, customerId = 'kh-001', text, lang, diagnostics = false }) {
     lang = normLang(lang);
     text = String(text || '').trim();
     if (!text) throw err('text is required', 400);
+    const qvec = await this.queryVector(text);
     const t = this.bus.trace('recall', { agentId, customerId, lang });
-    const p = this.perceive(t, { agentId, customerId, text, lang });
+    const p = this.perceive(t, { agentId, customerId, text, lang, qvec });
     const { agent, clean, salience, intent, skill, retrieval, actions, ctx } = p;
     const promptBlock = [
       `Reply in ${LANGUAGE_NAME[lang]}.`,

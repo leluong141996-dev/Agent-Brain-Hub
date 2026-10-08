@@ -29,6 +29,7 @@ export async function runScenario(s, makeTarget, { llm = false } = {}) {
         const t0 = performance.now();
         const obs = await target.say(st.agent, st.say, st.customer);
         res.timings.say.push(performance.now() - t0);
+        await target.settle?.();
         res.checks.push(...scoreSay(st.expect, obs, { llm }).map((c) => ({ ...c, step: n })));
       } else if (st.recall !== undefined) {
         const t0 = performance.now();

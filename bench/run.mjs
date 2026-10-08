@@ -3,12 +3,14 @@
 //   npm run bench
 //   npm run bench -- --filter leakage --compare bench/results/0.2.0.json
 //   npm run bench -- --llm --save
+//   npm run bench -- --embed          (configured embedding model; Settings → Semantic search or BRAIN_EMBED_*)
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_AGENTS } from '../server/agents.js';
 import { LLM } from '../server/llm.js';
+import { Embedder } from '../server/embeddings.js';
 import { loadScenarios } from './lib/validate.mjs';
 import { runScenario } from './lib/runner.mjs';
 import { InProcessTarget } from './lib/targets/inprocess.mjs';
@@ -56,6 +58,15 @@ if (flag('llm')) {
   };
 }
 
+let embedder = null;
+if (flag('embed')) {
+  embedder = new Embedder({ settingsFile: process.env.BRAIN_SETTINGS || path.join(root, 'data', 'settings.json'), llm });
+  if (!embedder.available) {
+    console.error('--embed: no embedding model is configured. Pick one in the UI (Settings → Semantic search) or set BRAIN_EMBED_PROVIDER / BRAIN_EMBED_MODEL.');
+    process.exit(1);
+  }
+}
+
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 let commit = null;
 try {
@@ -65,7 +76,7 @@ try {
 const results = [];
 const started = performance.now();
 for (const s of scenarios) {
-  const r = await runScenario(s, (sc) => new InProcessTarget({ lang: sc.lang, llm }), { llm: !!llm });
+  const r = await runScenario(s, (sc) => new InProcessTarget({ lang: sc.lang, llm, embedder }), { llm: !!llm });
   results.push(r);
   process.stderr.write(r.status === 'passed' ? '.' : r.status === 'error' ? 'E' : 'F');
 }
@@ -75,7 +86,7 @@ const summary = summarize(results, {
   version: pkg.version,
   commit,
   date: new Date().toISOString(),
-  mode: llm ? `llm: ${llm.label}` : 'offline',
+  mode: [llm ? `llm: ${llm.label}` : 'offline', embedder ? `embeddings: ${embedder.modelId}` : 'hashing'].join(', '),
   node: process.version,
   ...(llm ? { llmUsage: { calls: usage.calls, seconds: +(usage.ms / 1000).toFixed(1) } } : {}),
 });
@@ -85,7 +96,8 @@ console.log(markdown(summary, base));
 if (llm) console.log(`\nLLM: ${usage.calls} calls, ${(usage.ms / 1000).toFixed(1)} s`);
 
 if (flag('save')) {
-  const file = path.join(here, 'results', `${pkg.version}${llm ? '-llm' : ''}.json`);
+  const suffix = `${llm ? '-llm' : ''}${embedder ? `-embed-${embedder.modelId.replace(/[^a-z0-9.]+/gi, '-')}` : ''}`;
+  const file = path.join(here, 'results', `${pkg.version}${suffix}.json`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(summary, null, 2) + '\n');
   console.log(`\nSaved ${path.relative(root, file)}`);

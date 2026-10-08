@@ -27,7 +27,7 @@ test('Provenance — a reader sees who wrote a fact and how old it is (#11)', as
   const b = makeBrain();
   await b.think({ agentId: 'kai', text: 'My car is a Honda Civic, it broke down and will be in the shop for 3 days', lang: 'en' });
   b.advanceClock(2);
-  const ctx = b.recall({ agentId: 'atlas', text: 'I need a flight to Da Nang next week', lang: 'en' });
+  const ctx = await b.recall({ agentId: 'atlas', text: 'I need a flight to Da Nang next week', lang: 'en' });
   const line = ctx.promptBlock.split('\n').find((l) => /no car for 3 days/.test(l));
   assert.ok(line, 'the fact reaches the prompt');
   assert.match(line, /\(from Kai, 2 days ago, expires in 2 days\)/, 'source, age and expiry are in the prompt');
@@ -286,7 +286,7 @@ test('Connected agent — recall returns shared memory, remember teaches the bra
   assert.equal(b.agentByKey(apiKey).id, agent.id);
   assert.equal(b.agentByKey('abk_wrong'), null);
 
-  const ctx = b.recall({ agentId: agent.id, text: 'Tôi cần đặt vé máy bay đi Huế', lang: 'vi' });
+  const ctx = await b.recall({ agentId: agent.id, text: 'Tôi cần đặt vé máy bay đi Huế', lang: 'vi' });
   assert.ok(ctx.memories.some((m) => /không có xe 3 ngày/.test(m.text) && m.from === 'kai'));
   assert.match(ctx.promptBlock, /## Semantic memory/);
   assert.equal(ctx.suggestedActions[0].id, 'rental_car_bundle');
@@ -298,7 +298,7 @@ test('Connected agent — recall returns shared memory, remember teaches the bra
   assert.equal(r.feedback.bandit.alpha, 2, 'outcome trains the basal ganglia');
   assert.equal(events.length, 1);
   assert.equal(events[0].reply, 'Mình sẽ tìm vé đi Huế cho anh.');
-  assert.throws(() => b.recall({ agentId: agent.id, text: '' }), /text is required/);
+  await assert.rejects(() => b.recall({ agentId: agent.id, text: '' }), /text is required/);
   await assert.rejects(b.remember({ agentId: 'kai', traceId: ctx.traceId, reply: 'x' }), /another agent/);
 });
 
@@ -306,7 +306,7 @@ test('Governance — readShared=false and write=false are enforced and audited',
   const b = makeBrain();
   await b.think({ agentId: 'mia', text: 'Tên tôi là Lê Minh, tôi sống ở Hà Nội' });
   const { agent } = b.createAgent({ name: 'Partner Bot', domain: 'shopping', kind: 'external', permissions: { readShared: false, write: false } });
-  const ctx = b.recall({ agentId: agent.id, text: 'Tôi muốn mua giày' });
+  const ctx = await b.recall({ agentId: agent.id, text: 'Tôi muốn mua giày' });
   assert.ok(!ctx.memories.some((m) => /Lê Minh|Hà Nội/.test(m.text)), 'shared memory hidden');
   const r = await b.remember({ agentId: agent.id, traceId: ctx.traceId, reply: 'ok', facts: [{ relation: 'clothing_size', value: '42' }] });
   assert.equal(r.learned.length, 0, 'read-only agent writes nothing');
@@ -314,7 +314,7 @@ test('Governance — readShared=false and write=false are enforced and audited',
   const blocked = b.state.audit.filter((e) => e.op === 'blocked' && e.agentId === agent.id);
   assert.ok(blocked.length >= 2, 'blocked reads are audited');
   b.updateAgent(agent.id, { permissions: { readShared: true } });
-  const ctx2 = b.recall({ agentId: agent.id, text: 'Tôi muốn mua giày' });
+  const ctx2 = await b.recall({ agentId: agent.id, text: 'Tôi muốn mua giày' });
   assert.ok(ctx2.memories.some((m) => /Lê Minh/.test(m.text)), 'permission change takes effect');
 });
 

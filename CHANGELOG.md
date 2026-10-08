@@ -7,9 +7,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
-- **Memory benchmark** (`npm run bench`, [#12](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/12)): 20 multi-agent scenarios across six categories (cross-agent recall, stale facts, contradictions, leakage, multi-hop, long conversations), in English plus Vietnamese and Japanese cases. Reports recall accuracy, leak rate, stale-use rate, conflict handling, latency and prompt tokens, offline and deterministic; `--llm` also scores replies. Scenarios are JSON files, so adding one needs no code. Baseline: `bench/results/0.2.0.json`.
+- **Semantic search with real embedding models** ([#17](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/17)). Pick OpenAI, Gemini, Ollama, vLLM, LM Studio or any OpenAI-compatible `/embeddings` endpoint in **Settings → Semantic search**, or with `BRAIN_EMBED_*`. Opt-in: local feature hashing stays the default, and a provider key alone doesn't enable it. Writes never wait on the network: a background queue adds model vectors and re-indexes when the model changes. Queries fall back to hashing after 1.5 s. Only redacted text is embedded. On the memory benchmark (23 scenarios):
 
+  | | Hashing | `bge-m3` (Ollama, CPU) |
+  |---|---|---|
+  | Scenario pass rate | 82.6% | **95.7%** |
+  | Recall accuracy | 88.5% | **100%** |
+  | Leak rate | 0% | 0% |
+  | recall p50 | 0.5 ms | 94 ms |
+
+- `npm run bench -- --embed` runs the benchmark with the configured embedding model; three paraphrase scenarios were added (questions that share no words with the memory).
+- Failed benchmark checks explain facts dropped below the relevance threshold.
+- **Memory benchmark** (`npm run bench`, [#12](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/12)): 20 multi-agent scenarios across six categories (cross-agent recall, stale facts, contradictions, leakage, multi-hop, long conversations), in English plus Vietnamese and Japanese cases. Reports recall accuracy, leak rate, stale-use rate, conflict handling, latency and prompt tokens, offline and deterministic; `--llm` also scores replies. Scenarios are JSON files, so adding one needs no code. Baseline: `bench/results/0.2.0.json`.
 - **Every memory says who wrote it and how old it is.** The prompt block now reads `availability: no car for 3 days (from Kai, 2 days ago, expires in 2 days)` instead of just the fact, and the model is told to prefer recent facts and confirm old ones that matter. `/v1/recall` returns `updatedAt` and `validUntil` for each memory, so connected agents can make the same call. ([#11](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/11))
+
+### Fixed
+
+- SQLite: updating a fact or episode rewrote its JSON but not its vector columns.
 
 ## [0.2.0] - 2026-10-07
 

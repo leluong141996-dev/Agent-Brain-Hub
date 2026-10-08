@@ -1,0 +1,24 @@
+{
+  "id": "vi-paraphrase-tu-lai",
+  "category": "cross_agent",
+  "lang": "vi",
+  "description": "Tiếng Việt, diễn đạt khác: \"tự lái\" cần biết xe đang phải sửa.",
+  "steps": [
+    {
+      "agent": "kai",
+      "say": "Xe của tôi hỏng rồi, phải sửa 3 ngày"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "mia",
+      "recall": "Ngày mai tôi tự lái ra sân bay được không?",
+      "expect": {
+        "remembers": [
+          "3 ngày"
+        ]
+      }
+    }
+  ]
+}

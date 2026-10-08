@@ -41,7 +41,7 @@ These hold for every milestone:
 
 *Goal: know how good the memory is, and make retrieval semantic.*
 
-- [ ] **Memory benchmark** (`npm run bench`) with multi-agent scenarios:
+- [x] **Memory benchmark** (`npm run bench`, [#12](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/12)) with multi-agent scenarios:
   - cross-agent recall;
   - acting on stale facts;
   - contradictions;
@@ -52,7 +52,7 @@ These hold for every milestone:
   Metrics: accuracy, leak rate, latency, prompt tokens, cost.
 - [ ] A public long-term-memory dataset in the same harness (LongMemEval-style), so results compare with other systems.
 - [ ] Run the benchmark through [Argus](https://github.com/leluong141996-dev/Argus), the agent evaluation platform.
-- [ ] Pluggable embeddings: OpenAI, Gemini, Voyage, or local models through Ollama (e.g. bge-m3, which handles Vietnamese and Japanese). Feature hashing stays as the offline fallback.
+- [x] Pluggable embeddings: OpenAI, Gemini, Ollama, vLLM, LM Studio or any OpenAI-compatible endpoint (e.g. bge-m3, which handles Vietnamese and Japanese). Feature hashing stays as the offline fallback. ([#17](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/17))
 - [ ] Hybrid retrieval: keyword (SQLite FTS5) + vector (sqlite-vec) + recency, fused with Reciprocal Rank Fusion; optional reranker.
 - [ ] Benchmark results table in the README; CI fails if a tracked metric regresses.
 
