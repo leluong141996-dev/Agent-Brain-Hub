@@ -5,6 +5,7 @@
 //   npm run bench -- --llm --save
 //   npm run bench -- --embed          (configured embedding model; Settings → Semantic search or BRAIN_EMBED_*)
 //   npm run bench -- --gate bench/results/0.3.0.json   (CI: exit 1 if a quality metric got worse)
+//   npm run bench -- --url http://localhost:4317 [--token …]  (a running hub, with its own LLM/embedding settings)
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
@@ -15,6 +16,7 @@ import { Embedder } from '../server/embeddings.js';
 import { loadScenarios } from './lib/validate.mjs';
 import { runScenario } from './lib/runner.mjs';
 import { InProcessTarget } from './lib/targets/inprocess.mjs';
+import { HttpTarget } from './lib/targets/http.mjs';
 import { summarize, markdown, gate } from './lib/report.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -36,6 +38,13 @@ const filter = opt('filter');
 const scenarios = filter ? all.filter((s) => s.category === filter || s.id === filter) : all;
 if (!scenarios.length) {
   console.error(`No scenario matches --filter ${filter}`);
+  process.exit(1);
+}
+
+const url = opt('url');
+const token = opt('token') || process.env.BRAIN_ADMIN_TOKEN || '';
+if (url && (flag('llm') || flag('embed'))) {
+  console.error('--url benchmarks the hub as it is configured; drop --llm / --embed (set them in the hub instead).');
   process.exit(1);
 }
 
@@ -74,10 +83,25 @@ try {
   commit = execSync('git rev-parse --short HEAD', { cwd: root, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
 } catch {}
 
+// A remote hub: describe what it runs, so results are only compared like with like.
+let remote = null;
+if (url) {
+  const probe = new HttpTarget({ url, token });
+  try {
+    const [l, e] = await Promise.all([probe.call('GET', '/api/settings/llm'), probe.call('GET', '/api/settings/embeddings')]);
+    remote = { llm: l.config.available ? l.config.label : null, embeddings: e.config.available ? e.config.modelId : null };
+  } catch (err) {
+    console.error(`--url: cannot reach the hub's admin API at ${url} (${err.message}). Is it running? Does it need --token?`);
+    process.exit(1);
+  }
+}
+
+const runId = Date.now().toString(36);
 const results = [];
 const started = performance.now();
 for (const s of scenarios) {
-  const r = await runScenario(s, (sc) => new InProcessTarget({ lang: sc.lang, llm, embedder }), { llm: !!llm });
+  const make = url ? (sc) => new HttpTarget({ url, token, lang: sc.lang, scenarioId: sc.id, run: runId }) : (sc) => new InProcessTarget({ lang: sc.lang, llm, embedder });
+  const r = await runScenario(s, make, { llm: url ? !!remote.llm : !!llm });
   results.push(r);
   process.stderr.write(r.status === 'passed' ? '.' : r.status === 'error' ? 'E' : 'F');
 }
@@ -87,7 +111,9 @@ const summary = summarize(results, {
   version: pkg.version,
   commit,
   date: new Date().toISOString(),
-  mode: [llm ? `llm: ${llm.label}` : 'offline', embedder ? `embeddings: ${embedder.modelId}` : 'hashing'].join(', '),
+  mode: url
+    ? [`http`, remote.llm ? `llm: ${remote.llm}` : 'offline', remote.embeddings ? `embeddings: ${remote.embeddings}` : 'hashing'].join(', ')
+    : [llm ? `llm: ${llm.label}` : 'offline', embedder ? `embeddings: ${embedder.modelId}` : 'hashing'].join(', '),
   node: process.version,
   ...(llm ? { llmUsage: { calls: usage.calls, seconds: +(usage.ms / 1000).toFixed(1) } } : {}),
 });
@@ -119,7 +145,10 @@ if (gateFile) {
 }
 
 if (flag('save')) {
-  const suffix = `${llm ? '-llm' : ''}${embedder ? `-embed-${embedder.modelId.replace(/[^a-z0-9.]+/gi, '-')}` : ''}`;
+  const slug = (m) => m.replace(/[^a-z0-9.]+/gi, '-');
+  const suffix = url
+    ? `-http${remote.llm ? '-llm' : ''}${remote.embeddings ? `-embed-${slug(remote.embeddings)}` : ''}`
+    : `${llm ? '-llm' : ''}${embedder ? `-embed-${slug(embedder.modelId)}` : ''}`;
   const file = path.join(here, 'results', `${pkg.version}${suffix}.json`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(summary, null, 2) + '\n');

@@ -9,6 +9,8 @@ npm run bench -- --compare bench/results/0.2.0.json   # adds a delta column
 npm run bench -- --llm                                # with the configured LLM (UI settings or BRAIN_LLM_* env)
 npm run bench -- --save                               # writes bench/results/<version>.json
 npm run bench -- --gate bench/results/0.3.0.json      # what CI runs: exit 1 if a quality metric got worse
+npm run bench -- --url http://localhost:4317          # a running hub, as it is configured (add --token if it has one)
+npm run bench:scale                                   # retrieval latency with 20,000 episodes (--episodes, --customers)
 ```
 
 **The CI gate** fails a PR if scenario pass rate, recall accuracy, stale-use rate, conflict handling or reply accuracy gets worse than the committed baseline, or if anything leaks. Latency and prompt tokens are reported but not gated. If a change is meant to move a number (for example, a new scenario that the current memory fails), re-save the baseline with `--save` in the same PR and say why in the description.
@@ -57,7 +59,7 @@ Add one JSON file to `bench/scenarios/`. No code changes are needed.
 | `{ "advance": "45m" \| "6h" \| "2d" }` | moves the brain's simulated clock |
 | `{ "sleep": true }` | runs a sleep cycle manually |
 
-Agents are `mia` (personal), `kai` (repair), `atlas` (travel), `sage` (health, private), `penny` (finance), `nova` (shopping). Add `"customer": "<id>"` to a step to use more than one customer; by default every scenario has its own customer.
+Categories also include `exact_match` (order numbers, model names). Agents are `mia` (personal), `kai` (repair), `atlas` (travel), `sage` (health, private), `penny` (finance), `nova` (shopping). Add `"customer": "<id>"` to a step to use more than one customer; by default every scenario has its own customer.
 
 Automatic sleep runs after every step, as it does in production (idle and pressure triggers; the nightly trigger is off because it depends on wall-clock time).
 
@@ -83,6 +85,8 @@ Run `npm test`: it validates every scenario file. `npm run bench` stops with a l
 ## How it works
 
 Each scenario runs against a **target** with a small interface (`say`, `recall`, `advance`, `sleep`). Scoring only uses what a public API exposes: the `recall` payload (`memories[]`, `promptBlock`) and replies. The same scenarios can therefore run over HTTP later ([#15](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/15)) and keep working when the memory core changes.
+
+**Benchmarking a running hub** (`--url`, [lib/targets/http.mjs](lib/targets/http.mjs)) uses only its REST APIs, so it scores exactly what you deployed: a Docker container, a hub with its own LLM and embedding settings. Each scenario gets its own customer, and each scenario agent becomes a temporary connected agent with the same domain, deleted afterwards; built-in agents and their keys are never touched. `advance` moves the hub's simulated clock, which is global, so **point it at a test hub, not production**. Run against the same configuration, it gives the same numbers as the in-process target.
 
 The in-process target ([lib/targets/inprocess.mjs](lib/targets/inprocess.mjs)) creates a fresh brain for every scenario. It also returns RAS diagnostics, so a failed check can say why a memory was excluded. Diagnostics explain results; they are never scored.
 

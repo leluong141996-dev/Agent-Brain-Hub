@@ -83,6 +83,9 @@ const admin = {
     const b = await readBody(req);
     return brain.sleep({ customerId: b.customerId, lang: b.lang, trigger: 'manual' });
   },
+  // Run one automatic-sleep pass now (operators; the HTTP benchmark target uses
+  // it to reproduce what the scheduler does between requests).
+  'POST /api/sleep/tick': async () => ({ runs: (await sleeper.tick()).map((r) => ({ customerId: r.customerId, trigger: r.trigger, consolidated: r.consolidated })) }),
   'GET /api/settings/sleep': () => sleeper.status(),
   'PUT /api/settings/sleep': async (req) => sleeper.configure(await readBody(req)),
   'POST /api/clock': async (req) => {

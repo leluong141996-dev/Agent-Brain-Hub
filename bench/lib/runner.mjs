@@ -50,7 +50,7 @@ export async function runScenario(s, makeTarget, { llm = false } = {}) {
     res.checks = res.checks.map((c) => ({ ...c, passed: false }));
     s.steps.slice(n - 1).forEach((st, i) => res.checks.push(...failedChecks(st, n + i)));
   } finally {
-    target.close?.();
+    await target.close?.();
   }
   if (res.status !== 'error') res.status = res.checks.filter((c) => c.counted).every((c) => c.passed) ? 'passed' : 'failed';
   return res;

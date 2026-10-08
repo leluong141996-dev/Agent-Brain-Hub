@@ -157,3 +157,46 @@ test('bench: the CI gate fails on regressions and passes otherwise', () => {
   assert.match(leak[0].message, /Leak rate must be 0/);
   assert.deepEqual(gate(m({ conflictHandling: null }), m({ conflictHandling: null })), [], 'metrics with no checks are skipped');
 });
+
+test('bench: the HTTP target scores a running hub and cleans up after itself', async () => {
+  const { spawn } = await import('node:child_process');
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const net = await import('node:net');
+  const { HttpTarget } = await import('../bench/lib/targets/http.mjs');
+  const port = await new Promise((r) => {
+    const s = net.createServer().listen(0, () => {
+      const p = s.address().port;
+      s.close(() => r(p));
+    });
+  });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bench-http-'));
+  const env = { ...process.env, PORT: String(port), BRAIN_DB: path.join(dir, 'brain.db'), BRAIN_SETTINGS: path.join(dir, 'settings.json'), BRAIN_OFFLINE: '1', BRAIN_ADMIN_TOKEN: 'bench-token' };
+  delete env.BRAIN_EMBED_PROVIDER;
+  const hub = spawn(process.execPath, [path.join(here, '..', 'server', 'index.js')], { env, stdio: 'ignore' });
+  const url = `http://127.0.0.1:${port}`;
+  try {
+    for (let i = 0; i < 50; i++) {
+      if (await fetch(`${url}/healthz`).then((r) => r.ok, () => false)) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    const scenario = {
+      id: 'http',
+      category: 'leakage',
+      lang: 'en',
+      steps: [
+        { agent: 'sage', say: 'I am allergic to peanuts' },
+        { agent: 'kai', say: 'My car broke down, it will be in the shop for 3 days' },
+        { advance: '1d' },
+        { agent: 'atlas', recall: 'I need a flight to Da Nang next week', expect: { remembers: ['no car for 3 days'], private: ['peanut'] } },
+      ],
+    };
+    const r = await runScenario(scenario, () => new HttpTarget({ url, token: 'bench-token', lang: 'en', scenarioId: 'http' }));
+    assert.equal(r.status, 'passed', JSON.stringify(r.checks));
+    const state = await fetch(`${url}/api/state`, { headers: { 'x-admin-token': 'bench-token' } }).then((x) => x.json());
+    assert.ok(!state.agents.some((a) => /^bench-/.test(a.name)), 'temporary agents are deleted');
+    assert.equal(state.agents.length, 6, 'built-in agents untouched');
+  } finally {
+    hub.kill();
+  }
+});
