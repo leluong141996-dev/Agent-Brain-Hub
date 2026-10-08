@@ -129,7 +129,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     fCands.push({ kind: 'semantic', id: f.id, text, relation: f.relation, value: factValue(f, lang), tier: 'warm', scope: f.scope, owner: f.ownerDomain, source: f.sourceAgentId, sourceName: f.sourceAgentId ? B.agentName(f.sourceAgentId) : null, at: f.updatedAt || f.createdAt, validUntil: f.validUntil || null, status: f.status, score, parts: { sim, entityHit, profile } });
   }
   t.step('neocortex', t.L(`Semantic: tra ${facts.length} fact theo entity/query`, `Semantic: looked up ${facts.length} facts by entity/query`, `意味記憶：${facts.length}件をエンティティ/クエリで検索`), {
-    store: 'semantic (graph + SQL)',
+    store: 'semantic (facts)',
     scanned: facts.length,
     candidates: fCands.length,
     conflicted: fCands.filter((f) => f.status === 'conflicted').length,

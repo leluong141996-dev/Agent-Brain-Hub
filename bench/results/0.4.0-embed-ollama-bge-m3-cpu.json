@@ -1,0 +1,635 @@
+{
+  "version": "0.4.0",
+  "commit": "c775fdd",
+  "date": "2026-10-08T18:32:26.847Z",
+  "mode": "offline, embeddings: ollama:bge-m3-cpu",
+  "node": "v22.23.3",
+  "metrics": {
+    "scenarios": 25,
+    "scenarioPassRate": 0.96,
+    "recallAccuracy": 1,
+    "leakRate": 0,
+    "staleUseRate": 0.25,
+    "conflictHandling": 1,
+    "replyAccuracy": null,
+    "sayP50": 106.61402699999962,
+    "sayP95": 246.64767500000016,
+    "recallP50": 95.95684500000061,
+    "recallP95": 135.27110500000163,
+    "promptTokens": 513.3125
+  },
+  "categories": {
+    "cross_agent": {
+      "scenarios": 10,
+      "scenarioPassRate": 1,
+      "recallAccuracy": 1,
+      "leakRate": null,
+      "staleUseRate": null,
+      "conflictHandling": null,
+      "replyAccuracy": null,
+      "sayP50": 235.55495500000006,
+      "sayP95": 274.30077099999835,
+      "recallP50": 102.97297099999923,
+      "recallP95": 158.23548500000106,
+      "promptTokens": 501.6363636363636
+    },
+    "stale": {
+      "scenarios": 3,
+      "scenarioPassRate": 1,
+      "recallAccuracy": 1,
+      "leakRate": null,
+      "staleUseRate": 0,
+      "conflictHandling": null,
+      "replyAccuracy": null,
+      "sayP50": 225.8732799999998,
+      "sayP95": 230.6834259999996,
+      "recallP50": 90.10751300000265,
+      "recallP95": 123.70657700000083,
+      "promptTokens": 465.4
+    },
+    "contradiction": {
+      "scenarios": 3,
+      "scenarioPassRate": 0.6666666666666666,
+      "recallAccuracy": 1,
+      "leakRate": null,
+      "staleUseRate": 0.5,
+      "conflictHandling": 1,
+      "replyAccuracy": null,
+      "sayP50": 149.349651,
+      "sayP95": 234.624006,
+      "recallP50": 98.68402199999991,
+      "recallP95": 99.15885900000012,
+      "promptTokens": 544.6666666666666
+    },
+    "leakage": {
+      "scenarios": 4,
+      "scenarioPassRate": 1,
+      "recallAccuracy": 1,
+      "leakRate": 0,
+      "staleUseRate": null,
+      "conflictHandling": null,
+      "replyAccuracy": null,
+      "sayP50": 222.6191429999999,
+      "sayP95": 246.64767500000016,
+      "recallP50": 94.5550089999997,
+      "recallP95": 108.19089200000053,
+      "promptTokens": 386.1666666666667
+    },
+    "multi_hop": {
+      "scenarios": 2,
+      "scenarioPassRate": 1,
+      "recallAccuracy": 1,
+      "leakRate": null,
+      "staleUseRate": null,
+      "conflictHandling": null,
+      "replyAccuracy": null,
+      "sayP50": 222.8225220000022,
+      "sayP95": 236.37718400000085,
+      "recallP50": 98.45992000000115,
+      "recallP95": 98.45992000000115,
+      "promptTokens": 565.5
+    },
+    "long_conversation": {
+      "scenarios": 1,
+      "scenarioPassRate": 1,
+      "recallAccuracy": 1,
+      "leakRate": null,
+      "staleUseRate": null,
+      "conflictHandling": null,
+      "replyAccuracy": null,
+      "sayP50": 92.9676729999992,
+      "sayP95": 128.49509300000136,
+      "recallP50": 98.7240320000019,
+      "recallP95": 98.7240320000019,
+      "promptTokens": 810
+    },
+    "exact_match": {
+      "scenarios": 2,
+      "scenarioPassRate": 1,
+      "recallAccuracy": 1,
+      "leakRate": null,
+      "staleUseRate": null,
+      "conflictHandling": null,
+      "replyAccuracy": null,
+      "sayP50": 109.4172329999983,
+      "sayP95": 239.44181900000058,
+      "recallP50": 114.06802199999947,
+      "recallP95": 135.27110500000163,
+      "promptTokens": 626.3333333333334
+    }
+  },
+  "scenarios": [
+    {
+      "id": "contradiction-explicit-move",
+      "category": "contradiction",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "Saigon",
+          "passed": true,
+          "counted": true,
+          "step": 5
+        },
+        {
+          "type": "stale",
+          "pattern": "/lives in:? hanoi/i",
+          "passed": true,
+          "counted": true,
+          "step": 5
+        }
+      ]
+    },
+    {
+      "id": "contradiction-like-to-dislike",
+      "category": "contradiction",
+      "lang": "en",
+      "status": "failed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "/^dislikes:? spicy/i",
+          "passed": true,
+          "counted": true,
+          "step": 5
+        },
+        {
+          "type": "stale",
+          "pattern": "/^likes:? spicy/i",
+          "passed": false,
+          "counted": true,
+          "step": 5
+        }
+      ]
+    },
+    {
+      "id": "contradiction-two-cities",
+      "category": "contradiction",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "conflict",
+          "pattern": "Hanoi",
+          "passed": true,
+          "counted": true,
+          "step": 5
+        },
+        {
+          "type": "conflict",
+          "pattern": "Da Nang",
+          "passed": true,
+          "counted": true,
+          "step": 5
+        }
+      ]
+    },
+    {
+      "id": "cross-agent-car-unavailable",
+      "category": "cross_agent",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "no car for 3 days",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        }
+      ]
+    },
+    {
+      "id": "cross-agent-name-and-diet",
+      "category": "cross_agent",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "vegetarian",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        },
+        {
+          "type": "remembers",
+          "pattern": "vegetarian",
+          "passed": true,
+          "counted": true,
+          "step": 4
+        },
+        {
+          "type": "remembers",
+          "pattern": "Linh",
+          "passed": true,
+          "counted": true,
+          "step": 4
+        }
+      ]
+    },
+    {
+      "id": "cross-agent-trip-to-personal",
+      "category": "cross_agent",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "Tokyo",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        }
+      ]
+    },
+    {
+      "id": "exact-model-name",
+      "category": "exact_match",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "WH-1000XM5",
+          "passed": true,
+          "counted": true,
+          "step": 13
+        }
+      ]
+    },
+    {
+      "id": "exact-order-number",
+      "category": "exact_match",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "ORD-48211",
+          "passed": true,
+          "counted": true,
+          "step": 25
+        },
+        {
+          "type": "remembers",
+          "pattern": "ORD-48207",
+          "passed": true,
+          "counted": true,
+          "step": 26
+        }
+      ]
+    },
+    {
+      "id": "ja-car-unavailable",
+      "category": "cross_agent",
+      "lang": "ja",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "3日間",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        }
+      ]
+    },
+    {
+      "id": "ja-diet",
+      "category": "cross_agent",
+      "lang": "ja",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "ベジタリアン",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        }
+      ]
+    },
+    {
+      "id": "leakage-after-sleep",
+      "category": "leakage",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "private",
+          "pattern": "diabetes",
+          "passed": true,
+          "counted": true,
+          "step": 5
+        }
+      ]
+    },
+    {
+      "id": "leakage-allergy",
+      "category": "leakage",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "private",
+          "pattern": "peanut",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        },
+        {
+          "type": "private",
+          "pattern": "peanut",
+          "passed": true,
+          "counted": true,
+          "step": 4
+        },
+        {
+          "type": "remembers",
+          "pattern": "peanut",
+          "passed": true,
+          "counted": true,
+          "step": 5
+        }
+      ]
+    },
+    {
+      "id": "leakage-handoff-right-after",
+      "category": "leakage",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "private",
+          "pattern": "diabetes",
+          "passed": true,
+          "counted": true,
+          "step": 2
+        },
+        {
+          "type": "private",
+          "pattern": "shellfish",
+          "passed": true,
+          "counted": true,
+          "step": 2
+        }
+      ]
+    },
+    {
+      "id": "leakage-income-vs-budget",
+      "category": "leakage",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "800",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        },
+        {
+          "type": "private",
+          "pattern": "3000",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        }
+      ]
+    },
+    {
+      "id": "long-conversation-early-detail",
+      "category": "long_conversation",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "aisle",
+          "passed": true,
+          "counted": true,
+          "step": 33
+        },
+        {
+          "type": "remembers",
+          "pattern": "Minh",
+          "passed": true,
+          "counted": true,
+          "step": 34
+        }
+      ]
+    },
+    {
+      "id": "multi-hop-car-and-trip",
+      "category": "multi_hop",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "no car for 3 days",
+          "passed": true,
+          "counted": true,
+          "step": 4
+        },
+        {
+          "type": "remembers",
+          "pattern": "Da Nang",
+          "passed": true,
+          "counted": true,
+          "step": 4
+        }
+      ]
+    },
+    {
+      "id": "multi-hop-diet-and-trip",
+      "category": "multi_hop",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "vegetarian",
+          "passed": true,
+          "counted": true,
+          "step": 4
+        },
+        {
+          "type": "remembers",
+          "pattern": "Tokyo",
+          "passed": true,
+          "counted": true,
+          "step": 4
+        }
+      ]
+    },
+    {
+      "id": "paraphrase-drive-without-car",
+      "category": "cross_agent",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "no car for 3 days",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        }
+      ]
+    },
+    {
+      "id": "paraphrase-spending-budget",
+      "category": "cross_agent",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "800",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        }
+      ]
+    },
+    {
+      "id": "stale-car-after-ttl",
+      "category": "stale",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "no car for 3 days",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        },
+        {
+          "type": "stale",
+          "pattern": "no car for 3 days",
+          "passed": true,
+          "counted": true,
+          "step": 5
+        }
+      ]
+    },
+    {
+      "id": "stale-name-persists",
+      "category": "stale",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "John",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        }
+      ]
+    },
+    {
+      "id": "stale-trip-destination",
+      "category": "stale",
+      "lang": "en",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "Tokyo",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        },
+        {
+          "type": "stale",
+          "pattern": "/trip to:? tokyo/i",
+          "passed": true,
+          "counted": true,
+          "step": 5
+        }
+      ]
+    },
+    {
+      "id": "vi-no-diacritics",
+      "category": "cross_agent",
+      "lang": "vi",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "/chay/i",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        },
+        {
+          "type": "remembers",
+          "pattern": "Lan",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        }
+      ]
+    },
+    {
+      "id": "vi-paraphrase-tu-lai",
+      "category": "cross_agent",
+      "lang": "vi",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "3 ngày",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        }
+      ]
+    },
+    {
+      "id": "vi-window-seat",
+      "category": "cross_agent",
+      "lang": "vi",
+      "status": "passed",
+      "error": null,
+      "checks": [
+        {
+          "type": "remembers",
+          "pattern": "cửa sổ",
+          "passed": true,
+          "counted": true,
+          "step": 3
+        }
+      ]
+    }
+  ]
+}

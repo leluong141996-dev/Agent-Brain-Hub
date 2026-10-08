@@ -306,23 +306,27 @@ By default, memories are matched with local feature-hashing vectors: no network,
 
 ## Benchmark
 
-`npm run bench` scores the shared memory on 23 multi-agent scenarios: cross-agent recall, stale facts, contradictions, private-data leakage, multi-hop questions and long conversations, in English with Vietnamese and Japanese cases. It runs offline in about a second, and CI fails any change that makes a quality metric worse ([bench/README.md](bench/README.md)).
+`npm run bench` scores the shared memory on 25 multi-agent scenarios: cross-agent recall, stale facts, contradictions, private-data leakage, multi-hop questions, long conversations and exact matches (order numbers, model names), in English with Vietnamese and Japanese cases. It runs offline in under a second, and CI fails any change that makes a quality metric worse ([bench/README.md](bench/README.md)).
 
-| v0.3.0 | Hashing (default, offline) | `bge-m3` embeddings (Ollama, CPU) |
+| v0.4.0 | Hashing (default, offline) | Hybrid with `bge-m3` (Ollama, CPU) |
 |---|---|---|
-| Scenario pass rate | 82.6% | **95.7%** |
-| Recall accuracy | 88.5% | **100%** |
+| Scenario pass rate | 84.0% | **96.0%** |
+| Recall accuracy | 89.7% | **100%** |
 | Leak rate | **0%** | **0%** |
 | Stale-use rate | 25.0% | 25.0% |
 | Conflict handling | 100% | 100% |
-| recall latency (p50) | 0.4 ms | 95 ms |
-| Prompt tokens (mean) | 417 | 497 |
+| recall latency (p50) | 0.5 ms | 96 ms |
+| Prompt tokens (mean) | 426 | 513 |
 
-These are our own scenarios, so they compare versions of this project, not other systems; a public dataset is [on the roadmap](ROADMAP.md). The remaining stale-use failure is a known bug ([#22](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/22)).
+These are our own scenarios, so they compare versions of this project. The remaining stale-use failure is a known bug ([#22](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/22)).
+
+**On a public dataset.** `npm run bench:longmemeval` scores retrieval on [LongMemEval-S](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned) (MIT, 470 questions, ~50 sessions each): is the session that holds the answer near the top? With local hashing it is in the top 4 for **52.8%** of questions and in the top 10 for **71.3%**. Preferences (20% @4) and questions that need every evidence session are the weak spots. Answer accuracy isn't measured yet.
+
+**At scale.** A per-customer index keeps recall at p50 0.6 ms / p95 1.9 ms with 100,000 episodes (`npm run bench:scale`).
 
 ## Tests
 
-- `npm test`: 63 unit tests, covering:
+- `npm test`: 70 unit tests, covering:
   - the acceptance QA suite from the architecture document: amnesia, contradiction, staleness, skill promotion, 20k-episode load;
   - permissions and prompt leakage;
   - English and Japanese;
@@ -330,7 +334,7 @@ These are our own scenarios, so they compare versions of this project, not other
   - the LLM layer: provider catalog, adapting to a strict mock OpenAI-style server, storing and masking keys, fetching model lists;
   - SQLite storage: data survives a reopen (embeddings included), only changed rows are written, the audit log is never truncated and SQL metrics match the in-memory computation, legacy JSON import, reset;
   - the automatic sleep cycle (idle, pressure, nightly), fact provenance in prompts, embedding providers (with a mock server), and the benchmark harness itself.
-- `npm run bench`: the memory benchmark. 23 multi-agent scenarios (cross-agent recall, stale facts, contradictions, leakage, multi-hop, long conversations) scored offline in about a second. See [bench/README.md](bench/README.md); adding a scenario is one JSON file.
+- `npm run bench`: the memory benchmark. 25 multi-agent scenarios (cross-agent recall, stale facts, contradictions, leakage, multi-hop, long conversations, exact matches) scored offline in under a second. Also `npm run bench:longmemeval` (public dataset, retrieval) and `npm run bench:scale` (latency with a large memory). See [bench/README.md](bench/README.md); adding a scenario is one JSON file.
 - `npm run e2e -- --lang vi|en|ja`: 11 steps against a running server, with any LLM configuration (offline, Claude, GPT, local models…). Includes a connected agent through the SDK and the MCP server over stdio. The test uses a new customer so existing data is left alone, but it advances the simulated clock by 7 days.
 
 ## Project structure
@@ -367,10 +371,11 @@ The goal: **the memory layer for multi-agent systems — correct over time, gove
 
 | Version | Focus |
 |---|---|
-| **v0.3** | A memory benchmark first, then pluggable embeddings and hybrid retrieval (FTS5 + sqlite-vec) |
-| **v0.4** | A bi-temporal knowledge graph: point-in-time `recall({ asOf })`, entity resolution, multi-hop retrieval |
-| **v0.5** | Open-schema extraction, write-arbitration policies and agent trust scores |
-| **v0.6** | Policy-as-code governance, PostgreSQL + pgvector, OpenTelemetry, multi-tenancy |
+| ✅ **v0.3** | Memory benchmark with a CI gate; pluggable embedding models |
+| ✅ **v0.4** | Hybrid retrieval, a per-customer index, LongMemEval retrieval, benchmarking a running hub |
+| **v0.5** | A bi-temporal knowledge graph: point-in-time `recall({ asOf })`, entity resolution, multi-hop retrieval |
+| **v0.6** | Open-schema extraction, write-arbitration policies and agent trust scores |
+| **v0.7** | Policy-as-code governance, PostgreSQL + pgvector, OpenTelemetry, multi-tenancy |
 
 Details, principles and what's not planned: [ROADMAP.md](ROADMAP.md).
 

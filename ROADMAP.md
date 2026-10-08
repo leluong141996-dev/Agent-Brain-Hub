@@ -6,24 +6,24 @@ Most memory libraries are built for one agent. When several agents share one mem
 
 It's a plan, not a promise. Priorities change with feedback: comment on the milestone issues or open a [Discussion](https://github.com/leluong141996-dev/Agent-Brain-Hub/discussions).
 
-## Where we are (v0.3)
+## Where we are (v0.4)
 
 **Solid today**
 - Shared memory with governance: private / shared / global scopes, one writer domain per relation, per-agent permissions, append-only audit log.
 - Every request traced live through 13 brain regions; facts carry their source, age and expiry into the prompt.
 - Automatic sleep cycle (idle, pressure, nightly), TTL-based forgetting, contradiction flagging, skill promotion.
 - Runs offline with zero configuration, or with any LLM. REST, JS SDK and MCP. English, Vietnamese, Japanese.
-- Measured: a 23-scenario memory benchmark with a CI gate. Optional semantic search with real embedding models (recall 88.5% → 100% with `bge-m3`).
+- Measured: a 25-scenario memory benchmark with a CI gate, plus LongMemEval-S retrieval. Hybrid semantic + lexical search with real embedding models; a per-customer index keeps retrieval under 2 ms at 100,000 episodes.
 
 **Still basic**
 
 | Limitation | Today |
 |---|---|
 | Closed schema | 19 predefined relations and 35 regex rules. LLM extraction is limited to the same list, so anything outside it (say, a favourite colour) is not remembered. |
-| Retrieval at scale | Hashing by default, embedding models opt-in, but every query still scans a customer's memories linearly; no keyword index for exact names and codes. |
+| Retrieval quality on long histories | On LongMemEval-S, hashing finds the evidence session in the top 4 for about half the questions; preferences and multi-session questions are weakest. |
 | Coarse time | A fact has a TTL and is deleted when it expires. There's no way to ask what the brain believed at a given moment. |
 | No graph | Facts hang off a customer. No relations between entities, no entity resolution. |
-| Own scenarios only | The benchmark uses our own 23 scenarios; there's no public-dataset number yet. The value dashboard's "time saved" is an estimate (20 s per question). |
+| Answers not measured | Benchmarks score what reaches the agent (25 own scenarios, LongMemEval retrieval), not the final answers. The value dashboard's "time saved" is an estimate (20 s per question). |
 | Single process | State lives in memory; SQLite is the persistence layer. |
 
 ## Principles
@@ -48,17 +48,22 @@ These hold for every milestone:
 
 **Result:** with `bge-m3`, recall accuracy went from 88.5% to 100% and scenario pass rate from 82.6% to 95.7%, with no leaks (see the README).
 
-### Next: hybrid retrieval and external benchmarks
+### v0.4: Hybrid retrieval and external benchmarks ✅ released
 
-*Goal: fast retrieval at scale, exact matches for names and codes, and numbers that compare with other systems.* Moved out of v0.3 to keep releases small.
+*Goal: fast retrieval at scale, exact matches for names and codes, and numbers that compare with other systems.*
 
-- [ ] Hybrid retrieval: keyword (SQLite FTS5) + vector (sqlite-vec) + recency, fused with Reciprocal Rank Fusion; optional reranker. ([#13](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/13)) Needs new scenarios for large memories and exact names or codes, since recall is already 100% on the current set.
-- [ ] A public long-term-memory dataset in the same harness (LongMemEval-style), so results compare with other systems. Offline, measure whether the evidence sessions are retrieved; answer accuracy needs an LLM. ([#14](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/14))
-- [ ] Run the benchmark through [Argus](https://github.com/leluong141996-dev/Argus), the agent evaluation platform. ([#15](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/15))
+- [x] Hybrid retrieval ([#13](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/13)): model + lexical similarity (CombSUM), so embeddings never lose exact matches; a per-customer index instead of a scan. Done in memory rather than with FTS5 / sqlite-vec: the brain's state lives in memory and SQLite is written behind it, so an index in SQLite would lag fresh writes. A database-side index comes with the PostgreSQL adapter.
+- [x] A public long-term-memory dataset ([#14](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/14)): LongMemEval-S, session-level retrieval recall@k.
+- [ ] Run the benchmark through [Argus](https://github.com/leluong141996-dev/Argus) ([#15](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/15)). This repo's side is done: the benchmark can score any running hub over HTTP. The Argus plugin remains.
 
-**Done when** retrieval latency at 20k episodes is lower than today with equal or better accuracy, and the README reports a public-dataset number.
+**Result:** recall latency at 100,000 episodes went from p95 40 ms to 1.9 ms. LongMemEval-S with local hashing: evidence session in the top 4 for 52.8% of questions, in the top 10 for 71.3%.
 
-### v0.4: A temporal knowledge graph
+### Next: memory that reads like memory
+
+- Answer accuracy on LongMemEval with an LLM (needs a GPU run), and embedding-model numbers on it.
+- Retrieval quality on LongMemEval's weak spots: preferences (20% @4) and questions that need every evidence session (26% @4).
+
+### v0.5: A temporal knowledge graph
 
 *Goal: memory that is correct over time, and connected.*
 
@@ -68,9 +73,9 @@ These hold for every milestone:
 - [ ] Multi-hop retrieval over the graph (customer → car → repair shop), inside the same permission checks.
 - [ ] A time slider in the UI to replay memory state; graph view of a customer's entities.
 
-**Done when** the stale-fact and multi-hop benchmark scores improve over v0.3, and `asOf` queries are covered by tests.
+**Done when** the stale-fact and multi-hop benchmark scores improve over v0.4, and `asOf` queries are covered by tests.
 
-### v0.5: Open schema and multi-agent consistency
+### v0.6: Open schema and multi-agent consistency
 
 *Goal: remember anything, and keep many writers consistent.*
 
@@ -83,7 +88,7 @@ These hold for every milestone:
 
 **Done when** the benchmark's contradiction and long-conversation scores improve, and "favourite colour" is remembered and recalled.
 
-### v0.6: Production governance and scale
+### v0.7: Production governance and scale
 
 *Goal: something a team can run for real.*
 
@@ -107,7 +112,7 @@ These hold for every milestone:
 
 - Move the six demo agents and their domains into `examples/`, so the core is domain-agnostic.
 - Label the value dashboard's estimates as estimates until they're measured.
-- Rename the `semantic (graph + SQL)` trace label to match what exists until v0.4 ships.
+- ~~Rename the `semantic (graph + SQL)` trace label to match what exists~~ (done in v0.4: `semantic (facts)`).
 
 ## Not planned
 

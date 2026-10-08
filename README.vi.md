@@ -294,23 +294,27 @@ Mặc định, ký ức được so khớp bằng vector feature hashing chạy 
 
 ## Benchmark
 
-`npm run bench` chấm bộ nhớ dùng chung trên 23 kịch bản nhiều agent: nhớ chéo giữa agent, fact hết hạn, mâu thuẫn, rò rỉ dữ liệu private, câu hỏi nhiều bước và hội thoại dài, bằng tiếng Anh kèm các ca tiếng Việt và tiếng Nhật. Chạy offline trong khoảng một giây, và CI chặn mọi thay đổi làm tụt một chỉ số chất lượng ([bench/README.md](bench/README.md)).
+`npm run bench` chấm bộ nhớ dùng chung trên 25 kịch bản nhiều agent: nhớ chéo giữa agent, fact hết hạn, mâu thuẫn, rò rỉ dữ liệu private, câu hỏi nhiều bước, hội thoại dài và khớp chính xác (mã đơn hàng, tên model), bằng tiếng Anh kèm các ca tiếng Việt và tiếng Nhật. Chạy offline dưới một giây, và CI chặn mọi thay đổi làm tụt một chỉ số chất lượng ([bench/README.md](bench/README.md)).
 
-| v0.3.0 | Hashing (mặc định, offline) | Embedding `bge-m3` (Ollama, CPU) |
+| v0.4.0 | Hashing (mặc định, offline) | Lai với `bge-m3` (Ollama, CPU) |
 |---|---|---|
-| Scenario pass rate | 82,6% | **95,7%** |
-| Recall accuracy | 88,5% | **100%** |
+| Scenario pass rate | 84,0% | **96,0%** |
+| Recall accuracy | 89,7% | **100%** |
 | Leak rate | **0%** | **0%** |
 | Stale-use rate | 25,0% | 25,0% |
 | Conflict handling | 100% | 100% |
-| Độ trễ recall (p50) | 0,4 ms | 95 ms |
-| Prompt tokens (trung bình) | 417 | 497 |
+| Độ trễ recall (p50) | 0,5 ms | 96 ms |
+| Prompt tokens (trung bình) | 426 | 513 |
 
-Đây là kịch bản do dự án tự viết, nên chỉ dùng để so các phiên bản của chính dự án, không so với hệ thống khác; bộ dữ liệu công khai nằm trong [lộ trình](ROADMAP.md). Lỗi stale-use còn lại là lỗi đã biết ([#22](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/22)).
+Đây là kịch bản do dự án tự viết, nên dùng để so các phiên bản của chính dự án. Lỗi stale-use còn lại là lỗi đã biết ([#22](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/22)).
+
+**Trên bộ dữ liệu công khai.** `npm run bench:longmemeval` chấm khả năng truy xuất trên [LongMemEval-S](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned) (MIT, 470 câu hỏi, mỗi câu khoảng 50 phiên): phiên chứa câu trả lời có nằm gần đầu không? Với hashing local, nó nằm trong top 4 ở **52,8%** câu hỏi và trong top 10 ở **71,3%**. Điểm yếu là câu hỏi về sở thích (20% @4) và câu cần đủ mọi phiên bằng chứng. Độ chính xác của câu trả lời chưa được đo.
+
+**Ở quy mô lớn.** Chỉ mục theo khách hàng giữ recall ở p50 0,6 ms / p95 1,9 ms với 100.000 episode (`npm run bench:scale`).
 
 ## Test
 
-- `npm test`: 63 unit test, gồm:
+- `npm test`: 70 unit test, gồm:
   - bộ QA nghiệm thu của tài liệu: amnesia, contradiction, staleness, skill promotion, load 20k episode;
   - phân quyền và rò rỉ prompt;
   - tiếng Anh, tiếng Nhật;
@@ -318,7 +322,7 @@ Mặc định, ký ức được so khớp bằng vector feature hashing chạy 
   - lớp LLM: danh mục nhà cung cấp, tự thích nghi với một server giả lập khó tính kiểu OpenAI, lưu/ẩn key, tải danh sách model;
   - lưu trữ SQLite: mở lại thì dữ liệu còn nguyên (kể cả embedding), chỉ ghi các dòng thay đổi, audit không bị cắt và số liệu SQL khớp với cách tính trong bộ nhớ, nhập từ JSON cũ, reset;
   - vòng ngủ tự động (im lặng, áp lực, ban đêm), nguồn gốc và tuổi của fact trong prompt, nhà cung cấp embedding (với server giả lập), và chính bộ benchmark.
-- `npm run bench`: benchmark bộ nhớ. 23 kịch bản nhiều agent (nhớ chéo, fact hết hạn, mâu thuẫn, rò rỉ, nhiều bước, hội thoại dài), chấm offline trong khoảng một giây. Xem [bench/README.md](bench/README.md); thêm kịch bản chỉ cần một file JSON.
+- `npm run bench`: benchmark bộ nhớ. 25 kịch bản nhiều agent (nhớ chéo, fact hết hạn, mâu thuẫn, rò rỉ, nhiều bước, hội thoại dài, khớp chính xác), chấm offline dưới một giây. Ngoài ra có `npm run bench:longmemeval` (bộ dữ liệu công khai, truy xuất) và `npm run bench:scale` (độ trễ khi bộ nhớ lớn). Xem [bench/README.md](bench/README.md); thêm kịch bản chỉ cần một file JSON.
 - `npm run e2e -- --lang vi|en|ja`: 11 bước chạy trên server đang chạy, với bất kỳ cấu hình LLM nào (offline, Claude, GPT, model local…). Bao gồm cả agent connected qua SDK và MCP server qua stdio. Bài test dùng một khách hàng mới nên không đụng dữ liệu đang có, nhưng tua đồng hồ mô phỏng thêm 7 ngày.
 
 ## Cấu trúc
@@ -356,10 +360,11 @@ Mục tiêu: **lớp bộ nhớ cho hệ nhiều agent — đúng theo thời gi
 
 | Phiên bản | Trọng tâm |
 |---|---|
-| **v0.3** | Làm bộ benchmark bộ nhớ trước, rồi embedding thay thế được và tìm kiếm lai (FTS5 + sqlite-vec) |
-| **v0.4** | Đồ thị tri thức hai trục thời gian: `recall({ asOf })` theo thời điểm, gộp thực thể, truy xuất nhiều bước |
-| **v0.5** | Trích xuất schema mở, chính sách giải quyết khi ghi trùng, điểm tin cậy cho agent |
-| **v0.6** | Quản trị bằng chính sách khai báo, PostgreSQL + pgvector, OpenTelemetry, multi-tenant |
+| ✅ **v0.3** | Benchmark bộ nhớ có cổng chặn trong CI; model embedding thay thế được |
+| ✅ **v0.4** | Tìm kiếm lai, chỉ mục theo khách hàng, LongMemEval, benchmark một hub đang chạy |
+| **v0.5** | Đồ thị tri thức hai trục thời gian: `recall({ asOf })` theo thời điểm, gộp thực thể, truy xuất nhiều bước |
+| **v0.6** | Trích xuất schema mở, chính sách giải quyết khi ghi trùng, điểm tin cậy cho agent |
+| **v0.7** | Quản trị bằng chính sách khai báo, PostgreSQL + pgvector, OpenTelemetry, multi-tenant |
 
 Chi tiết, nguyên tắc và những gì không nằm trong kế hoạch: [ROADMAP.md](ROADMAP.md) (tiếng Anh).
 

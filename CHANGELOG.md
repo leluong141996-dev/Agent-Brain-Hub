@@ -5,6 +5,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-09
+
+Retrieval that scales, keeps exact matches with embeddings on, and a first number on a public dataset.
+
+### Added
+
+- **Hybrid retrieval** ([#13](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/13)). With an embedding model on, similarity is now model + lexical (CombSUM). Models blur exact tokens: among twelve order conversations, bge-m3 alone could not pick out "order 48207"; the lexical signal does. Hashing-only mode is unchanged.
+- **Per-customer memory index** ([#13](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/13)). Retrieval reads one customer's memories instead of scanning everyone's (`npm run bench:scale`):
+
+  | Recall latency (hashing) | 0.3.0 | 0.4.0 |
+  |---|---|---|
+  | 20,000 episodes | p50 1.48 ms · p95 2.19 ms | p50 0.59 ms · p95 1.15 ms |
+  | 100,000 episodes | p50 4.31 ms · p95 40.1 ms | p50 0.60 ms · p95 1.85 ms |
+
+- **LongMemEval retrieval benchmark** ([#14](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/14)): `npm run bench:longmemeval` scores session-level retrieval on LongMemEval-S (MIT, 470 questions with evidence). With local hashing: evidence session in the top 4 for 52.8% of questions, in the top 10 for 71.3%; weakest on preference questions (20.0% @4) and on questions that need every evidence session (26.4% @4). Retrieval only; answer accuracy needs an LLM and is not measured yet.
+- **Benchmark a running hub over HTTP** (`npm run bench -- --url …`, part of [#15](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/15)): scores a deployed hub through its REST APIs with temporary agents that are deleted afterwards. Gives the same numbers as the in-process run. `POST /api/sleep/tick` runs one automatic-sleep pass on demand.
+- Benchmark category `exact_match`: order numbers that differ by a digit, with and without their prefix, and device model names. The suite now has 25 scenarios.
+
+### Fixed
+
+- Embedding backfill stalled with long texts on CPU models: big batches timed out on every retry, so indexing never finished. The batch size now halves on a timeout, and background embedding gets a 120 s timeout.
+- Benchmark scripts could exit silently when embedding failed; they now report the error.
+
 ## [0.3.0] - 2026-10-09
 
 The memory is now **measured** and **retrieves by meaning**. See the benchmark table in the README.
@@ -85,7 +108,8 @@ First public release.
 - README in English (`README.md`) and Vietnamese (`README.vi.md`), `CONTRIBUTING.md`, issue and PR templates, and a CI workflow (tests on Node 18/20/22, Docker build, end-to-end run).
 - 32 unit tests (including the acceptance QA suite: amnesia, contradiction, staleness, skill promotion, 20k-episode load) and an 11-step end-to-end script (`npm run e2e -- --lang vi|en|ja`).
 
-[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.1.0...v0.1.1
