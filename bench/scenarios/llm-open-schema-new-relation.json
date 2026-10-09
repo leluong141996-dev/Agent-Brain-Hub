@@ -3,7 +3,7 @@
   "category": "open_schema",
   "lang": "en",
   "requires": "llm",
-  "description": "With an LLM, a fact no rule covers becomes a new relation (measured only with --llm).",
+  "description": "With an LLM, a fact no rule covers becomes a new relation (measured only with --llm). The check matches the stored fact line, not the conversation.",
   "steps": [
     {
       "agent": "mia",
@@ -17,7 +17,7 @@
       "recall": "Which loyalty level am I?",
       "expect": {
         "remembers": [
-          "/gold/i"
+          "/loyal[^:\\n]*:\\s*gold/i"
         ]
       }
     }
