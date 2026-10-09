@@ -6,7 +6,7 @@ Most memory libraries are built for one agent. When several agents share one mem
 
 It's a plan, not a promise. Priorities change with feedback: comment on the milestone issues or open a [Discussion](https://github.com/leluong141996-dev/Agent-Brain-Hub/discussions).
 
-## Where we are (v0.5)
+## Where we are (v0.6)
 
 **Solid today**
 - Shared memory with governance: private / shared / global scopes, one writer domain per relation, per-agent permissions, append-only audit log.
@@ -14,7 +14,8 @@ It's a plan, not a promise. Priorities change with feedback: comment on the mile
 - Automatic sleep cycle (idle, pressure, nightly), TTL-based forgetting, contradiction flagging, skill promotion.
 - Runs offline with zero configuration, or with any LLM. REST, JS SDK and MCP. English, Vietnamese, Japanese.
 - Correct over time: facts are invalidated rather than deleted, and `recall({ asOf })` shows what the brain believed at any moment.
-- Measured: a 29-scenario memory benchmark with a CI gate, plus LongMemEval-S retrieval. Hybrid semantic + lexical search with real embedding models; a per-customer index keeps retrieval under 2 ms at 100,000 episodes.
+- Connected: facts are grouped into entities per customer, and retrieval follows links between them (multi-hop), explaining each added fact with `via`, inside the same permission checks.
+- Measured: a 37-scenario memory benchmark with a CI gate, plus LongMemEval-S retrieval. Hybrid semantic + lexical search with real embedding models; a per-customer index keeps retrieval under 2 ms at 100,000 episodes.
 
 **Still basic**
 
@@ -22,8 +23,8 @@ It's a plan, not a promise. Priorities change with feedback: comment on the mile
 |---|---|
 | Closed schema | 19 predefined relations and 35 regex rules. LLM extraction is limited to the same list, so anything outside it (say, a favourite colour) is not remembered. |
 | Retrieval quality on long histories | On LongMemEval-S, hashing finds the evidence session in the top 4 for about half the questions; preferences and multi-session questions are weakest. |
-| No graph | Facts hang off a customer. No relations between entities, no entity resolution. |
-| Answers not measured | Benchmarks score what reaches the agent (25 own scenarios, LongMemEval retrieval), not the final answers. The value dashboard's "time saved" is an estimate (20 s per question). |
+| A narrow graph | Entities are assets, trips and profile groups, found with a lexicon; one node per asset type per customer, so two cars are one node. No people or organisations yet. The affinity table is hand-written. |
+| Answers not measured | Benchmarks score what reaches the agent (37 own scenarios, LongMemEval retrieval), not the final answers. The value dashboard's "time saved" is an estimate (20 s per question). |
 | Single process | State lives in memory; SQLite is the persistence layer. |
 
 ## Principles
@@ -60,6 +61,7 @@ These hold for every milestone:
 
 ### Next: memory that reads like memory
 
+- Harder multi-hop scenarios: longer chains, more distractors, entities that an embedding model alone does not link.
 - Answer accuracy on LongMemEval with an LLM (needs a GPU run), and embedding-model numbers on it.
 - Retrieval quality on LongMemEval's weak spots: preferences (20% @4) and questions that need every evidence session (26% @4).
 
@@ -74,15 +76,17 @@ These hold for every milestone:
 
 **Result:** stale-use rate 25% → 0%; the new `temporal` benchmark category passes 100%; with `bge-m3` all 29 scenarios pass.
 
-### v0.6: An entity graph
+### v0.6: An entity graph ✅ released
 
 *Goal: memory that is connected.* Split from v0.5, which shipped the time model first.
 
-- [ ] **Entities as nodes, relations as edges**, with entity resolution ("John" = "Mr. Smith" = customer `kh-001`; "my car" = the Honda Civic).
-- [ ] Multi-hop retrieval over the graph (customer → car → repair shop), inside the same permission checks.
-- [ ] A graph view of a customer's entities in the UI.
+- [x] **Entities per customer**, with entity resolution inside one customer ("my car" = "xe" = "車" = the Honda Civic; "Da Nang" = "Đà Nẵng"). Customers are never merged automatically.
+- [x] Multi-hop retrieval by spreading activation (customer's Civic → the car in the shop; a trip → the car being unavailable), only over memories that already passed the permission and time checks. Added facts carry `via`.
+- [x] A Graph tab in the UI and `GET /api/graph`, both with `asOf`.
 
-**Done when** the multi-hop benchmark category passes with hashing (today 50%), and graph traversal never crosses a permission boundary (leak tests).
+**Result:** with hashing, multi-hop passes 100% (40% without the graph, measured with `--no-graph`), overall 81.1% → 97.3%; leak rate 0%. With `bge-m3` the multi-hop scenarios pass even without the graph, so they are not yet hard enough to show its value there.
+
+**Not done:** people and organisations as entities ("John" = "Mr. Smith"), and more than one asset of a type per customer. Both need LLM extraction, planned with the open schema in v0.7.
 
 ### v0.7: Open schema and multi-agent consistency
 
@@ -94,6 +98,7 @@ These hold for every milestone:
 - [ ] **Conflict resolution during sleep:** an LLM proposes a resolution with evidence, and a review queue in the UI lets a human accept it.
 - [ ] Memory tools for agents over MCP and REST: `brain_correct`, `brain_forget`.
 - [ ] LLM consolidation in the sleep cycle: distil episodes into facts, merge duplicate entities.
+- [ ] Richer graph entities from LLM extraction: people and organisations, and several assets of one type per customer.
 
 **Done when** the benchmark's contradiction and long-conversation scores improve, and "favourite colour" is remembered and recalled.
 

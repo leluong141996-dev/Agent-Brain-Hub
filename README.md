@@ -120,7 +120,7 @@ The Agents screen generates the `mcpServers` config for Claude Desktop and Curso
 | Method | Path | Body / query | Returns |
 |---|---|---|---|
 | GET | `/v1/me` | | agent, domain, kind, permissions |
-| POST | `/v1/recall` | `{customerId, text, lang, asOf?}` | `traceId, intent, salience, handoff, playbook, memories[]` (each with `from`, `updatedAt`, `validUntil`), `suggestedActions[], promptBlock, redactedText` |
+| POST | `/v1/recall` | `{customerId, text, lang, asOf?}` | `traceId, intent, salience, handoff, playbook, memories[]` (each with `from`, `updatedAt`, `validUntil`, and `via` when it came in through the entity graph), `suggestedActions[], promptBlock, redactedText` |
 | POST | `/v1/remember` | `{traceId \| userText, reply, facts?: [{relation, value}], outcome?: {actionId, accepted}, lang}` | `learned[]`, feedback |
 | POST | `/v1/chat` | `{customerId, text, lang}` | the brain answers itself (native mode over the API) |
 | POST | `/v1/feedback` | `{traceId, actionId, accepted}` | bandit update + skill promotion |
@@ -310,6 +310,23 @@ await brain.recall({ customerId, text: 'Book a taxi from my home', asOf: '2026-1
 
 `asOf` works on `POST /v1/recall` and on the Live brain's Semantic and Episodic tabs (*View memory as of*). A look into the past is read-only: it changes no memory, is recorded in the audit log, and respects the same permissions. Each fact's replacement chain is at `GET /api/facts/:id/history`.
 
+### Connected memory (entity graph)
+
+Facts are grouped into **entities** within each customer: "my car", "xe", "車" and "Honda Civic" are one car; "Da Nang" and "Đà Nẵng" are one trip. When a question names an entity or matches a fact, retrieval follows the links to connected facts, up to two hops:
+
+```text
+Penny (finance): "Should I set money aside for my Civic this week?"
+→ "Civic" is the car, and the car is in the shop. The prompt gets:
+  - owns: Honda Civic (from Mia, 2 hours ago)
+  - availability: no car for 3 days (from Kai, 2 hours ago, expires in 4 days, via: Honda Civic)
+```
+
+Links are the same entity (the Civic and its repair) or a related kind of fact (a trip and the car being unavailable, a trip and a diet or budget). The graph only runs over memories the asking agent may already see, so it never carries a private fact to another domain, and it ignores facts that have ended. Two customers are never merged.
+
+![The Graph tab: a trip linked to the car in the shop, the budget, the home city, and a private allergy only health agents can follow](docs/entity-graph.png)
+
+The **Graph** tab in the Live brain shows a customer's entities and links, also as of any past time; `GET /api/graph?customerId=&asOf=` returns the same data. `npm run bench -- --no-graph` measures what the graph adds (see Benchmark).
+
 ### Semantic search (embeddings)
 
 By default, memories are matched with local feature-hashing vectors: no network, no setup, but only shared words count. To also find paraphrases ("Can I drive to the airport?" → "no car for 3 days"), pick an embedding model in **Settings → Semantic search**: OpenAI, Gemini, Ollama, vLLM, LM Studio or any OpenAI-compatible `/embeddings` endpoint. For Vietnamese and Japanese, `bge-m3` on Ollama is a good local choice.
@@ -321,19 +338,20 @@ By default, memories are matched with local feature-hashing vectors: no network,
 
 ## Benchmark
 
-`npm run bench` scores the shared memory on 29 multi-agent scenarios: cross-agent recall, stale facts, contradictions, private-data leakage, multi-hop questions, long conversations, exact matches (order numbers, model names) and looking back in time, in English with Vietnamese and Japanese cases. It runs offline in under a second, and CI fails any change that makes a quality metric worse ([bench/README.md](bench/README.md)).
+`npm run bench` scores the shared memory on 37 multi-agent scenarios: cross-agent recall, stale facts, contradictions, private-data leakage, multi-hop questions, long conversations, exact matches (order numbers, model names) and looking back in time, in English with Vietnamese and Japanese cases. It runs offline in under a second, and CI fails any change that makes a quality metric worse ([bench/README.md](bench/README.md)).
 
-| v0.5.0 | Hashing (default, offline) | Hybrid with `bge-m3` (Ollama, CPU) |
+| v0.6.0 | Hashing (default, offline) | Hybrid with `bge-m3` (Ollama, CPU) |
 |---|---|---|
-| Scenario pass rate | 89.7% | **100%** |
-| Recall accuracy | 91.2% | **100%** |
+| Scenario pass rate | 97.3% | **100%** |
+| Recall accuracy | 97.7% | **100%** |
+| Multi-hop questions | **100%** (40% without the graph) | **100%** |
 | Leak rate | **0%** | **0%** |
 | Stale-use rate | **0%** | **0%** |
 | Conflict handling | 100% | 100% |
-| recall latency (p50) | 0.4 ms | 100 ms |
-| Prompt tokens (mean) | 408 | 492 |
+| recall latency (p50) | 0.4 ms | 96 ms |
+| Prompt tokens (mean) | 427 | 508 |
 
-These are our own scenarios, so they compare versions of this project. With hashing, the remaining failures are paraphrases and multi-hop questions that share no words with the memory; the entity graph in v0.6 targets the multi-hop ones.
+These are our own scenarios, so they compare versions of this project. The entity graph lifts the offline pass rate from 81.1% to 97.3% for about 6 more prompt tokens (`--no-graph` runs the same set without it). With `bge-m3`, the multi-hop scenarios also pass without the graph, since the model already links "the XPS" to "the laptop"; there the graph adds the `via` explanation. The one remaining offline failure is a paraphrase that shares no words with the memory.
 
 **On a public dataset.** `npm run bench:longmemeval` scores retrieval on [LongMemEval-S](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned) (MIT, 470 questions, ~50 sessions each): is the session that holds the answer near the top? With local hashing it is in the top 4 for **52.8%** of questions and in the top 10 for **71.3%**. Preferences (20% @4) and questions that need every evidence session are the weak spots. Answer accuracy isn't measured yet.
 
@@ -341,15 +359,16 @@ These are our own scenarios, so they compare versions of this project. With hash
 
 ## Tests
 
-- `npm test`: 82 unit tests, covering:
+- `npm test`: 92 unit tests, covering:
   - the acceptance QA suite from the architecture document: amnesia, contradiction, staleness, skill promotion, 20k-episode load;
   - permissions and prompt leakage;
   - English and Japanese;
   - connected agents (recall/remember), governance, key rotation, the value report;
   - the LLM layer: provider catalog, adapting to a strict mock OpenAI-style server, storing and masking keys, fetching model lists;
   - SQLite storage: data survives a reopen (embeddings included), only changed rows are written, the audit log is never truncated and SQL metrics match the in-memory computation, legacy JSON import, reset;
-  - the automatic sleep cycle (idle, pressure, nightly), fact provenance in prompts, embedding providers (with a mock server), and the benchmark harness itself.
-- `npm run bench`: the memory benchmark. 29 multi-agent scenarios (cross-agent recall, stale facts, contradictions, leakage, multi-hop, long conversations, exact matches, looking back in time) scored offline in under a second. Also `npm run bench:longmemeval` (public dataset, retrieval) and `npm run bench:scale` (latency with a large memory). See [bench/README.md](bench/README.md); adding a scenario is one JSON file.
+  - the automatic sleep cycle (idle, pressure, nightly), fact provenance in prompts, embedding providers (with a mock server), and the benchmark harness itself;
+  - memory over time (`asOf`, history) and the entity graph: entity resolution, multi-hop retrieval that never reaches a private or expired fact, the graph API.
+- `npm run bench`: the memory benchmark. 37 multi-agent scenarios (cross-agent recall, stale facts, contradictions, leakage, multi-hop, long conversations, exact matches, looking back in time) scored offline in under a second. Also `npm run bench:longmemeval` (public dataset, retrieval) and `npm run bench:scale` (latency with a large memory). See [bench/README.md](bench/README.md); adding a scenario is one JSON file.
 - `npm run e2e -- --lang vi|en|ja`: 11 steps against a running server, with any LLM configuration (offline, Claude, GPT, local models…). Includes a connected agent through the SDK and the MCP server over stdio. The test uses a new customer so existing data is left alone, but it advances the simulated clock by 7 days.
 
 ## Project structure
@@ -389,7 +408,7 @@ The goal: **the memory layer for multi-agent systems — correct over time, gove
 | ✅ **v0.3** | Memory benchmark with a CI gate; pluggable embedding models |
 | ✅ **v0.4** | Hybrid retrieval, a per-customer index, LongMemEval retrieval, benchmarking a running hub |
 | ✅ **v0.5** | Memory over time: facts invalidated not deleted, `recall({ asOf })`, fact history |
-| **v0.6** | An entity graph: entity resolution, multi-hop retrieval |
+| ✅ **v0.6** | An entity graph: entities per customer, multi-hop retrieval with `via`, a Graph view |
 | **v0.7** | Open-schema extraction, write-arbitration policies and agent trust scores |
 | **v0.8** | Policy-as-code governance, PostgreSQL + pgvector, OpenTelemetry, multi-tenancy |
 

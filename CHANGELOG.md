@@ -5,6 +5,36 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-09
+
+Memory that is **connected**: facts are grouped into entities, and retrieval follows the links between them.
+
+### Added
+
+- **Entity graph** (`server/brain/entities.js`). A customer's facts are grouped into entities: a car, laptop, phone or appliance (a vi / en / ja lexicon with brands and models, so "my car" = "xe" = "車" = "Honda Civic"), a trip ("Da Nang" = "Đà Nẵng"), and profile groups (health, finance, travel…). Resolution happens only within one customer; two customers are never merged.
+- **Multi-hop retrieval.** RAS links the entities a question names ("my Civic", "the XPS", "Tokyo") and spreads relevance from the facts the question matched to connected ones: the same car or trip (weight 0.6), or a related kind of fact through an affinity table (trip ↔ car availability, diet, allergy, budget…; 0.5). At most 2 hops and 6 added facts. Only candidates that already passed the permission and time checks take part, so the graph cannot reach a private or expired fact. Profile groups are not hubs.
+- **`via` explains each added fact:** in the prompt (`no car for 3 days (… via: Honda Civic)`), on `/v1/recall` memories, and in the live trace.
+- **`GET /api/graph?customerId&asOf`** returns one customer's entities, facts and edges, at any time.
+- **Graph tab** in the Live brain inspector: entities around the customer, facts around their entity, related-kind edges as dashed curves. Click a fact to see what it connects to and why; a link to a private fact is marked with the only domain that can follow it. Works with *View memory as of*.
+- **Benchmark:** 8 new `multi_hop` scenarios (37 in total), and `npm run bench -- --no-graph` (`BRAIN_GRAPH=off`) to measure what the graph adds:
+
+  | 0.6.0, hashing | With the graph | `--no-graph` |
+  |---|---|---|
+  | multi_hop (10 scenarios) | **100%** | 40% |
+  | All 37 scenarios | **97.3%** | 81.1% |
+  | Prompt tokens (mean) | 427 | 421 |
+
+  Leak rate is 0% in both. With `bge-m3`, all 37 pass with or without the graph: the embedding model already links "the XPS" to "the laptop". Today the graph pays off in the default offline mode, and in explaining *why* a fact was retrieved.
+
+### Fixed
+
+- "I'm flying / travelling / heading to X" was not remembered as a trip, and "airport" questions were not recognised as ground transport.
+- "The Camry broke down" was stored as "no device for 4 days": brands and models now name the asset.
+
+### Not changed
+
+- LongMemEval-S retrieval stays at 52.8% @4: it ranks whole sessions, which the fact graph does not touch.
+
 ## [0.5.0] - 2026-10-09
 
 Memory that is **correct over time**: facts are invalidated instead of deleted, and you can ask what the brain believed at any moment.
@@ -130,7 +160,8 @@ First public release.
 - README in English (`README.md`) and Vietnamese (`README.vi.md`), `CONTRIBUTING.md`, issue and PR templates, and a CI workflow (tests on Node 18/20/22, Docker build, end-to-end run).
 - 32 unit tests (including the acceptance QA suite: amnesia, contradiction, staleness, skill promotion, 20k-episode load) and an 11-step end-to-end script (`npm run e2e -- --lang vi|en|ja`).
 
-[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.2.0...v0.3.0
