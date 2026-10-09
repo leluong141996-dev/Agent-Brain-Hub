@@ -3,8 +3,10 @@
 // ttlDays) and every relation learned at runtime. A new relation starts
 // provisional: private to the domain that wrote it, short TTL, "latest wins".
 // Admins promote, merge or delete it (Settings → Memory schema).
-import { RELATIONS, setRelationLabel, relationLabel } from './ontology.js';
+import { RELATIONS, setRelationLabel, relationLabel, factToText, factEmbedText } from './ontology.js';
 import { stripDiacritics, truncate } from '../text.js';
+import { embed } from '../embed.js';
+import { DOMAINS } from '../agents.js';
 
 export const POLICIES = ['latest', 'owner', 'trust', 'human'];
 export const MAX_PROVISIONAL = 200;
@@ -79,4 +81,75 @@ export function listRelations(B, lang) {
 export function loadRegistry(B) {
   B.state.relations ||= {};
   for (const r of Object.values(B.state.relations)) if (r.label) setRelationLabel(r.name, r.label);
+}
+
+const bad = (message, status = 400) => Object.assign(new Error(message), { status });
+
+function checkPolicy(p) {
+  if (p !== undefined && !POLICIES.includes(p)) throw bad(`policy must be one of ${POLICIES.join(', ')}`);
+}
+function checkTtl(t) {
+  if (t !== undefined && t !== null && !(Number.isInteger(t) && t >= 1 && t <= 3650)) throw bad('ttlDays must be null or a whole number from 1 to 3650');
+}
+
+// Re-derive what each stored fact of a relation inherits from its definition.
+function restamp(B, name, rel) {
+  for (const f of B.state.facts) {
+    if (f.relation !== name) continue;
+    f.scope = rel.scope;
+    f.ownerDomain = rel.owner;
+    f.entity = rel.entity;
+    f.text = factToText(f, 'vi');
+    f.embedding = embed(factEmbedText(f));
+  }
+  B.embedQueue?.kick();
+}
+
+export function updateRelation(B, name, body = {}) {
+  const r = relationOf(B, name);
+  if (!r) throw bad(`relation "${name}" not found`, 404);
+  const regs = (B.state.relations ||= {});
+  checkPolicy(body.policy);
+  checkTtl(body.ttlDays);
+  if (body.action === 'edit') {
+    const target = r.status === 'core' ? (regs[name] ||= { name }) : regs[name];
+    if (body.policy !== undefined) target.policy = body.policy;
+    if (body.ttlDays !== undefined) target.ttlDays = body.ttlDays;
+    return relationOf(B, name);
+  }
+  if (r.status === 'core') throw bad('core relations only allow policy and ttlDays to change');
+  if (body.action === 'promote') {
+    if (body.scope !== undefined && !['private', 'shared'].includes(body.scope)) throw bad('scope must be private or shared');
+    if (body.owner !== undefined && !DOMAINS[body.owner]) throw bad(`unknown domain "${body.owner}"`);
+    if (body.card !== undefined && !['one', 'many'].includes(body.card)) throw bad('card must be one or many');
+    const e = regs[name];
+    Object.assign(e, { status: 'promoted' }, ...['scope', 'owner', 'ttlDays', 'policy', 'card'].filter((k) => body[k] !== undefined).map((k) => ({ [k]: body[k] })));
+    if (body.label) {
+      e.label = body.label;
+      setRelationLabel(name, body.label);
+    }
+    restamp(B, name, e);
+    return relationOf(B, name);
+  }
+  if (body.action === 'merge') {
+    const into = relationOf(B, normalizeName(body.into));
+    if (!into || into.name === name) throw bad('merge needs an existing relation in "into"');
+    for (const f of B.state.facts) if (f.relation === name) f.relation = into.name;
+    restamp(B, into.name, into);
+    delete regs[name];
+    setRelationLabel(name, null);
+    return into;
+  }
+  throw bad('action must be edit, promote or merge');
+}
+
+export function deleteRelation(B, name) {
+  const r = relationOf(B, name);
+  if (!r) throw bad(`relation "${name}" not found`, 404);
+  if (r.status === 'core') throw bad('core relations cannot be deleted');
+  const before = B.state.facts.length;
+  B.state.facts = B.state.facts.filter((f) => f.relation !== name);
+  delete B.state.relations[name];
+  setRelationLabel(name, null);
+  return { removedFacts: before - B.state.facts.length };
 }

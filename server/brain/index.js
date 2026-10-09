@@ -25,12 +25,13 @@ import { reflect } from './dmn.js';
 import { emptySleepState, recordSleep } from './sleepScheduler.js';
 import { EmbedQueue } from './embedQueue.js';
 import { MemoryIndex } from './memoryIndex.js';
-import { loadRegistry, listRelations } from './registry.js';
+import { loadRegistry, listRelations, updateRelation as updateRel, deleteRelation as deleteRel } from './registry.js';
+import { trustView } from './trust.js';
 import { normalizeFact, stateAt, visibleAt, DEFAULT_HISTORY_DAYS } from './temporal.js';
 import { entityOf, link, CONCRETE, W_ENTITY } from './entities.js';
 import { detectIntent } from './prefrontal.js';
 import { seedGlobal, resolveConflict, undoDecision } from './neocortex.js';
-import { extractFactsRuleBased, factToText, factValue } from './ontology.js';
+import { extractFactsRuleBased, factToText, factValue, relationLabel } from './ontology.js';
 import { templateReply, buildPrompt, contextBlock, memoryInstructions } from './respond.js';
 import { audit, auditRetrieval } from './audit.js';
 import { DOMAINS, DEFAULT_PERMISSIONS, actionLabel } from '../agents.js';
@@ -602,6 +603,48 @@ export class Brain {
   }
 
   // ---------------- Memory admin ----------------
+  relations(lang) {
+    return listRelations(this, normLang(lang));
+  }
+
+  updateRelation(name, body) {
+    const r = updateRel(this, name, body);
+    audit(this, { op: 'schema', relation: name, kind: body?.action || 'edit' });
+    this.store.save();
+    return r;
+  }
+
+  deleteRelation(name) {
+    const r = deleteRel(this, name);
+    audit(this, { op: 'schema', relation: name, kind: 'delete' });
+    this.store.save();
+    return r;
+  }
+
+  // The admin review queue: open conflicts, recent automatic decisions, and
+  // provisional relations worth promoting.
+  review(lang) {
+    lang = normLang(lang);
+    const now = this.clock.now();
+    const side = (f) => ({ id: f.id, value: factValue(f, lang), text: factToText(f, lang), agentId: f.sourceAgentId, agentName: this.agentName(f.sourceAgentId), trust: trustView(this, f.sourceAgentId).score, evidence: f.evidence, at: f.createdAt });
+    const seen = new Set();
+    const conflicts = [];
+    for (const f of this.state.facts) {
+      if (seen.has(f.id) || !f.conflictWith || stateAt(f, now) !== 'conflicted') continue;
+      const o = this.state.facts.find((x) => x.id === f.conflictWith);
+      if (!o) continue;
+      seen.add(f.id).add(o.id);
+      conflicts.push({ customerId: f.customerId, customerName: this.state.customers[f.customerId]?.name || f.customerId, relation: f.relation, label: relationLabel(f.relation, lang), a: side(o), b: side(f) });
+    }
+    const facts = new Map(this.state.facts.map((f) => [f.id, f]));
+    const decisions = (this.state.decisions || [])
+      .filter((d) => !d.undoneAt && now - d.at <= 30 * 86_400_000 && facts.has(d.winnerId) && facts.has(d.loserId))
+      .map((d) => ({ ...d, label: relationLabel(d.relation, lang), winner: side(facts.get(d.winnerId)), loser: side(facts.get(d.loserId)), customerName: this.state.customers[d.customerId]?.name || d.customerId }))
+      .reverse();
+    const suggestions = listRelations(this, lang).filter((r) => r.worthReview);
+    return { conflicts, decisions, suggestions };
+  }
+
   undoDecision(decisionId) {
     const r = undoDecision(this, decisionId);
     if (!r) throw err('decision not found or already undone', 404);
@@ -775,7 +818,7 @@ export class Brain {
       adminProtected: !!process.env.BRAIN_ADMIN_TOKEN,
       llm: { available: this.llm.available, provider: this.llm.provider, model: this.llm.model, label: this.llm.label, lastError: this.llm.lastError },
       domains: Object.fromEntries(Object.entries(DOMAINS).map(([k, d]) => [k, { label: tr(d.label, lang), color: d.color, retentionDays: d.retentionDays, primaryLayers: d.primaryLayers, episodeScope: d.episodeScope }])),
-      agents: this.state.agents.map((a) => ({ ...publicAgent(a), persona: tr(a.persona, lang), stats: this.state.stats?.byAgent?.[a.id] || {} })),
+      agents: this.state.agents.map((a) => ({ ...publicAgent(a), persona: tr(a.persona, lang), stats: this.state.stats?.byAgent?.[a.id] || {}, trust: trustView(this, a.id) })),
       customers: Object.values(this.state.customers),
       working: wm
         ? { ...wm, activeTaskName: taskName(wm.activeTask, lang), outcomes: wm.outcomes.map((o) => ({ ...o, label: actionLabel(o.actionId, lang) })) }

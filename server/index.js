@@ -73,6 +73,10 @@ const q = (url, k) => url.searchParams.get(k);
 const admin = {
   'GET /api/state': (req, url) => ({ ...brain.snapshot(q(url, 'customerId') || 'kh-001', q(url, 'lang'), q(url, 'asOf')), hubRoot: ROOT, autoSleep: { enabled: sleeper.config.enabled, nextNightly: sleeper.nextNightly() } }),
   'GET /api/graph': (req, url) => brain.graph(q(url, 'customerId') || 'kh-001', q(url, 'lang'), q(url, 'asOf')),
+  'GET /api/relations': (req, url) => ({ relations: brain.relations(q(url, 'lang')) }),
+  'GET /api/review': (req, url) => brain.review(q(url, 'lang')),
+  'POST /api/review/resolve': async (req) => brain.resolveConflict((await readBody(req)).factId),
+  'POST /api/review/undo': async (req) => brain.undoDecision((await readBody(req)).decisionId),
   'GET /api/value': (req, url) => brain.valueReport(q(url, 'lang')),
   'GET /api/audit': (req, url) => brain.auditLog(Math.min(5000, Number(q(url, 'limit') || 100))),
   'GET /api/storage': () => store.info(),
@@ -222,6 +226,11 @@ const server = http.createServer(async (req, res) => {
         }
         if (req.method === 'PATCH' && !m[2]) return send(res, 200, brain.updateAgent(m[1], await readBody(req)));
         if (req.method === 'POST' && m[2]) return send(res, 200, brain.rotateKey(m[1]));
+      }
+      const rel = url.pathname.match(/^\/api\/relations\/([\w-]+)$/);
+      if (rel) {
+        if (req.method === 'PUT') return send(res, 200, brain.updateRelation(rel[1], await readBody(req)));
+        if (req.method === 'DELETE') return send(res, 200, brain.deleteRelation(rel[1]));
       }
       const handler = admin[`${req.method} ${url.pathname}`];
       if (handler) return send(res, 200, await handler(req, url));

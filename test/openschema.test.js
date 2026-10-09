@@ -91,3 +91,44 @@ test('open schema offline: favourite colour is remembered and recalled, with lab
   assert.equal(relationLabel('favourite_colour', 'vi'), 'màu yêu thích');
   assert.equal(relationLabel('favourite_colour', 'ja'), '好きな色');
 });
+test('admin: promoting a relation widens it for existing facts too, and is audited', async () => {
+  const b = makeBrain();
+  await b.remember({ agentId: 'kai', facts: [{ relation: 'loyalty_tier', value: 'gold' }], lang: 'en' });
+  b.updateRelation('loyalty_tier', { action: 'promote', scope: 'shared', policy: 'trust', label: { vi: 'hạng thành viên', en: 'loyalty tier', ja: '会員ランク' } });
+  assert.equal(b.state.facts.find((f) => f.relation === 'loyalty_tier').scope, 'shared');
+  const atlas = await b.recall({ agentId: 'atlas', text: 'What loyalty tier is this customer?', lang: 'en' });
+  assert.ok(atlas.memories.some((m) => /gold/.test(m.text)));
+  assert.ok(b.auditLog(50).some((e) => e.op === 'schema' && e.relation === 'loyalty_tier'));
+});
+
+test('admin: core relations only change policy and TTL; merge and delete apply to provisional ones', async () => {
+  const b = makeBrain();
+  b.updateRelation('lives_in', { action: 'edit', policy: 'human', ttlDays: 400 });
+  assert.equal(b.relations('en').find((r) => r.name === 'lives_in').policy, 'human');
+  assert.throws(() => b.updateRelation('lives_in', { action: 'promote', scope: 'global' }), /core/);
+  assert.throws(() => b.updateRelation('lives_in', { action: 'edit', policy: 'loudest' }), /policy/);
+  await b.remember({ agentId: 'mia', facts: [{ relation: 'hometown_city', value: 'Hue' }], lang: 'en' });
+  b.updateRelation('hometown_city', { action: 'merge', into: 'lives_in' });
+  const f = b.state.facts.find((x) => x.value === 'Hue');
+  assert.equal(f.relation, 'lives_in');
+  assert.equal(f.scope, 'shared');
+  assert.ok(!b.state.relations.hometown_city);
+  await b.remember({ agentId: 'mia', facts: [{ relation: 'pet_name', value: 'Rex' }], lang: 'en' });
+  assert.equal(b.deleteRelation('pet_name').removedFacts, 1);
+  assert.throws(() => b.deleteRelation('lives_in'), /core/);
+});
+
+test('admin: the review queue lists conflicts, decisions and suggestions', async () => {
+  const b = makeBrain();
+  await b.think({ agentId: 'mia', text: 'I live in Hanoi', lang: 'en' });
+  await b.think({ agentId: 'atlas', text: 'I live in Da Nang', lang: 'en' });
+  await b.think({ agentId: 'atlas', text: "I'm flying to Tokyo next week", lang: 'en' });
+  await b.think({ agentId: 'mia', text: "I'm travelling to Seoul next week", lang: 'en' });
+  for (const c of ['x', 'y', 'z']) await b.remember({ agentId: 'kai', customerId: c, facts: [{ relation: 'loyalty_tier', value: 'gold' }], lang: 'en' });
+  const r = b.review('en');
+  assert.equal(r.conflicts.length, 1);
+  assert.deepEqual([r.conflicts[0].a.value, r.conflicts[0].b.value].sort(), ['Da Nang', 'Hanoi']);
+  assert.equal(r.decisions.length, 1);
+  assert.equal(r.decisions[0].policy, 'latest');
+  assert.ok(r.suggestions.some((s) => s.name === 'loyalty_tier'));
+});

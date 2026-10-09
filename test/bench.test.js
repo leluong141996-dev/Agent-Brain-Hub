@@ -198,6 +198,10 @@ test('bench: the HTTP target scores a running hub and cleans up after itself', a
     assert.equal(state.agents.length, 6, 'built-in agents untouched');
     const graph = await fetch(`${url}/api/graph?lang=en`, { headers: { 'x-admin-token': 'bench-token' } }).then((x) => x.json());
     assert.ok(Array.isArray(graph.entities) && Array.isArray(graph.edges), 'GET /api/graph answers');
+    const review = await fetch(`${url}/api/review?lang=en`, { headers: { 'x-admin-token': 'bench-token' } }).then((x) => x.json());
+    assert.ok(Array.isArray(review.conflicts) && Array.isArray(review.decisions), 'GET /api/review answers');
+    const rels = await fetch(`${url}/api/relations?lang=en`, { headers: { 'x-admin-token': 'bench-token' } }).then((x) => x.json());
+    assert.ok(rels.relations.some((r) => r.name === 'lives_in'), 'GET /api/relations answers');
   } finally {
     hub.kill();
   }
