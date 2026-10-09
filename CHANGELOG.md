@@ -5,6 +5,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-09
+
+### Fixed
+
+- A Vietnamese preference change ("Tôi không thích ăn cay nữa") became a conflict instead of replacing "Tôi thích ăn cay": "nữa" / "nữa rồi" now mark an update ([#23](https://github.com/leluong141996-dev/Agent-Brain-Hub/pull/23), thanks [@nova-loop](https://github.com/nova-loop)).
+- A final full stop or exclamation mark no longer hides an update marker ("…nữa.", "I hate onions now.").
+
 ## [0.6.0] - 2026-10-09
 
 Memory that is **connected**: facts are grouped into entities, and retrieval follows the links between them.
@@ -160,7 +167,8 @@ First public release.
 - README in English (`README.md`) and Vietnamese (`README.vi.md`), `CONTRIBUTING.md`, issue and PR templates, and a CI workflow (tests on Node 18/20/22, Docker build, end-to-end run).
 - 32 unit tests (including the acceptance QA suite: amnesia, contradiction, staleness, skill promotion, 20k-episode load) and an 11-step end-to-end script (`npm run e2e -- --lang vi|en|ja`).
 
-[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.3.0...v0.4.0

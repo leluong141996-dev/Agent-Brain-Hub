@@ -102,7 +102,7 @@ const RULES = [
   ...JA_RULES,
 ];
 
-export const UPDATE_MARKERS = ['moi chuyen', 'bay gio', 'gio thi', 'hien gio', 'da doi', 'khong con', 'cap nhat', 'thay doi', ' now ', 'nowadays', 'from now', 'moved', 'changed', 'no longer', 'anymore', 'actually', '引っ越し', '今は', '変わり', 'もう', '最近は'];
+export const UPDATE_MARKERS = ['moi chuyen', 'bay gio', 'gio thi', 'hien gio', 'da doi', 'khong con', 'cap nhat', 'thay doi', ' now ', 'nowadays', 'from now', 'moved', 'changed', 'no longer', 'anymore', 'actually', ' nua ', ' nua roi ', '引っ越し', '今は', '変わり', 'もう', '最近は'];
 
 const ASSET_NOUNS = [
   ['o to', 'xe', 'car'], ['xe', 'xe', 'car'], ['laptop', 'laptop', 'laptop'], ['may tinh', 'máy tính', 'computer'],
@@ -178,7 +178,9 @@ export function extractFactsRuleBased(rawText) {
       facts.push({ entity: 'asset', relation: 'asset_unavailable', value: `${jaNoun(text)}が故障中`, evidence: 'broken' });
     }
   }
-  const isUpdate = UPDATE_MARKERS.some((k) => ` ${low} `.includes(k));
+  // Punctuation must not hide a marker at the end: "… nữa." / "… now!"
+  const padded = ` ${low.replace(/[.,!?;:…。、！？]+/g, ' ')} `;
+  const isUpdate = UPDATE_MARKERS.some((k) => padded.includes(k));
   return facts.map((f) => ({ ...f, isUpdate }));
 }
 
