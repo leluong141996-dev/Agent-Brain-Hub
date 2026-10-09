@@ -678,16 +678,22 @@ export class Brain {
   }
 
   // Everything the visualizer needs to render the memory panels, localized.
-  snapshot(customerId = 'kh-001', lang = 'vi') {
+  // asOf: show memory as it stood then (facts with their state at that time,
+  // episodes that existed then). Everything else is current.
+  snapshot(customerId = 'kh-001', lang = 'vi', asOf = null) {
     lang = normLang(lang);
     const now = this.clock.now();
-    const strip = ({ embedding, ...rest }) => rest;
-    const eps = this.state.episodes.filter((e) => e.customerId === customerId);
+    const at = asOf === null || asOf === undefined || asOf === '' ? null : parseTime(asOf);
+    const view = at ?? now;
+    const strip = ({ embedding, vec, ...rest }) => rest;
+    const eps = this.state.episodes.filter((e) => e.customerId === customerId && (at === null || (e.createdAt <= at && (!e.expiresAt || e.expiresAt > at))));
     const recent = new Set([...eps].sort((a, b) => b.createdAt - a.createdAt).slice(0, 3).map((e) => e.id));
     const tier = (e) => (recent.has(e.id) ? 'hot' : (now - e.createdAt) / 86400000 <= 30 ? 'warm' : 'cold');
     const wm = this.state.working[customerId];
     return {
       now,
+      asOf: at,
+      historyDays: this.state.sleep?.config?.historyDays ?? this.historyDays,
       lang,
       adminProtected: !!process.env.BRAIN_ADMIN_TOKEN,
       llm: { available: this.llm.available, provider: this.llm.provider, model: this.llm.model, label: this.llm.label, lastError: this.llm.lastError },
@@ -699,8 +705,11 @@ export class Brain {
         : null,
       episodes: eps.map((e) => ({ ...strip(e), tier: tier(e) })).sort((a, b) => b.createdAt - a.createdAt),
       facts: this.state.facts
-        .filter((f) => f.customerId === customerId || f.customerId === '*')
-        .map((f) => ({ ...strip(f), text: factToText(f, lang), displayValue: factValue(f, lang), stale: !!(f.validUntil && f.validUntil < now && !f.pinned) })),
+        .filter((f) => (f.customerId === customerId || f.customerId === '*') && stateAt(f, view) !== 'unknown')
+        .map((f) => {
+          const state = stateAt(f, view);
+          return { ...strip(f), text: factToText(f, lang), displayValue: factValue(f, lang), state, stale: state === 'expired', status: state === 'conflicted' ? 'conflicted' : state === 'active' ? 'active' : f.status };
+        }),
       skills: this.state.skills.map((s) => ({ ...s, name: skillName(s, lang), stepLabels: s.steps.map((x) => labelOf(x, lang)) })),
       patterns: Object.values(this.state.patterns),
       bandit: Object.entries(this.state.bandit).map(([k, v]) => ({ key: k, label: actionLabel(k.split('|')[0], lang), ...v })),

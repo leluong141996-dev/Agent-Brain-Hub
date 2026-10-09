@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Brain } from './brain/index.js';
+import { factToText } from './brain/ontology.js';
 import { Store } from './store.js';
 import { NeuralBus } from './bus.js';
 import { LLM } from './llm.js';
@@ -70,7 +71,7 @@ const q = (url, k) => url.searchParams.get(k);
 
 // ---------- Admin API (hub UI) ----------
 const admin = {
-  'GET /api/state': (req, url) => ({ ...brain.snapshot(q(url, 'customerId') || 'kh-001', q(url, 'lang')), hubRoot: ROOT, autoSleep: { enabled: sleeper.config.enabled, nextNightly: sleeper.nextNightly() } }),
+  'GET /api/state': (req, url) => ({ ...brain.snapshot(q(url, 'customerId') || 'kh-001', q(url, 'lang'), q(url, 'asOf')), hubRoot: ROOT, autoSleep: { enabled: sleeper.config.enabled, nextNightly: sleeper.nextNightly() } }),
   'GET /api/value': (req, url) => brain.valueReport(q(url, 'lang')),
   'GET /api/audit': (req, url) => brain.auditLog(Math.min(5000, Number(q(url, 'limit') || 100))),
   'GET /api/storage': () => store.info(),
@@ -148,7 +149,7 @@ const v1 = {
   'GET /v1/profile': (agent, req, url) => ({ customerId: q(url, 'customerId') || 'kh-001', facts: brain.profile(agent, q(url, 'customerId') || 'kh-001', q(url, 'lang')) }),
   'POST /v1/recall': async (agent, req) => {
     const b = await readBody(req);
-    const r = await brain.recall({ agentId: agent.id, customerId: b.customerId, text: b.text, lang: b.lang });
+    const r = await brain.recall({ agentId: agent.id, customerId: b.customerId, text: b.text, lang: b.lang, asOf: b.asOf ?? null });
     return b.includeSteps ? r : { ...r, steps: undefined };
   },
   'POST /v1/remember': async (agent, req) => {
@@ -206,6 +207,11 @@ const server = http.createServer(async (req, res) => {
           clients.delete(res);
         });
         return;
+      }
+      const h = url.pathname.match(/^\/api\/facts\/([\w-]+)\/history$/);
+      if (h && req.method === 'GET') {
+        const lang = q(url, 'lang');
+        return send(res, 200, { history: brain.factHistory(h[1]).map(({ embedding, vec, ...f }) => ({ ...f, text: factToText(f, lang || 'vi') })) });
       }
       const m = url.pathname.match(/^\/api\/agents\/([\w-]+)(\/rotate-key)?$/);
       if (m) {

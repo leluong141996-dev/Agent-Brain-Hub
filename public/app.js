@@ -19,6 +19,7 @@ const store = (k, v) => {
 
 const ui = {
   snap: null,
+  asOf: null, // v0.5: view memory as it was at this time (ms), or null for now
   view: 'brain',
   agentId: 'kai',
   customerId: store('brain.customer') || 'kh-001',
@@ -162,7 +163,7 @@ function renderCurrentView() {
 }
 
 async function refresh() {
-  ui.snap = await api(`/api/state?customerId=${encodeURIComponent(ui.customerId)}&lang=${lang()}`);
+  ui.snap = await api(`/api/state?customerId=${encodeURIComponent(ui.customerId)}&lang=${lang()}${ui.asOf ? `&asOf=${ui.asOf}` : ''}`);
   renderShell();
   renderCurrentView();
 }
@@ -557,19 +558,21 @@ const TABS = {
   },
   semantic() {
     const facts = ui.snap?.facts || [];
-    if (!facts.length) return emptyBox('database', t('s_empty'));
-    return `<table class="table"><thead><tr><th>${t('th_relation')}</th><th>${t('th_value')}</th><th>${t('th_scope')}</th><th>${t('th_writer')}</th><th>${t('th_from')}</th><th>${t('th_status')}</th><th>${t('th_conf')}</th><th>${t('th_exp')}</th><th></th></tr></thead><tbody>
+    if (!facts.length) return timeBar() + emptyBox('database', t('s_empty'));
+    const past = !!ui.snap.asOf;
+    return `${timeBar()}<table class="table"><thead><tr><th>${t('th_relation')}</th><th>${t('th_value')}</th><th>${t('th_scope')}</th><th>${t('th_writer')}</th><th>${t('th_from')}</th><th>${t('th_status')}</th><th>${t('th_conf')}</th><th>${t('th_exp')}</th><th></th></tr></thead><tbody>
       ${facts
         .map((f) => `<tr><td><code class="muted">${esc(f.entity)}.</code><code>${esc(f.relation)}</code></td><td class="status-${f.status}">${esc(f.displayValue)}</td><td>${scopeTag(f.scope)}</td><td>${esc(f.ownerDomain)}</td><td>${esc(nameOf(f.sourceAgentId))}</td>
-        <td>${f.stale ? `<span class="badge warning">stale</span>` : f.status === 'conflicted' ? `<span class="badge warning">${icon('alert', 12)}conflict</span>` : f.status === 'superseded' ? `<span class="badge">superseded</span>` : `<span class="badge success">active</span>`}${f.pinned ? ' <span class="badge accent">pinned</span>' : ''}</td><td>${meter(f.confidence)}</td><td class="time-cell">${fmtDate(f.validUntil, lang())}</td>
-        <td><div class="row-actions">${f.status === 'conflicted' ? `<button class="btn sm" data-resolve="${f.id}">${t('keep_this')}</button>` : ''}${f.customerId !== '*' ? `<button class="btn sm ghost" data-pin="${f.id}" data-pinned="${!f.pinned}">${f.pinned ? t('unpin') : t('pin')}</button>` : ''}</div></td></tr>`)
+        <td>${stateBadge(f.state)}${f.pinned ? ` <span class="badge accent">${t('st_pinned')}</span>` : ''}</td><td>${meter(f.confidence)}</td><td class="time-cell">${fmtDate(f.validUntil, lang())}</td>
+        <td><div class="row-actions">${!past && f.state === 'conflicted' ? `<button class="btn sm" data-resolve="${f.id}">${t('keep_this')}</button>` : ''}${!past && f.customerId !== '*' ? `<button class="btn sm ghost" data-pin="${f.id}" data-pinned="${!f.pinned}">${f.pinned ? t('unpin') : t('pin')}</button>` : ''}${f.customerId !== '*' ? `<button class="btn sm ghost" data-history="${f.id}" title="${esc(t('hist_btn'))}">${icon('clock', 13)}</button>` : ''}</div></td></tr>
+        <tr class="history-row" id="hist-${f.id}" hidden><td colspan="9"></td></tr>`)
         .join('')}
     </tbody></table>`;
   },
   episodic() {
     const eps = ui.snap?.episodes || [];
-    if (!eps.length) return emptyBox('book', t('e_empty'));
-    return `<table class="table"><thead><tr><th>${t('th_kind')}</th><th>${t('th_tier')}</th><th>${t('th_scope')}</th><th>${t('th_content')}</th><th>${t('th_importance')}</th><th class="num">${t('th_access')}</th><th>${t('th_created')}</th><th>${t('th_exp')}</th></tr></thead><tbody>
+    if (!eps.length) return timeBar() + emptyBox('book', t('e_empty'));
+    return `${timeBar()}<table class="table"><thead><tr><th>${t('th_kind')}</th><th>${t('th_tier')}</th><th>${t('th_scope')}</th><th>${t('th_content')}</th><th>${t('th_importance')}</th><th class="num">${t('th_access')}</th><th>${t('th_created')}</th><th>${t('th_exp')}</th></tr></thead><tbody>
       ${eps.map((e) => `<tr><td><span class="badge">${esc(e.kind)}</span></td><td>${tierTag(e.tier)}</td><td>${scopeTag(e.scope)}</td><td>${esc(e.text)}</td><td>${meter(e.importance)}</td><td class="num">${e.accessCount}</td><td class="time-cell">${fmtDate(e.createdAt, lang())}</td><td class="time-cell">${fmtDate(e.expiresAt, lang())}</td></tr>`).join('')}
     </tbody></table>`;
   },
@@ -613,6 +616,51 @@ function renderTab() {
   $$('#tabBody [data-resolve]').forEach((b) => (b.onclick = () => api('/api/facts/resolve', { factId: b.dataset.resolve }).then(refresh)));
   $$('#tabBody [data-pin]').forEach((b) => (b.onclick = () => api('/api/facts/pin', { factId: b.dataset.pin, pinned: b.dataset.pinned === 'true' }).then(refresh)));
   $$('#tabBody [data-rollback]').forEach((b) => (b.onclick = () => api('/api/skills/rollback', { skillId: b.dataset.rollback }).then(refresh)));
+  $$('#tabBody [data-history]').forEach((b) => (b.onclick = () => showHistory(b.dataset.history)));
+  const at = $('#asOfInput');
+  if (at) {
+    at.onchange = () => {
+      const ms = at.value ? new Date(at.value).getTime() : NaN;
+      ui.asOf = Number.isFinite(ms) ? ms : null;
+      refresh();
+    };
+    const now = $('#asOfNow');
+    if (now) now.onclick = () => ((ui.asOf = null), refresh());
+  }
+}
+
+// ---- v0.5: memory over time ----
+const STATE_BADGE = { active: 'success', conflicted: 'warning', expired: 'warning', superseded: '', resolved: '' };
+function stateBadge(state = 'active') {
+  return `<span class="badge ${STATE_BADGE[state] ?? ''}">${state === 'conflicted' ? icon('alert', 12) : ''}${esc(t('st_' + state))}</span>`;
+}
+
+// <input type="datetime-local"> wants local time without seconds.
+const localInput = (ms) => {
+  const d = new Date(ms);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+};
+
+function timeBar() {
+  const s = ui.snap;
+  const at = s.asOf ?? s.now;
+  return `<div class="time-bar ${s.asOf ? 'past' : ''}">
+    <label class="field-inline">${icon('clock', 14)}<span>${t('asof_label')}</span><input type="datetime-local" id="asOfInput" value="${localInput(at)}" /></label>
+    ${s.asOf ? `<button class="btn sm" id="asOfNow">${t('asof_now')}</button><span class="small">${esc(t('asof_banner', { at: new Date(s.asOf).toLocaleString() }))}</span>` : `<span class="muted small">${esc(t('asof_hint', { n: s.historyDays }))}</span>`}
+  </div>`;
+}
+
+async function showHistory(id) {
+  const row = $(`#hist-${id}`);
+  if (!row) return;
+  if (!row.hidden) return void (row.hidden = true);
+  const { history } = await api(`/api/facts/${encodeURIComponent(id)}/history?lang=${lang()}`);
+  const when = (ms) => (ms ? new Date(ms).toLocaleString() : '');
+  row.firstElementChild.innerHTML = `<div class="history-chain"><span class="section-label">${t('hist_title')}</span>${history
+    .map((f) => `<span class="hist-item ${f.invalidatedAt ? 'old' : ''}"><b>${esc(f.text)}</b><small>${esc(when(f.recordedAt))}${f.invalidatedAt ? ` → ${esc(when(f.invalidatedAt))} · ${esc(t('hist_' + (f.invalidReason || 'superseded')))}` : ` · ${esc(t('hist_current'))}`}</small></span>`)
+    .join(`<span class="muted">→</span>`)}</div>`;
+  row.hidden = false;
 }
 
 // ======================= Wiring =======================

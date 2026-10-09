@@ -11,7 +11,9 @@
 // All runs, manual or automatic, go through Brain.sleep(), which serializes them.
 import { MAX_TURNS } from './prefrontal.js';
 
-export const SLEEP_DEFAULTS = { enabled: true, idleMinutes: 30, maxPendingTurns: 24, nightly: true, nightlyAt: '03:00' };
+// historyDays: how long facts that ended (expired or replaced) are kept for
+// recall({ asOf }) before forgetting purges them (0 = at once).
+export const SLEEP_DEFAULTS = { enabled: true, idleMinutes: 30, maxPendingTurns: 24, nightly: true, nightlyAt: '03:00', historyDays: 90 };
 const HISTORY = 20;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -25,6 +27,7 @@ export function sleepDefaultsFromEnv(env = process.env) {
   if (env.BRAIN_SLEEP_AUTO !== undefined) d.enabled = !['0', 'false', 'off', 'no'].includes(String(env.BRAIN_SLEEP_AUTO).toLowerCase());
   if (env.BRAIN_SLEEP_IDLE_MINUTES) d.idleMinutes = Number(env.BRAIN_SLEEP_IDLE_MINUTES);
   if (env.BRAIN_SLEEP_MAX_PENDING) d.maxPendingTurns = Number(env.BRAIN_SLEEP_MAX_PENDING);
+  if (env.BRAIN_HISTORY_DAYS !== undefined && env.BRAIN_HISTORY_DAYS !== '') d.historyDays = Number(env.BRAIN_HISTORY_DAYS);
   if (env.BRAIN_SLEEP_NIGHTLY_AT) {
     d.nightly = env.BRAIN_SLEEP_NIGHTLY_AT !== 'off';
     if (d.nightly) d.nightlyAt = env.BRAIN_SLEEP_NIGHTLY_AT;
@@ -46,6 +49,7 @@ export function normalizeSleepConfig(input = {}, base = SLEEP_DEFAULTS) {
   int('idleMinutes', 5, 1440);
   // Below MAX_TURNS, otherwise turns could still be dropped before consolidation.
   int('maxPendingTurns', 6, MAX_TURNS - 2);
+  int('historyDays', 0, 3650);
   if (input.nightlyAt !== undefined) {
     if (!TIME_RE.test(String(input.nightlyAt))) throw bad('nightlyAt must be HH:MM (24-hour)');
     c.nightlyAt = String(input.nightlyAt);
