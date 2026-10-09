@@ -101,7 +101,7 @@ const RULES = [
   ...JA_RULES,
 ];
 
-export const UPDATE_MARKERS = ['moi chuyen', 'bay gio', 'gio thi', 'hien gio', 'da doi', 'khong con', 'cap nhat', 'thay doi', ' now ', 'nowadays', 'from now', 'moved', 'changed', 'no longer', 'anymore', 'actually', '引っ越し', '今は', '変わり', 'もう', '最近は'];
+export const UPDATE_MARKERS = ['moi chuyen', 'bay gio', 'gio thi', 'hien gio', 'da doi', 'khong con', 'cap nhat', 'thay doi', ' now ', 'nowadays', 'from now', 'moved', 'changed', 'no longer', 'anymore', 'actually', ' nua ', ' nua roi ', '引っ越し', '今は', '変わり', 'もう', '最近は'];
 
 const ASSET_NOUNS = [
   ['o to', 'xe', 'car'], ['xe', 'xe', 'car'], ['laptop', 'laptop', 'laptop'], ['may tinh', 'máy tính', 'computer'],
@@ -124,6 +124,17 @@ function shadow(text) {
   return out;
 }
 
+
+// Trailing time/update words that speakers attach to a preference change
+// ("I don't like X anymore"). Keep them in the sentence so UPDATE_MARKERS
+// still fire; strip them from the stored value so opposite-fact matching works.
+const TEMPORAL_TAIL = /(?:\s+(?:anymore|any\s+more|now|these\s+days|nowadays|nữa\s+rồi|nua\s+roi|nữa|nua|rồi|roi))+$/iu;
+
+function stripTemporalTail(value) {
+  const next = String(value || '').replace(TEMPORAL_TAIL, '').trim();
+  return next || String(value || '').trim();
+}
+
 export function extractFactsRuleBased(rawText) {
   const text = rawText.normalize('NFC');
   const low = shadow(text);
@@ -137,6 +148,7 @@ export function extractFactsRuleBased(rawText) {
     const [s, e] = m.indices[g];
     let value = text.slice(s, e).trim();
     if (rel === 'name') value = value.replace(/(^|\s)(\p{L})/gu, (_, sp, c) => sp + c.toUpperCase());
+    if (rel === 'prefers' || rel === 'dislikes') value = stripTemporalTail(value);
     facts.push({ entity: RELATIONS[rel].entity, relation: rel, value, evidence: text.slice(m.index, m.index + m[0].length) });
   }
   // "xe phải sửa 3 ngày" / "my car is in the shop for 3 days" → temporary unavailability

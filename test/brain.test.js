@@ -6,6 +6,7 @@ import { Store } from '../server/store.js';
 import { NeuralBus } from '../server/bus.js';
 import { LLM } from '../server/llm.js';
 import { addEpisode } from '../server/brain/neocortex.js';
+import { extractFactsRuleBased } from '../server/brain/ontology.js';
 
 function makeBrain() {
   return new Brain({ store: new Store(null), bus: new NeuralBus(), llm: new LLM({ offline: true }), deterministic: true });
@@ -346,4 +347,34 @@ test('Value report — cross-agent reuse, knowledge flow matrix, leaks blocked',
   assert.equal(v.perAgent.find((a) => a.id === 'kai').reusedByOthers >= 2, true);
   assert.equal(v.daily.length, 7);
   assert.ok(v.daily.at(-1).turns >= 3, 'today is the last bucket');
+});
+
+
+test('strip trailing temporal markers from prefers/dislikes values (#22)', () => {
+  const cases = [
+    ["I don't like spicy food anymore", 'dislikes', 'spicy food'],
+    ['I hate onions now', 'dislikes', 'onions'],
+    ['tôi không thích ăn cay nữa', 'dislikes', 'ăn cay'],
+    ['tôi không thích hành nữa rồi', 'dislikes', 'hành'],
+  ];
+  for (const [input, rel, value] of cases) {
+    const facts = extractFactsRuleBased(input).filter((f) => f.relation === rel);
+    assert.equal(facts.length, 1, input);
+    assert.equal(facts[0].value, value, input);
+    assert.equal(facts[0].isUpdate, true, `isUpdate for: ${input}`);
+  }
+  // Positive preference must keep its value untouched.
+  const like = extractFactsRuleBased('I love spicy food').find((f) => f.relation === 'prefers');
+  assert.equal(like.value, 'spicy food');
+});
+
+test('anymore preference change supersedes the old like (#22)', async () => {
+  const b = makeBrain();
+  await b.think({ agentId: 'mia', text: 'I love spicy food', lang: 'en' });
+  const r = await b.think({ agentId: 'mia', text: "I don't like spicy food anymore", lang: 'en' });
+  assert.ok(r.learned.some((l) => l.action === 'superseded'));
+  const likes = b.state.facts.filter((f) => f.relation === 'prefers' && /spicy/i.test(f.value));
+  const dislikes = b.state.facts.filter((f) => f.relation === 'dislikes' && /spicy/i.test(f.value));
+  assert.ok(likes.every((f) => f.status === 'superseded'));
+  assert.ok(dislikes.some((f) => f.status === 'active' && f.value === 'spicy food'));
 });
