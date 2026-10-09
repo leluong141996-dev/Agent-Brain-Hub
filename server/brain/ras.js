@@ -6,6 +6,7 @@ import { embed, cosine } from '../embed.js';
 import { dot } from '../embeddings.js';
 import { DAY } from '../clock.js';
 import { stateAt } from './temporal.js';
+import { link, entityOf, mentionedEntities } from './entities.js';
 import { estimateTokens, truncate } from '../text.js';
 import { visible, hiddenReason, episodeTier } from './neocortex.js';
 import { factToText, factValue } from './ontology.js';
@@ -110,6 +111,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
   // --- Semantic search ---
   const facts = B.memoryIndex.facts(customerId);
   const fCands = [];
+  const factOf = new Map(); // candidate id → fact (for the entity graph)
   for (const f of facts) {
     const text = factToText(f, lang);
     const state = stateAt(f, now);
@@ -133,6 +135,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     const profile = PROFILE.has(f.relation) ? (ESSENTIAL.has(f.relation) ? 0.35 : 0.15) : 0;
     const global = f.scope === 'global' ? 0.1 : 0;
     const score = 0.5 * sim + entityHit + profile + global + 0.1 * f.confidence;
+    factOf.set(f.id, f);
     fCands.push({ kind: 'semantic', id: f.id, text, relation: f.relation, value: factValue(f, lang), tier: 'warm', scope: f.scope, owner: f.ownerDomain, source: f.sourceAgentId, sourceName: f.sourceAgentId ? B.agentName(f.sourceAgentId) : null, at: f.updatedAt || f.createdAt, validUntil: f.validUntil || null, status: state, score, parts: { sim, entityHit, profile } });
   }
   t.step('neocortex', t.L(`Semantic: tra ${facts.length} fact theo entity/query`, `Semantic: looked up ${facts.length} facts by entity/query`, `意味記憶：${facts.length}件をエンティティ/クエリで検索`), {
@@ -142,6 +145,50 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     conflicted: fCands.filter((f) => f.status === 'conflicted').length,
     blocked: blocked.length,
   }, { from: 'ras', status: blocked.length ? 'warn' : 'ok' });
+
+  // --- Multi-hop (v0.6): spread relevance over the entity graph ---
+  // Seeds are facts the question itself matched (wording or intent). Their
+  // neighbours, the same car or trip, or a related kind of fact, are pulled
+  // in, at most 2 hops. Only candidates that already passed the permission and
+  // time checks take part, so the graph can never reach a private or expired fact.
+  const MAX_EXPANSIONS = 6;
+  const mentioned = mentionedEntities(query, [...factOf.values()]);
+  // An entity's name is its owns_asset / trip_destination value ("Honda Civic").
+  const nameOf = new Map();
+  for (const f of factOf.values()) if (f.relation === 'owns_asset' || f.relation === 'trip_destination') nameOf.set(entityOf(f), factValue(f, lang));
+  for (const c of fCands) {
+    const e = entityOf(factOf.get(c.id));
+    if (!mentioned.has(e)) continue;
+    c.parts.mention = 1;
+    c.score = Math.max(c.score, 0.35); // the question names this entity
+    if (nameOf.has(e) && nameOf.get(e) !== c.value) c.via = nameOf.get(e);
+  }
+  const isSeed = (c) => c.score >= 0.2 && (c.parts.entityHit > 0 || c.parts.sim >= 0.15 || c.parts.mention);
+  let frontier = fCands.filter(isSeed).map((c) => ({ c, weight: 1 }));
+  const reached = new Set(frontier.map((x) => x.c.id));
+  const expanded = [];
+  for (let hop = 1; hop <= 2 && frontier.length && expanded.length < MAX_EXPANSIONS; hop++) {
+    const next = [];
+    for (const { c: seed, weight } of frontier) {
+      for (const c of fCands) {
+        if (reached.has(c.id) || c.scope === 'global' || expanded.length >= MAX_EXPANSIONS) continue;
+        const w = link(factOf.get(seed.id), factOf.get(c.id)) * weight;
+        if (w < 0.3) continue; // two hops: one entity edge and one affinity edge at most
+        c.score = Math.max(c.score, seed.score * w);
+        c.via = seed.value ?? seed.text;
+        c.hop = hop;
+        reached.add(c.id);
+        expanded.push(c);
+        next.push({ c, weight: w });
+      }
+    }
+    frontier = next;
+  }
+  if (expanded.length) {
+    t.step('ras', t.L(`Đa bước: kéo thêm ${expanded.length} fact qua đồ thị thực thể`, `Multi-hop: ${expanded.length} facts pulled in through the entity graph`, `多段：エンティティグラフ経由で事実を${expanded.length}件追加`), {
+      expanded: expanded.map((c) => `${c.text} ← ${c.via} (hop ${c.hop})`),
+    }, { status: 'hit' });
+  }
 
   // --- Re-rank + budget ---
   epCands.sort((a, b) => b.score - a.score);
@@ -157,7 +204,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     used += cost;
     selected.push({ ...c, score: +c.score.toFixed(3), latency: TIER_LATENCY[c.tier], parts: roundParts(c.parts) });
   };
-  const relevant = (c) => c.score >= 0.2 || c.status === 'conflicted';
+  const relevant = (c) => c.score >= 0.2 || c.status === 'conflicted' || c.hop;
   fCands.filter(relevant).slice(0, maxFacts).forEach(take);
   epCands.filter((c) => c.score >= 0.25).slice(0, maxEpisodes).forEach(take);
   for (const c of fCands.filter(relevant).slice(maxFacts)) excluded.push({ kind: c.kind, id: c.id, text: c.text, reason: t.L('điểm thấp', 'low score', 'スコア不足') });
