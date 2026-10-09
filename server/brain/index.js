@@ -14,7 +14,7 @@ import crypto from 'node:crypto';
 import { thalamus } from './thalamus.js';
 import { brainstemIn, brainstemOut, crisisReply, redact } from './brainstem.js';
 import { amygdala } from './amygdala.js';
-import { updateWorkingMemory, recordReply, hotTurns, ensureWorking, taskName } from './prefrontal.js';
+import { updateWorkingMemory, recordReply, hotTurns, ensureWorking, taskName, pendingTurns, MAX_TURNS } from './prefrontal.js';
 import { matchSkill, recordOutcome, seedSkills, rollbackSkill, labelOf, skillName } from './cerebellum.js';
 import { retrieve } from './ras.js';
 import { selectActions, learn } from './basalGanglia.js';
@@ -61,6 +61,7 @@ export class Brain {
     this.clock = new Clock(store.state.clockOffsetMs || 0);
     store.state.sleep ||= emptySleepState(); // states imported from older versions
     this._sleepQueue = Promise.resolve();
+    this._forcedSleep = new Set();
     seedGlobal(this);
     seedSkills(this);
     // Ended facts are kept this long as history (sleep settings can override).
@@ -234,6 +235,7 @@ export class Brain {
     if (via === 'api') this.bus.emit('conversation', { agentId: agent.id, customerId, user: text, reply, via, traceId: t.id });
 
     this.store.save();
+    this.afterTurn(customerId, lang);
     const end = t.end({ mode, intent: intent.intent });
     return {
       traceId: t.id,
@@ -395,6 +397,7 @@ export class Brain {
     audit(this, { op: 'remember', agentId: agent.id, customerId, traceId: traceId || t.id });
     if (text || cleanReply) this.bus.emit('conversation', { agentId: agent.id, customerId, user: text, reply: cleanReply, via: 'api', traceId: traceId || t.id });
     this.store.save();
+    this.afterTurn(customerId, lang);
     const end = t.end();
     return { traceId: t.id, linkedTrace: traceId || null, learned: this.learnedView(encoded, lang), feedback, steps: t.steps, ms: end.ms };
   }
@@ -440,6 +443,22 @@ export class Brain {
     const p = this._sleepQueue.then(run, run);
     this._sleepQueue = p.catch(() => {});
     return p;
+  }
+
+  // Resolves when every queued sleep has finished.
+  idle() {
+    return this._sleepQueue;
+  }
+
+  // Working memory never drops a turn that is not in long-term memory yet, so
+  // when pending turns reach its size, sleep now instead of waiting for the
+  // scheduler (which may be off, or a minute away during a burst).
+  afterTurn(customerId, lang) {
+    if (pendingTurns(this.state.working[customerId]) < MAX_TURNS || this._forcedSleep.has(customerId)) return;
+    this._forcedSleep.add(customerId);
+    this.sleep({ customerId, lang, trigger: 'pressure' })
+      .catch((e) => console.error('[sleep] forced sleep failed:', e.message))
+      .finally(() => this._forcedSleep.delete(customerId));
   }
 
   async _sleep({ customerId = 'kh-001', lang, trigger = 'manual' } = {}) {

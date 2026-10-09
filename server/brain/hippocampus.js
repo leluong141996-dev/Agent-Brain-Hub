@@ -160,8 +160,13 @@ export async function consolidate(B, t, { customerId }) {
     created.push(ep);
     for (const x of turns) x.consolidated = true;
   }
-  // Working memory keeps only the latest few turns after consolidation.
-  if (wm) wm.turns = wm.turns.slice(-6);
+  // Working memory keeps the latest few turns after consolidation, plus every
+  // turn that is still pending: turns that arrived while this sleep waited on
+  // the summarizer were not part of it, and must wait for the next one.
+  if (wm) {
+    const n = wm.turns.length;
+    wm.turns = wm.turns.filter((x, i) => !x.consolidated || i >= n - 6);
+  }
   if (created.length) {
     t.step('neocortex', t.L(`Lưu ${created.length} episode phiên vào long-term`, `Stored ${created.length} session episodes in long-term memory`, `セッションエピソード${created.length}件を長期記憶に保存`), {
       episodes: created.map((e) => ({ text: truncate(e.text, 120), scope: e.scope, expires: e.expiresAt ? new Date(e.expiresAt).toISOString().slice(0, 10) : '∞' })),

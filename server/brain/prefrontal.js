@@ -90,7 +90,7 @@ export function updateWorkingMemory(B, t, { customerId, agent, text, salience, n
   if (TASKS[it.intent]) wm.activeTask = { intent: it.intent, agentId: agent.id, since: now };
   wm.salience = salience;
   wm.turns.push({ role: 'user', text, agentId: agent.id, at: now, traceId, sessionId: wm.sessionId, consolidated: false });
-  if (wm.turns.length > MAX_TURNS) wm.turns.splice(0, wm.turns.length - MAX_TURNS);
+  capTurns(wm);
   wm.updatedAt = now;
 
   t.step('prefrontal', t.L(`Cập nhật Working Memory — intent: ${it.intent}`, `Working memory updated — intent: ${it.intent}`, `ワーキングメモリ更新 — 意図: ${it.intent}`), {
@@ -106,7 +106,19 @@ export function updateWorkingMemory(B, t, { customerId, agent, text, salience, n
 export function recordReply(B, { customerId, agent, text, traceId }) {
   const wm = ensureWorking(B, customerId);
   wm.turns.push({ role: 'assistant', text, agentId: agent.id, at: B.clock.now(), traceId, sessionId: wm.sessionId, consolidated: false });
+  capTurns(wm);
 }
+
+// Over MAX_TURNS, only turns already in long-term memory are evicted, oldest
+// first. Turns that were never consolidated stay until a sleep stores them
+// (the brain starts one when they reach the cap: Brain.afterTurn).
+function capTurns(wm) {
+  let over = wm.turns.length - MAX_TURNS;
+  if (over <= 0) return;
+  wm.turns = wm.turns.filter((x) => !(over > 0 && x.consolidated && over--));
+}
+
+export const pendingTurns = (wm) => (wm?.turns || []).filter((x) => !x.consolidated).length;
 
 // A turn spoken with a private-scope agent (e.g. Health) is only visible to
 // agents of that same domain — working memory obeys the same partitioning.

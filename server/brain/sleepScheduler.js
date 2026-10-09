@@ -3,9 +3,9 @@
 //   - idle:     a customer's conversation has gone quiet (default 30 min, the same
 //               gap the thalamus uses to open a new session) and turns are waiting
 //               to be consolidated → a short nap for that customer.
-//   - pressure: too many unconsolidated turns. Working memory keeps only the last
-//               MAX_TURNS, so without this older turns would be dropped before they
-//               ever reach long-term memory.
+//   - pressure: too many unconsolidated turns. Working memory holds MAX_TURNS;
+//               at that point the brain forces a sleep itself (Brain.afterTurn),
+//               and this trigger keeps that rare by consolidating earlier.
 //   - nightly:  once a day at a set server-local time, for every customer active
 //               since the previous night (forgetting and reflection catch up).
 // All runs, manual or automatic, go through Brain.sleep(), which serializes them.
@@ -47,7 +47,7 @@ export function normalizeSleepConfig(input = {}, base = SLEEP_DEFAULTS) {
     c[k] = n;
   };
   int('idleMinutes', 5, 1440);
-  // Below MAX_TURNS, otherwise turns could still be dropped before consolidation.
+  // Below MAX_TURNS, so the scheduler consolidates before the cap forces a sleep.
   int('maxPendingTurns', 6, MAX_TURNS - 2);
   int('historyDays', 0, 3650);
   if (input.nightlyAt !== undefined) {

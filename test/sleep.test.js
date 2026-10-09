@@ -77,25 +77,51 @@ test('pressure: consolidates before working memory starts dropping turns', async
   assert.equal(runs[0].trigger, 'pressure');
 });
 
-test('without the scheduler, a long conversation loses turns; with it, none are lost', async () => {
-  // Working memory keeps only the last 40 turns: the first questions are gone
-  // without ever reaching long-term memory.
-  const lost = makeBrain();
-  await chat(lost, 30);
-  const kept = lost.state.working['kh-001'].turns;
-  assert.ok(kept.length < 60);
-  assert.ok(!kept.some((x) => x.text === 'I need a flight to Da Nang, question 0'), 'question 0 was dropped');
-  assert.equal(lost.state.episodes.filter((e) => e.kind === 'session').length, 0, 'and never consolidated');
+test('without the scheduler, a long conversation still loses no turns: the cap forces a sleep', async () => {
+  // Working memory holds 40 turns. Before, the 41st turn evicted the oldest
+  // one even if it had never reached long-term memory. Now the cap only
+  // evicts consolidated turns and asks the brain to sleep.
+  const b = makeBrain();
+  await chat(b, 30);
+  await b.idle();
+  const wm = b.state.working['kh-001'];
+  assert.ok(wm.turns.length <= 40 + 2, 'working memory stays bounded');
+  const sessions = b.state.episodes.filter((e) => e.kind === 'session');
+  assert.ok(b.state.sleep.history.some((h) => h.trigger === 'pressure'), 'the cap triggered a sleep');
+  const consolidatedTurns = sessions.reduce((n, e) => n + e.turnCount, 0);
+  const pendingTurns = wm.turns.filter((x) => !x.consolidated).length;
+  assert.equal(consolidatedTurns + pendingTurns, 60, 'every turn reached long-term memory or is still pending');
+  assert.ok(sessions.some((e) => /question 0\b/.test(e.text)), 'the first question was consolidated, not dropped');
 
-  const { b, s } = setup();
+  const { b: b2, s } = setup();
   for (let i = 0; i < 30; i++) {
-    await chat(b, 1);
+    await chat(b2, 1);
     await s.tick();
   }
-  const sessions = b.state.episodes.filter((e) => e.kind === 'session');
-  const consolidatedTurns = sessions.reduce((n, e) => n + e.turnCount, 0);
-  const pendingTurns = b.state.working['kh-001'].turns.filter((x) => !x.consolidated).length;
-  assert.equal(consolidatedTurns + pendingTurns, 60, 'every turn reached long-term memory or is still pending');
+  const sessions2 = b2.state.episodes.filter((e) => e.kind === 'session');
+  const total = sessions2.reduce((n, e) => n + e.turnCount, 0) + b2.state.working['kh-001'].turns.filter((x) => !x.consolidated).length;
+  assert.equal(total, 60, 'with the scheduler too');
+});
+
+test('burst: turns that arrive while sleep waits on a slow summarizer are not lost', async () => {
+  // Suggested by @ahmetozel on daily.dev: 8 messages while the summarizer
+  // takes 300 ms. Before the fix, 10 of 26 turns never reached long-term memory.
+  const llm = new LLM({ offline: true });
+  llm.summarize = async () => {
+    await new Promise((r) => setTimeout(r, 300));
+    return 'summary';
+  };
+  const b = new Brain({ store: new Store(null), bus: new NeuralBus(), llm, deterministic: true });
+  await chat(b, 5);
+  const sleeping = b.sleep({ customerId: 'kh-001', lang: 'en', trigger: 'pressure' });
+  await new Promise((r) => setTimeout(r, 20));
+  await chat(b, 8);
+  await sleeping;
+  const wm = b.state.working['kh-001'];
+  assert.equal(wm.turns.filter((x) => !x.consolidated).length, 16, 'all 8 exchanges during sleep are still pending');
+  await b.sleep({ customerId: 'kh-001', lang: 'en', trigger: 'idle' });
+  const covered = b.state.episodes.filter((e) => e.kind === 'session').reduce((n, e) => n + e.turnCount, 0);
+  assert.equal(covered, 26, 'every turn reached long-term memory');
 });
 
 test('disabled: no automatic sleep at all', async () => {
