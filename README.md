@@ -359,7 +359,7 @@ These are our own scenarios, so they compare versions of this project. The entit
 
 ## Tests
 
-- `npm test`: 92 unit tests, covering:
+- `npm test`: 96 unit tests, covering:
   - the acceptance QA suite from the architecture document: amnesia, contradiction, staleness, skill promotion, 20k-episode load;
   - permissions and prompt leakage;
   - English and Japanese;

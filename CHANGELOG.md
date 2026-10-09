@@ -5,6 +5,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-09
+
+### Fixed
+
+- **Turns were lost before they reached long-term memory.** Turns that arrived while sleep waited on a slow summarizer were cut when working memory was trimmed afterwards: with a 300 ms summarizer and 8 messages during sleep, 10 of 26 turns were lost. And past 40 turns, working memory evicted the oldest turn even if it had never been consolidated. Now a turn is only evicted once it is in a stored episode, and when pending turns reach the cap the brain sleeps right away instead of waiting for the scheduler. A burst test with a delayed summarizer guards it. Thanks to Ahmet Özel, who suggested that test.
+
 ## [0.6.1] - 2026-10-09
 
 ### Fixed
@@ -167,7 +173,8 @@ First public release.
 - README in English (`README.md`) and Vietnamese (`README.vi.md`), `CONTRIBUTING.md`, issue and PR templates, and a CI workflow (tests on Node 18/20/22, Docker build, end-to-end run).
 - 32 unit tests (including the acceptance QA suite: amnesia, contradiction, staleness, skill promotion, 20k-episode load) and an 11-step end-to-end script (`npm run e2e -- --lang vi|en|ja`).
 
-[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.4.0...v0.5.0

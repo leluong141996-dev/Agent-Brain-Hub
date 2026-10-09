@@ -347,7 +347,7 @@ Mặc định, ký ức được so khớp bằng vector feature hashing chạy 
 
 ## Test
 
-- `npm test`: 92 unit test, gồm:
+- `npm test`: 96 unit test, gồm:
   - bộ QA nghiệm thu của tài liệu: amnesia, contradiction, staleness, skill promotion, load 20k episode;
   - phân quyền và rò rỉ prompt;
   - tiếng Anh, tiếng Nhật;
