@@ -10,10 +10,13 @@ npm run bench -- --llm                                # with the configured LLM 
 npm run bench -- --save                               # writes bench/results/<version>.json
 npm run bench -- --gate bench/results/0.5.0.json      # what CI runs: exit 1 if a quality metric got worse
 npm run bench -- --url http://localhost:4317          # a running hub, as it is configured (add --token if it has one)
+npm run bench -- --no-graph                           # ablation: the same run without the v0.6 entity graph
 npm run bench:scale                                   # retrieval latency with 20,000 episodes (--episodes, --customers)
 ```
 
 **The CI gate** fails a PR if scenario pass rate, recall accuracy, stale-use rate, conflict handling or reply accuracy gets worse than the committed baseline, or if anything leaks. Latency and prompt tokens are reported but not gated. If a change is meant to move a number (for example, a new scenario that the current memory fails), re-save the baseline with `--save` in the same PR and say why in the description.
+
+**What the entity graph is worth** (`--no-graph`): the `multi_hop` scenarios are written so the answer needs a link the question does not state: "the XPS" is the laptop at the repair shop, planning a trip should bring up that the car is in the shop, "シビック" is the car being repaired. With hashing, multi_hop passes 100% with the graph and 40% without it (6 of 10 scenarios need it), overall 97.3% vs 81.1%, for about 6 more prompt tokens. `multi-hop-trip-allergy-private` checks the other side: the graph must not carry a private fact to an agent outside its domain.
 
 ## Metrics
 
@@ -47,7 +50,7 @@ Add one JSON file to `bench/scenarios/`. No code changes are needed.
 
 **Fields**
 - `id`: kebab-case and unique.
-- `category`: one of `cross_agent`, `stale`, `contradiction`, `leakage`, `multi_hop`, `long_conversation`.
+- `category`: one of `cross_agent`, `stale`, `contradiction`, `leakage`, `multi_hop`, `long_conversation`, `exact_match`, `temporal`.
 - `lang`: `en`, `vi` or `ja`.
 
 **Steps** (each step has exactly one of these):

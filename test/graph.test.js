@@ -115,3 +115,26 @@ test('graph/C: one customer\'s graph never contains another customer\'s facts', 
   assert.ok(!g.facts.some((f) => /Vios/.test(f.text)));
   assert.equal(g.entities.find((e) => e.id === 'asset:car').label, 'Honda Civic');
 });
+
+test('graph/A: a model name alone still names the asset (Camry → car; ホンダのシビック → car)', async () => {
+  const { entityOf } = await import('../server/brain/entities.js');
+  assert.ok(rels('The Camry broke down, it will be in the shop for 4 days').includes('asset_unavailable=no car for 4 days'));
+  assert.equal(entityOf({ relation: 'owns_asset', value: 'ホンダのシビック' }), 'asset:car');
+});
+
+test('graph: BRAIN_GRAPH=off turns multi-hop off (benchmark ablation)', async () => {
+  const run = async () => {
+    const b = makeBrain();
+    await b.think({ agentId: 'mia', text: 'My car is a Honda Civic', lang: 'en' });
+    await b.think({ agentId: 'kai', text: 'The car broke down, it will be in the shop for 3 days', lang: 'en' });
+    b.advanceClock(2 / 24);
+    return b.recall({ agentId: 'penny', text: 'Should I set money aside for my Civic this week?', lang: 'en' });
+  };
+  process.env.BRAIN_GRAPH = 'off';
+  try {
+    assert.ok(!(await run()).memories.some((m) => /no car/.test(m.text)));
+  } finally {
+    delete process.env.BRAIN_GRAPH;
+  }
+  assert.ok((await run()).memories.some((m) => /no car/.test(m.text)));
+});

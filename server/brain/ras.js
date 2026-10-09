@@ -151,8 +151,10 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
   // neighbours, the same car or trip, or a related kind of fact, are pulled
   // in, at most 2 hops. Only candidates that already passed the permission and
   // time checks take part, so the graph can never reach a private or expired fact.
+  // BRAIN_GRAPH=off turns it off (ablation: `npm run bench -- --no-graph`).
   const MAX_EXPANSIONS = 6;
-  const mentioned = mentionedEntities(query, [...factOf.values()]);
+  const graphOn = !['0', 'off', 'false', 'no'].includes(String(process.env.BRAIN_GRAPH ?? '').toLowerCase());
+  const mentioned = graphOn ? mentionedEntities(query, [...factOf.values()]) : new Set();
   // An entity's name is its owns_asset / trip_destination value ("Honda Civic").
   const nameOf = new Map();
   for (const f of factOf.values()) if (f.relation === 'owns_asset' || f.relation === 'trip_destination') nameOf.set(entityOf(f), factValue(f, lang));
@@ -164,7 +166,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     if (nameOf.has(e) && nameOf.get(e) !== c.value) c.via = nameOf.get(e);
   }
   const isSeed = (c) => c.score >= 0.2 && (c.parts.entityHit > 0 || c.parts.sim >= 0.15 || c.parts.mention);
-  let frontier = fCands.filter(isSeed).map((c) => ({ c, weight: 1 }));
+  let frontier = graphOn ? fCands.filter(isSeed).map((c) => ({ c, weight: 1 })) : [];
   const reached = new Set(frontier.map((x) => x.c.id));
   const expanded = [];
   for (let hop = 1; hop <= 2 && frontier.length && expanded.length < MAX_EXPANSIONS; hop++) {

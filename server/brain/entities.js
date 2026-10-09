@@ -8,9 +8,9 @@
 import { stripDiacritics } from '../text.js';
 
 const ASSET_TYPES = {
-  car: /\b(car|cars|vehicle|auto|sedan|suv|xe|o to|honda|civic|toyota|vios|camry|corolla|mazda|kia|hyundai|ford|vinfast|tesla|brakes?|engine|tyres?|tires?)\b|車|自動車|愛車|ブレーキ|エンジン|タイヤ/i,
-  laptop: /\b(laptop|notebook|macbook|thinkpad|dell|xps|lenovo|asus|acer|may tinh)\b|パソコン|ノートパソコン/i,
-  phone: /\b(phone|iphone|smartphone|galaxy|pixel|dien thoai)\b|スマホ|携帯/i,
+  car: /\b(car|cars|vehicle|auto|sedan|suv|xe|o to|honda|civic|toyota|vios|camry|corolla|mazda|kia|hyundai|ford|vinfast|tesla|brakes?|engine|tyres?|tires?)\b|車|自動車|愛車|ブレーキ|エンジン|タイヤ|ホンダ|シビック|トヨタ|カムリ|プリウス|マツダ|テスラ|日産|ニッサン/i,
+  laptop: /\b(laptop|notebook|macbook|thinkpad|dell|xps|lenovo|asus|acer|may tinh)\b|パソコン|ノートパソコン|マックブック|レノボ/i,
+  phone: /\b(phone|iphone|smartphone|galaxy|pixel|dien thoai)\b|スマホ|携帯|アイフォン/i,
   appliance: /\b(fridge|refrigerator|washing machine|washer|air conditioner|aircon|tu lanh|may giat|dieu hoa)\b|冷蔵庫|洗濯機|エアコン/i,
 };
 

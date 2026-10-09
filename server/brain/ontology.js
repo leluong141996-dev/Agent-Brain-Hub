@@ -3,6 +3,7 @@
 // scope:   private (only the writer domain sees it) | shared | global
 // writer:  the single domain allowed to write this relation (single-writer-per-entity)
 // card:    'one' → a new different value is a candidate contradiction; 'many' → a set
+import { assetType } from './entities.js';
 import { stripDiacritics, norm } from '../text.js';
 import { tr } from '../i18n.js';
 
@@ -107,12 +108,17 @@ const ASSET_NOUNS = [
   ['o to', 'xe', 'car'], ['xe', 'xe', 'car'], ['laptop', 'laptop', 'laptop'], ['may tinh', 'máy tính', 'computer'],
   ['dien thoai', 'điện thoại', 'phone'], ['car', 'xe', 'car'], ['phone', 'điện thoại', 'phone'], ['computer', 'máy tính', 'computer'],
 ];
+// No noun in the sentence ("The Camry broke down"): the entity lexicon knows
+// brands and models, so the value still says "car".
+const TYPE_NOUN = { car: ['xe', 'car', '車'], laptop: ['laptop', 'laptop', 'パソコン'], phone: ['điện thoại', 'phone', 'スマホ'] };
 const assetNoun = (low, lang) => {
   const hit = ASSET_NOUNS.find(([k]) => new RegExp(`\\b${k}\\b`).test(low));
-  return hit ? (lang === 'en' ? hit[2] : hit[1]) : lang === 'en' ? 'device' : 'thiết bị';
+  if (hit) return lang === 'en' ? hit[2] : hit[1];
+  const t = TYPE_NOUN[assetType(low)];
+  return t ? (lang === 'en' ? t[1] : t[0]) : lang === 'en' ? 'device' : 'thiết bị';
 };
 const JA_NOUNS = [['車', '車'], ['ノートパソコン', 'パソコン'], ['パソコン', 'パソコン'], ['スマホ', 'スマホ'], ['携帯', '携帯']];
-const jaNoun = (text) => (JA_NOUNS.find(([k]) => text.includes(k)) || [null, 'デバイス'])[1];
+const jaNoun = (text) => (JA_NOUNS.find(([k]) => text.includes(k)) || [null, TYPE_NOUN[assetType(text)]?.[2] || 'デバイス'])[1];
 
 function shadow(text) {
   // Same length as `text` (NFC), lowercase and without diacritics.
