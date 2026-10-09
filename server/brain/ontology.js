@@ -124,6 +124,19 @@ function shadow(text) {
   return out;
 }
 
+// Time and update words that end a sentence but aren't part of the value:
+// "I don't like spicy food anymore" → "spicy food" (#22). Kept in the sentence,
+// so the message still counts as an update and replaces the old preference.
+const TRAILING = /(?:\s+(?:any ?more|now|nowadays|these days|lately|at all|either|nữa|rồi|bây giờ|giờ đây|luôn))+\s*$/iu;
+const trimTrailing = (v) => {
+  let out = v;
+  for (let prev; prev !== out; ) {
+    prev = out;
+    out = out.replace(TRAILING, '').trim();
+  }
+  return out || v;
+};
+
 export function extractFactsRuleBased(rawText) {
   const text = rawText.normalize('NFC');
   const low = shadow(text);
@@ -135,7 +148,7 @@ export function extractFactsRuleBased(rawText) {
     const g = m.indices.findIndex((ix, i) => i > 0 && ix);
     if (g < 1) continue;
     const [s, e] = m.indices[g];
-    let value = text.slice(s, e).trim();
+    let value = trimTrailing(text.slice(s, e).trim());
     if (rel === 'name') value = value.replace(/(^|\s)(\p{L})/gu, (_, sp, c) => sp + c.toUpperCase());
     facts.push({ entity: RELATIONS[rel].entity, relation: rel, value, evidence: text.slice(m.index, m.index + m[0].length) });
   }

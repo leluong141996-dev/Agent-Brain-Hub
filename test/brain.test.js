@@ -347,3 +347,20 @@ test('Value report — cross-agent reuse, knowledge flow matrix, leaks blocked',
   assert.equal(v.daily.length, 7);
   assert.ok(v.daily.at(-1).turns >= 3, 'today is the last bucket');
 });
+
+test('#22: "I don\'t like X anymore" stores X and replaces "I like X"', async () => {
+  const { extractFactsRuleBased } = await import('../server/brain/ontology.js');
+  const value = (s) => extractFactsRuleBased(s).map((f) => `${f.relation}=${f.value}`);
+  assert.deepEqual(value("I don't like spicy food anymore"), ['dislikes=spicy food']);
+  assert.deepEqual(value('I hate onions now'), ['dislikes=onions']);
+  assert.deepEqual(value('tôi không thích ăn cay nữa'), ['dislikes=ăn cay']);
+  assert.deepEqual(value('tôi không thích hành nữa rồi'), ['dislikes=hành']);
+  assert.deepEqual(value('I really like hiking now'), ['prefers=hiking'], 'also on positive preferences');
+
+  const b = makeBrain();
+  await b.think({ agentId: 'mia', text: 'I love spicy food', lang: 'en' });
+  const r = await b.think({ agentId: 'mia', text: "I don't like spicy food anymore", lang: 'en' });
+  assert.ok(r.learned.some((l) => l.action === 'superseded'), JSON.stringify(r.learned));
+  const live = b.state.facts.filter((f) => /spicy/.test(f.value) && f.status === 'active');
+  assert.deepEqual(live.map((f) => `${f.relation}=${f.value}`), ['dislikes=spicy food']);
+});
