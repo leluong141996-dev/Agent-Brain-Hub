@@ -8,6 +8,7 @@ import * as agentsView from './views/agents.js';
 import * as valueView from './views/value.js';
 import * as auditView from './views/audit.js';
 import * as settingsView from './views/settings.js';
+import * as reviewView from './views/review.js';
 
 const store = (k, v) => {
   try {
@@ -41,7 +42,7 @@ const ctx = {
     location.hash = 'brain';
   },
 };
-const VIEWS = { agents: agentsView, value: valueView, audit: auditView, settings: settingsView };
+const VIEWS = { agents: agentsView, review: reviewView, value: valueView, audit: auditView, settings: settingsView };
 
 // ======================= Theme =======================
 function applyTheme(opt) {
@@ -132,6 +133,8 @@ function renderShell() {
   ms.innerHTML = `<span class="pulse"></span><div><b>${esc(t('model'))}</b><span>${esc(s.llm.available ? s.llm.label : t('model_offline'))}</span></div>`;
   ms.title = s.llm.lastError ? t('model_err', { err: s.llm.lastError.slice(0, 160) }) : '';
   $('#navAgentCount').textContent = s.agents.length;
+  // Conflicts waiting for a human (v0.7 review queue).
+  api(`/api/review?lang=${lang()}`).then((r) => ($('#navReviewCount').textContent = r.conflicts.length || '')).catch(() => {});
   $('#sleepBtn').title = s.autoSleep?.enabled ? t('sleep_btn_auto') : '';
   const sel = $('#customerSelect');
   if (!s.customers.some((c) => c.id === ui.customerId) && s.customers[0]) ui.customerId = s.customers[0].id;
@@ -144,7 +147,7 @@ function renderShell() {
 // ======================= Routing =======================
 function route() {
   const v = (location.hash || '#brain').slice(1);
-  ui.view = ['brain', 'agents', 'value', 'audit', 'settings'].includes(v) ? v : 'brain';
+  ui.view = v === 'brain' || VIEWS[v] ? v : 'brain';
   $$('.view').forEach((el) => (el.hidden = el.id !== `view-${ui.view}`));
   $$('#navLinks a').forEach((a) => (a.dataset.view === ui.view ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')));
   $('#nav').classList.remove('open');

@@ -634,7 +634,8 @@ export class Brain {
       const o = this.state.facts.find((x) => x.id === f.conflictWith);
       if (!o) continue;
       seen.add(f.id).add(o.id);
-      conflicts.push({ customerId: f.customerId, customerName: this.state.customers[f.customerId]?.name || f.customerId, relation: f.relation, label: relationLabel(f.relation, lang), a: side(o), b: side(f) });
+      const [older, newer] = (o.createdAt ?? 0) <= (f.createdAt ?? 0) ? [o, f] : [f, o];
+      conflicts.push({ customerId: f.customerId, customerName: this.state.customers[f.customerId]?.name || f.customerId, relation: f.relation, label: relationLabel(f.relation, lang), a: side(older), b: side(newer) });
     }
     const facts = new Map(this.state.facts.map((f) => [f.id, f]));
     const decisions = (this.state.decisions || [])

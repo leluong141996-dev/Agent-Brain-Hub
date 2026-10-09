@@ -19,7 +19,7 @@ let form = null; // unsaved form state
 let models = [];
 
 export async function render(root, ctx) {
-  const [{ config, providers }, storage, sleep, emb] = await Promise.all([api('/api/settings/llm'), api('/api/storage'), api('/api/settings/sleep'), api('/api/settings/embeddings')]);
+  const [{ config, providers }, storage, sleep, emb, { relations }] = await Promise.all([api('/api/settings/llm'), api('/api/storage'), api('/api/settings/sleep'), api('/api/settings/embeddings'), api(`/api/relations?lang=${lang()}`)]);
   const byId = Object.fromEntries(providers.map((p) => [p.id, p]));
   if (!form || form.saved !== config.provider + config.model) {
     form = { ...config, apiKey: '', saved: config.provider + config.model };
@@ -73,11 +73,14 @@ export async function render(root, ctx) {
 
       <div class="card" id="sleepCard"></div>
 
+      <div class="card" id="schema"></div>
+
       ${storageCard(storage)}
     </div>`;
 
   drawEmbeddings($('#embCard', root), emb);
   drawSleep($('#sleepCard', root), sleep);
+  drawSchema($('#schema', root), relations, () => render(root, ctx));
   drawForm(root, byId, config);
   $$('.prov-tile', root).forEach((b) => {
     b.onclick = () => {
@@ -365,4 +368,83 @@ function storageCard(st) {
     <div class="card-head"><div class="ico-tile neutral">${icon('database', 18)}</div><div><div class="card-title">${t('storage_title')}</div><div class="card-sub">${t('storage_sub')}</div></div></div>
     <div class="card-body">${body}</div>
   </div>`;
+}
+
+// ---------------- Memory schema (v0.7) ----------------
+// Core relations: only the write policy and TTL change. Relations learned at
+// runtime start provisional (private to the domain that wrote them); an admin
+// promotes, merges or deletes them here.
+const POLICIES = ['latest', 'owner', 'trust', 'human'];
+
+function drawSchema(box, relations, rerender) {
+  const order = { provisional: 0, promoted: 1, core: 2 };
+  const list = [...relations].filter((r) => r.owner !== 'system').sort((a, b) => order[a.status] - order[b.status] || (b.uses || 0) - (a.uses || 0) || a.name.localeCompare(b.name));
+  const cores = relations.filter((r) => r.status === 'core' && r.owner !== 'system');
+  const opts = (vals, cur, label = (v) => v) => vals.map((v) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(label(v))}</option>`).join('');
+  const rows = list
+    .map((r) => {
+      const learned = r.status !== 'core';
+      return `<tr data-rel="${esc(r.name)}">
+        <td><b>${esc(r.labelText)}</b> <code class="muted small">${esc(r.name)}</code>
+          <div style="margin-top:3px"><span class="badge ${r.status === 'provisional' ? 'warning' : r.status === 'promoted' ? 'success' : ''}">${t('sc_' + r.status)}</span>${r.worthReview ? ` <span class="badge accent">${t('sc_worth')}</span>` : ''}</div></td>
+        <td><span class="badge scope ${esc(r.scope)}">${esc(r.scope)}</span> <span class="muted small">${esc(r.owner)}</span></td>
+        <td><select class="input sm" data-policy aria-label="${esc(t('rv_policy'))}">${opts(POLICIES, r.policy, (p) => t('rv_pol_' + p))}</select></td>
+        <td class="num">${r.ttlDays ? esc(t('sc_days', { n: r.ttlDays })) : '∞'}</td>
+        <td class="num">${learned ? esc(t('rv_uses', { uses: r.uses || 0, customers: r.customers?.length || 0 })) : '—'}</td>
+        <td>${learned ? `<div class="row-actions">
+          ${r.status === 'provisional' ? `<button class="btn sm" data-promote>${t('sc_promote')}</button>` : ''}
+          <select class="input sm" data-merge aria-label="${esc(t('sc_merge'))}"><option value="">${t('sc_merge')}</option>${cores.map((c) => `<option value="${esc(c.name)}">${esc(c.labelText)}</option>`).join('')}</select>
+          <button class="icon-btn danger" data-delete title="${esc(t('sc_delete'))}" aria-label="${esc(t('sc_delete'))}">${icon('trash')}</button>
+        </div>` : ''}</td>
+      </tr>
+      ${r.status === 'provisional' ? `<tr class="sc-promote" data-form="${esc(r.name)}" hidden><td colspan="6"><div class="sc-form">
+        <label>${t('th_scope')} <select class="input sm" name="scope">${opts(['shared', 'private'], 'shared')}</select></label>
+        <label>${t('rv_policy')} <select class="input sm" name="policy">${opts(POLICIES, 'trust', (p) => t('rv_pol_' + p))}</select></label>
+        <label>vi <input class="input sm" name="vi" value="${esc(r.label?.vi || r.labelText)}" /></label>
+        <label>en <input class="input sm" name="en" value="${esc(r.label?.en || r.labelText)}" /></label>
+        <label>ja <input class="input sm" name="ja" value="${esc(r.label?.ja || r.labelText)}" /></label>
+        <button class="btn sm primary" data-save>${icon('check', 13)}<span>${t('sc_promote')}</span></button>
+      </div></td></tr>` : ''}`;
+    })
+    .join('');
+  box.innerHTML = `
+    <div class="card-head">
+      <div class="ico-tile neutral">${icon('database', 18)}</div>
+      <div style="flex:1;min-width:0"><div class="card-title">${t('sc_title')}</div><div class="card-sub">${t('sc_sub')}</div></div>
+    </div>
+    <div class="card-body table-card"><table class="table">
+      <thead><tr><th>${t('th_relation')}</th><th>${t('th_scope')}</th><th>${t('rv_policy')}</th><th class="num">TTL</th><th class="num">${t('sc_usage')}</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+
+  const put = async (name, body) => {
+    await api(`/api/relations/${encodeURIComponent(name)}`, body, 'PUT');
+    toast(esc(t('rv_done')), 'success', icon('check'));
+    rerender();
+  };
+  $$('tr[data-rel]', box).forEach((tr) => {
+    const name = tr.dataset.rel;
+    $('[data-policy]', tr).onchange = (e) => put(name, { action: 'edit', policy: e.target.value });
+    const merge = $('[data-merge]', tr);
+    if (merge) merge.onchange = (e) => e.target.value && confirm(t('sc_merge_confirm', { name, into: e.target.value })) && put(name, { action: 'merge', into: e.target.value });
+    const del = $('[data-delete]', tr);
+    if (del)
+      del.onclick = async () => {
+        if (!confirm(t('sc_delete_confirm', { name }))) return;
+        await api(`/api/relations/${encodeURIComponent(name)}`, undefined, 'DELETE');
+        toast(esc(t('rv_done')), 'success', icon('check'));
+        rerender();
+      };
+    const promote = $('[data-promote]', tr);
+    if (promote) promote.onclick = () => {
+        const form = $(`tr[data-form="${CSS.escape(name)}"]`, box);
+        form.hidden = !form.hidden;
+      };
+  });
+  $$('tr[data-form]', box).forEach((tr) => {
+    $('[data-save]', tr).onclick = () => {
+      const v = (n) => $(`[name=${n}]`, tr).value.trim();
+      put(tr.dataset.form, { action: 'promote', scope: v('scope'), policy: v('policy'), label: { vi: v('vi'), en: v('en'), ja: v('ja') } });
+    };
+  });
 }

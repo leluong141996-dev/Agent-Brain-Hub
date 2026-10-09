@@ -75,7 +75,7 @@ function row(a, s, L) {
     <td><span class="domain-cell" style="--c:${d?.color}"><i></i>${esc(d?.label)}${d?.episodeScope === 'private' ? icon('lock', 13) : ''}</span></td>
     <td><input type="checkbox" class="switch" data-perm="readShared" ${a.permissions?.readShared !== false ? 'checked' : ''} aria-label="${esc(t('perm_read'))}" title="${esc(t('perm_read'))}" /></td>
     <td><input type="checkbox" class="switch" data-perm="write" ${a.permissions?.write !== false ? 'checked' : ''} aria-label="${esc(t('perm_write'))}" title="${esc(t('perm_write'))}" /></td>
-    <td><div class="activity-cell"><span><b>${fmtNum(st.turns || 0, L)}</b>${t('st_turns')}</span><span><b>${fmtNum(facts, L)}</b>${t('st_facts')}</span><span><b>${fmtNum((st.recalls || 0) + (st.remembers || 0), L)}</b>${t('st_api')}</span></div></td>
+    <td><div class="activity-cell"><span><b>${fmtNum(st.turns || 0, L)}</b>${t('st_turns')}</span><span><b>${fmtNum(facts, L)}</b>${t('st_facts')}</span><span><b>${fmtNum((st.recalls || 0) + (st.remembers || 0), L)}</b>${t('st_api')}</span><span title="${esc(t('rv_trust_hint', { up: a.trust?.up || 0, down: a.trust?.down || 0 }))}"><b>${(a.trust?.score ?? 0.5).toFixed(2)}</b>${t('rv_trust')}</span></div></td>
     <td><span class="key-hint">${esc(a.keyHint || '—')}</span></td>
     <td><div class="row-actions">
       ${ext ? '' : `<button class="icon-btn" data-act="chat" title="${esc(t('chat'))}" aria-label="${esc(t('chat'))}">${icon('message')}</button>`}
