@@ -1,7 +1,8 @@
 // Hippocampus — Memory Encoding & Consolidation. Online: extract facts and
 // encode salient moments right away. Sleep: hierarchical summarization of
 // working-memory sessions into long-term episodic memories.
-import { extractFactsRuleBased, RELATIONS, factToText } from './ontology.js';
+import { extractFactsRuleBased, factToText } from './ontology.js';
+import { relationOf, normalizeName } from './registry.js';
 import { writeFact, addEpisode, WRITE_REASONS } from './neocortex.js';
 import { delegateWrite } from './corpusCallosum.js';
 import { domainOf, actionLabel } from '../agents.js';
@@ -20,12 +21,12 @@ function episodeScope(agent) {
 // Rule facts win; an LLM fact is added only if it says something new. For a
 // single-valued relation, two phrasings from the SAME message are one fact,
 // not a contradiction ("no car for 3 days" vs "in the shop for 3 days").
-function mergeFacts(rule, llm) {
+function mergeFacts(B, rule, llm) {
   const out = [...rule];
   for (const f of llm || []) {
-    const single = RELATIONS[f.relation]?.card === 'one';
-    if (!out.some((r) => r.relation === f.relation && (single || r.value.toLowerCase() === String(f.value).toLowerCase()))) {
-      out.push({ ...f, entity: f.entity || RELATIONS[f.relation].entity });
+    const single = (relationOf(B, normalizeName(f.relation))?.card ?? 'one') === 'one';
+    if (!out.some((r) => normalizeName(r.relation) === normalizeName(f.relation) && (single || r.value.toLowerCase() === String(f.value).toLowerCase()))) {
+      out.push({ ...f });
     }
   }
   return out;
@@ -38,7 +39,7 @@ export async function encodeOnline(B, t, { customerId, agent, text, salience, tr
   }
   const rule = text ? extractFactsRuleBased(text) : [];
   const llm = llmFactsPromise ? await llmFactsPromise : null;
-  const extracted = mergeFacts([...explicitFacts, ...rule], llm);
+  const extracted = mergeFacts(B, [...explicitFacts, ...rule], llm);
   const by = llm ? t.L('rule + LLM', 'rule + LLM') : t.L('rule-based', 'rule-based');
   t.step('hippocampus', t.L(`Mã hoá: trích ${extracted.length} fact (${by})`, `Encoding: extracted ${extracted.length} facts (${by})`, `符号化：事実を${extracted.length}件抽出（${by}）`), {
     extracted: extracted.map((f) => `${f.relation} = ${f.value}`),

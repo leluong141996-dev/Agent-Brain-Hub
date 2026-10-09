@@ -25,12 +25,12 @@ import { reflect } from './dmn.js';
 import { emptySleepState, recordSleep } from './sleepScheduler.js';
 import { EmbedQueue } from './embedQueue.js';
 import { MemoryIndex } from './memoryIndex.js';
-import { loadRegistry } from './registry.js';
+import { loadRegistry, listRelations } from './registry.js';
 import { normalizeFact, stateAt, visibleAt, DEFAULT_HISTORY_DAYS } from './temporal.js';
 import { entityOf, link, CONCRETE, W_ENTITY } from './entities.js';
 import { detectIntent } from './prefrontal.js';
 import { seedGlobal, resolveConflict } from './neocortex.js';
-import { extractFactsRuleBased, factToText, factValue, RELATIONS } from './ontology.js';
+import { extractFactsRuleBased, factToText, factValue } from './ontology.js';
 import { templateReply, buildPrompt, contextBlock, memoryInstructions } from './respond.js';
 import { audit, auditRetrieval } from './audit.js';
 import { DOMAINS, DEFAULT_PERMISSIONS, actionLabel } from '../agents.js';
@@ -176,6 +176,11 @@ export class Brain {
     return encoded;
   }
 
+  // Relations offered to the LLM extractor for reuse (core + learned, no system ones).
+  llmRelations() {
+    return listRelations(this, 'en').filter((r) => r.owner !== 'system').map((r) => ({ name: r.name, labelText: r.labelText }));
+  }
+
   learnedView(encoded, lang) {
     return encoded.results.map((r) => ({
       action: r.action,
@@ -194,7 +199,7 @@ export class Brain {
     const p = this.perceive(t, { agentId, customerId, text, lang, qvec });
     const { agent, guard, clean, salience, wm, intent, skill, retrieval, actions, ctx } = p;
     // Start LLM fact extraction now; Hippocampus awaits it after the reply.
-    const llmFactsPromise = this.llm.available && agent.permissions?.write !== false ? this.llm.extractFacts(clean) : null;
+    const llmFactsPromise = this.llm.available && agent.permissions?.write !== false ? this.llm.extractFacts(clean, this.llmRelations()) : null;
 
     let reply;
     let mode;
@@ -387,9 +392,9 @@ export class Brain {
       if (record) record.replied = true;
     }
     const explicitFacts = (Array.isArray(facts) ? facts : [])
-      .filter((f) => f && RELATIONS[f.relation] && f.value)
-      .map((f) => ({ relation: f.relation, value: String(f.value), entity: RELATIONS[f.relation].entity, isUpdate: !!f.isUpdate }));
-    const llmFactsPromise = text && this.llm.available && agent.permissions?.write !== false ? this.llm.extractFacts(text) : null;
+      .filter((f) => f && f.relation && f.value)
+      .map((f) => ({ relation: String(f.relation), value: String(f.value), isUpdate: !!f.isUpdate }));
+    const llmFactsPromise = text && this.llm.available && agent.permissions?.write !== false ? this.llm.extractFacts(text, this.llmRelations()) : null;
     const encoded = await this.encode(t, { agent, customerId, text, salience, llmFactsPromise, explicitFacts });
 
     let feedback = null;

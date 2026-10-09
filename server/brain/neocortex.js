@@ -1,6 +1,7 @@
 // Neocortex — Persistent Memory Layer (episodic + semantic stores) with
 // hot/warm/cold tiering, multi-agent scoping and contradiction resolution.
-import { RELATIONS, validateFact, factToText, factEmbedText, sameValue } from './ontology.js';
+import { validateFact, factToText, factEmbedText, sameValue } from './ontology.js';
+import { ensureRelation } from './registry.js';
 import { visibleAt, invalidate, markConflict } from './temporal.js';
 import { similarity } from '../text.js';
 import { embed } from '../embed.js';
@@ -57,12 +58,17 @@ export function addEpisode(B, ep) {
 // Write a fact through ontology validation, single-writer ownership and
 // contradiction resolution. Returns { action, fact, against? , reason? }.
 export function writeFact(B, input, { agent, customerId }) {
-  const err = validateFact(input, RELATIONS[input.relation] && { entity: RELATIONS[input.relation].entity });
+  const value = String(input.value ?? '').trim();
+  if (!value || value.length > 160) return { action: 'rejected', reason: 'empty or too long value', input };
+  const reg = ensureRelation(B, input.relation, { agent, customerId, value, label: input.label || null });
+  if (reg.error) return { action: 'rejected', reason: reg.error, input };
+  const rel = reg.rel;
+  input = { ...input, relation: reg.name, entity: input.entity || rel.entity };
+  const err = validateFact(input, rel);
   if (err) return { action: 'rejected', reason: err, input };
-  const rel = RELATIONS[input.relation];
   const now = B.clock.now();
   const ttlDays = input.ttlDays ?? rel.ttlDays;
-  const ownerDomain = rel.writer;
+  const ownerDomain = rel.owner;
   const delegated = agent.domain !== ownerDomain && ownerDomain !== 'system';
   const make = (extra = {}) => {
     const f = {

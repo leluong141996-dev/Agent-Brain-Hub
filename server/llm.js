@@ -339,32 +339,34 @@ export class LLM {
     }
   }
 
-  // Returns [{entity, relation, value, isUpdate}] or null on failure.
-  async extractFacts(text) {
+  // Returns [{relation, value, isUpdate}] or null on failure. relations: the
+  // registry's relations to reuse ([{name, labelText}]); new names are allowed.
+  async extractFacts(text, relations = null) {
     if (!this.client) return null;
-    const rels = Object.entries(RELATIONS)
-      .filter(([, r]) => r.writer !== 'system')
-      .map(([k, r]) => `- ${k} — ${r.label.en}`)
-      .join('\n');
+    const list = relations || Object.entries(RELATIONS).filter(([, r]) => r.writer !== 'system').map(([name, r]) => ({ name, labelText: r.label.en }));
+    const rels = list.map((r) => `- ${r.name} — ${r.labelText}`).join('\n');
     const system =
       'You extract durable facts about the customer from one chat message for a memory system. ' +
-      'Only use these relations:\n' + rels + '\n' +
+      'Prefer these relations:\n' + rels + '\n' +
+      'If a durable fact fits none of them, use a new short snake_case relation name (e.g. "favourite_colour", "loyalty_tier"). ' +
+      'Never extract passwords, PINs, one-time codes, card numbers or other secrets. ' +
       'Return ONLY a JSON object like {"facts":[{"relation":"lives_in","value":"Hà Nội","isUpdate":false}]}. ' +
       'Only include facts explicitly stated in the message; never infer preferences from complaints or problems. Keep values short, in the original language. ' +
       'isUpdate=true when the customer says a previous fact changed. Use "dislikes" for negated preferences. ' +
       'Return {"facts":[]} when there is nothing durable.';
     try {
       const { text: out } = await this._call({ system, messages: [{ role: 'user', content: text }], maxTokens: 1500, json: true, utility: true });
-      const list = listFrom(parseJson(out), 'facts');
-      if (!list) return null;
-      return list
-        .filter((f) => f && RELATIONS[f.relation] && RELATIONS[f.relation].writer !== 'system' && f.value)
-        .map((f) => ({ relation: f.relation, value: String(f.value), entity: RELATIONS[f.relation].entity, isUpdate: !!f.isUpdate }));
+      const facts = listFrom(parseJson(out), 'facts');
+      if (!facts) return null;
+      return facts
+        .filter((f) => f && typeof f.relation === 'string' && f.relation !== 'policy' && f.value)
+        .map((f) => ({ relation: f.relation, value: String(f.value), isUpdate: !!f.isUpdate }));
     } catch (e) {
       this.lastError = e.message;
       return null;
     }
   }
+
 
   async summarize(transcript, lang = 'vi') {
     if (!this.client) return null;
