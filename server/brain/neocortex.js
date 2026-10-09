@@ -2,6 +2,9 @@
 // hot/warm/cold tiering, multi-agent scoping and contradiction resolution.
 import { validateFact, factToText, factEmbedText, sameValue } from './ontology.js';
 import { ensureRelation } from './registry.js';
+import { arbitrate } from './arbitration.js';
+import { reward, penalize } from './trust.js';
+import { audit } from './audit.js';
 import { visibleAt, invalidate, markConflict } from './temporal.js';
 import { similarity } from '../text.js';
 import { embed } from '../embed.js';
@@ -12,6 +15,9 @@ export const WRITE_REASONS = {
   negation: { vi: 'phủ định fact đang active', en: 'negates an active fact', ja: '有効な事実を否定' },
   close_values: { vi: 'giá trị gần nhau → giữ bản mới', en: 'close values → keep the newer one', ja: '近い値 → 新しい方を保持' },
   customer_update: { vi: 'khách báo thay đổi', en: 'customer reported a change', ja: 'お客様が変更を申告' },
+  policy_latest: { vi: 'quy tắc "mới nhất" → giữ giá trị mới', en: 'policy "latest" → keep the newer value', ja: 'ルール「最新」→ 新しい値を採用' },
+  policy_owner: { vi: 'quy tắc "chủ sở hữu" → giữ giá trị của miền sở hữu', en: 'policy "owner" → keep the owner domain\'s value', ja: 'ルール「所有者」→ 所有ドメインの値を採用' },
+  policy_trust: { vi: 'quy tắc "tin cậy" → giữ giá trị của agent đáng tin hơn', en: 'policy "trust" → keep the more trusted agent\'s value', ja: 'ルール「信頼度」→ 信頼度の高いエージェントの値を採用' },
   two_active: { vi: 'hai giá trị khác nhau cùng active', en: 'two different values active at once', ja: '異なる値が同時に有効' },
 };
 
@@ -53,6 +59,17 @@ export function addEpisode(B, ep) {
   B.state.episodes.push(e);
   B.embedQueue?.kick(); // model vector is added in the background
   return e;
+}
+
+const MAX_DECISIONS = 500;
+
+function recordDecision(B, d) {
+  const rec = { id: B.store.id('dec'), ...d, at: B.clock.now(), undoneAt: null };
+  const list = (B.state.decisions ||= []);
+  list.push(rec);
+  if (list.length > MAX_DECISIONS) list.splice(0, list.length - MAX_DECISIONS);
+  audit(B, { op: 'arbitrate', agentId: d.agentId, customerId: d.customerId, relation: d.relation, itemId: d.winnerId, kind: d.policy });
+  return rec;
 }
 
 // Write a fact through ontology validation, single-writer ownership and
@@ -103,6 +120,26 @@ export function writeFact(B, input, { agent, customerId }) {
     (f) => f.customerId === customerId && f.entity === input.entity && visibleAt(f, now)
   );
 
+  // Two different values: the relation's policy decides (arbitration.js).
+  const clash = (olds, conflictReason) => {
+    const old = olds[olds.length - 1];
+    const d = arbitrate(B, { rel, agent, old });
+    const f = make();
+    const base = { customerId, relation: input.relation, policy: d.policy, agentId: agent.id };
+    if (d.winner === 'new') {
+      for (const o of olds) invalidate(o, { by: f.id, reason: 'outvoted', at: now });
+      const decision = recordDecision(B, { ...base, winnerId: f.id, loserId: old.id });
+      return { action: 'arbitrated', fact: f, against: old, reason: `policy_${d.policy}`, decision, delegated };
+    }
+    if (d.winner === 'old') {
+      invalidate(f, { by: old.id, reason: 'outvoted', at: now });
+      const decision = recordDecision(B, { ...base, winnerId: old.id, loserId: f.id });
+      return { action: 'outvoted', fact: f, against: old, reason: `policy_${d.policy}`, decision, delegated };
+    }
+    markConflict(f, old, now);
+    return { action: 'conflict', fact: f, against: old, reason: conflictReason, delegated };
+  };
+
   // Negation against the opposite relation ("thích X" vs "không thích X").
   if (rel.opposite) {
     const neg = live.find((f) => f.relation === rel.opposite && sameValue(f.value, input.value));
@@ -112,9 +149,7 @@ export function writeFact(B, input, { agent, customerId }) {
         invalidate(neg, { by: f.id, reason: 'superseded', at: now });
         return { action: 'superseded', fact: f, against: neg, delegated };
       }
-      const f = make();
-      markConflict(f, neg, now);
-      return { action: 'conflict', fact: f, against: neg, reason: 'negation', delegated };
+      return clash([neg], 'negation');
     }
   }
 
@@ -124,6 +159,10 @@ export function writeFact(B, input, { agent, customerId }) {
     dup.confidence = Math.min(1, dup.confidence + 0.1);
     dup.updatedAt = now;
     if (ttlDays) dup.validUntil = now + ttlDays * DAY;
+    if (dup.sourceAgentId && dup.sourceAgentId !== agent.id && !(dup.confirmedBy ||= []).includes(agent.id)) {
+      dup.confirmedBy.push(agent.id);
+      reward(B, dup.sourceAgentId);
+    }
     return { action: 'reinforced', fact: dup, delegated };
   }
   if (rel.card === 'one' && same.length) {
@@ -134,9 +173,7 @@ export function writeFact(B, input, { agent, customerId }) {
       for (const o of same) invalidate(o, { by: f.id, reason: 'superseded', at: now });
       return { action: 'superseded', fact: f, against: old, reason: close ? 'close_values' : 'customer_update', delegated };
     }
-    const f = make();
-    markConflict(f, old, now);
-    return { action: 'conflict', fact: f, against: old, reason: 'two_active', delegated };
+    return clash(same, 'two_active');
   }
   return { action: 'created', fact: make(), delegated };
 }
@@ -154,7 +191,30 @@ export function resolveConflict(B, factId) {
     invalidate(other, { by: keep.id, reason: 'resolved', at: now });
     delete other.conflictWith;
   }
+  if (other && keep.sourceAgentId !== other.sourceAgentId) {
+    reward(B, keep.sourceAgentId);
+    penalize(B, other.sourceAgentId);
+  }
   return keep;
+}
+
+// Undo an automatic decision. The loser's value comes back as a new fact, so
+// recall({ asOf }) still shows what the brain believed in between.
+export function undoDecision(B, decisionId) {
+  const d = (B.state.decisions || []).find((x) => x.id === decisionId);
+  if (!d || d.undoneAt) return null;
+  const winner = B.state.facts.find((f) => f.id === d.winnerId);
+  const loser = B.state.facts.find((f) => f.id === d.loserId);
+  if (!winner || !loser) return null;
+  const now = B.clock.now();
+  const back = { ...loser, id: B.store.id('fact'), status: 'active', confidence: 0.95, createdAt: now, updatedAt: now, recordedAt: now, validFrom: now, invalidatedAt: null, invalidReason: null, invalidatedBy: null, supersededBy: null, conflictedAt: null, conflictResolvedAt: null };
+  delete back.conflictWith;
+  B.state.facts.push(back);
+  if (visibleAt(winner, now)) invalidate(winner, { by: back.id, reason: 'resolved', at: now });
+  d.undoneAt = now;
+  penalize(B, winner.sourceAgentId);
+  reward(B, loser.sourceAgentId);
+  return { decision: d, fact: back };
 }
 
 export const GLOBAL_POLICIES = [

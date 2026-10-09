@@ -29,7 +29,7 @@ import { loadRegistry, listRelations } from './registry.js';
 import { normalizeFact, stateAt, visibleAt, DEFAULT_HISTORY_DAYS } from './temporal.js';
 import { entityOf, link, CONCRETE, W_ENTITY } from './entities.js';
 import { detectIntent } from './prefrontal.js';
-import { seedGlobal, resolveConflict } from './neocortex.js';
+import { seedGlobal, resolveConflict, undoDecision } from './neocortex.js';
 import { extractFactsRuleBased, factToText, factValue } from './ontology.js';
 import { templateReply, buildPrompt, contextBlock, memoryInstructions } from './respond.js';
 import { audit, auditRetrieval } from './audit.js';
@@ -602,6 +602,14 @@ export class Brain {
   }
 
   // ---------------- Memory admin ----------------
+  undoDecision(decisionId) {
+    const r = undoDecision(this, decisionId);
+    if (!r) throw err('decision not found or already undone', 404);
+    audit(this, { op: 'arbitrate', customerId: r.decision.customerId, relation: r.decision.relation, itemId: r.fact.id, kind: 'undo' });
+    this.store.save();
+    return r.decision;
+  }
+
   resolveConflict(factId) {
     const f = resolveConflict(this, factId);
     if (!f) throw err('fact not found', 404);

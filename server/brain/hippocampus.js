@@ -50,6 +50,10 @@ export async function encodeOnline(B, t, { customerId, agent, text, salience, tr
   for (const f of extracted) {
     const r = writeFact(B, f, { agent, customerId });
     results.push(r);
+    if (r.decision) {
+      const [win, lose] = r.action === 'arbitrated' ? [r.fact, r.against] : [r.against, r.fact];
+      t.step('neocortex', t.L(`Phân xử (${r.decision.policy}): giữ "${win.value}", bỏ "${lose.value}"`, `Arbitration (${r.decision.policy}): kept "${win.value}", outvoted "${lose.value}"`, `調停（${r.decision.policy}）：「${win.value}」を採用、「${lose.value}」を不採用`), { relation: r.decision.relation, policy: r.decision.policy }, { from: 'hippocampus' });
+    }
     if (r.delegated && r.fact) delegateWrite(B, t, { fact: r.fact, fromAgent: agent });
   }
 

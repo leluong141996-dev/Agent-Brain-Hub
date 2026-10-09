@@ -117,8 +117,13 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     const text = factToText(f, lang);
     const state = stateAt(f, now);
     if (state === 'unknown') continue; // learned after asOf
-    if (state === 'superseded' || state === 'resolved') {
-      excluded.push({ kind: 'semantic', id: f.id, text, reason: state === 'resolved' ? t.L('thua khi giải mâu thuẫn', 'lost a resolved conflict', '矛盾の解決で不採用') : t.L('đã bị thay thế (cold)', 'superseded (cold)', '置き換え済み（cold）') });
+    // Any invalidated fact (superseded, resolved, outvoted…) is history, not context.
+    if (state !== 'active' && state !== 'conflicted' && state !== 'expired') {
+      const why = {
+        resolved: t.L('thua khi giải mâu thuẫn', 'lost a resolved conflict', '矛盾の解決で不採用'),
+        outvoted: t.L('thua khi phân xử', 'outvoted by a write policy', '調停で不採用'),
+      };
+      excluded.push({ kind: 'semantic', id: f.id, text, reason: why[state] || t.L('đã bị thay thế (cold)', 'superseded (cold)', '置き換え済み（cold）') });
       continue;
     }
     if (!visible(f, agent)) {

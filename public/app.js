@@ -458,7 +458,7 @@ async function send(text, agentId = ui.agentId) {
   }
 }
 
-const LEARN_ICON = { created: ['plus', ''], reinforced: ['check', 'info'], superseded: ['refresh', 'info'], conflict: ['alert', 'warn'], rejected: ['x', 'warn'] };
+const LEARN_ICON = { created: ['plus', ''], reinforced: ['check', 'info'], superseded: ['refresh', 'info'], arbitrated: ['refresh', 'info'], outvoted: ['x', 'info'], conflict: ['alert', 'warn'], rejected: ['x', 'warn'] };
 
 function renderReply(el, r) {
   el.classList.remove('thinking');
@@ -634,7 +634,7 @@ function renderTab() {
 }
 
 // ---- v0.5: memory over time ----
-const STATE_BADGE = { active: 'success', conflicted: 'warning', expired: 'warning', superseded: '', resolved: '' };
+const STATE_BADGE = { active: 'success', conflicted: 'warning', expired: 'warning', superseded: '', resolved: '', outvoted: '' };
 function stateBadge(state = 'active') {
   return `<span class="badge ${STATE_BADGE[state] ?? ''}">${state === 'conflicted' ? icon('alert', 12) : ''}${esc(t('st_' + state))}</span>`;
 }
