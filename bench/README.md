@@ -58,8 +58,9 @@ Add one JSON file to `bench/scenarios/`. No code changes are needed.
 | `{ "agent", "recall" }` | an agent asks the memory for context (this is where most checks go) |
 | `{ "advance": "45m" \| "6h" \| "2d" }` | moves the brain's simulated clock |
 | `{ "sleep": true }` | runs a sleep cycle manually |
+| `{ "mark": "before-move" }` | remembers the current (simulated) time under a name; a later `recall` can add `"asOf": "before-move"` to ask what the brain believed then |
 
-Categories also include `exact_match` (order numbers, model names). Agents are `mia` (personal), `kai` (repair), `atlas` (travel), `sage` (health, private), `penny` (finance), `nova` (shopping). Add `"customer": "<id>"` to a step to use more than one customer; by default every scenario has its own customer.
+Categories also include `exact_match` (order numbers, model names) and `temporal` (looking back with `asOf`). Agents are `mia` (personal), `kai` (repair), `atlas` (travel), `sage` (health, private), `penny` (finance), `nova` (shopping). Add `"customer": "<id>"` to a step to use more than one customer; by default every scenario has its own customer.
 
 Automatic sleep runs after every step, as it does in production (idle and pressure triggers; the nightly trigger is off because it depends on wall-clock time).
 

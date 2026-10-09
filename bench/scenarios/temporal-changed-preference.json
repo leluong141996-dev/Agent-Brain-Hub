@@ -1,0 +1,50 @@
+{
+  "id": "temporal-changed-preference",
+  "category": "temporal",
+  "lang": "en",
+  "description": "A preference that changed: the past still shows what the customer liked then.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "I love spicy food"
+    },
+    {
+      "mark": "then"
+    },
+    {
+      "advance": "5d"
+    },
+    {
+      "agent": "mia",
+      "say": "I don't like spicy food anymore"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "recall": "Suggest some snacks for me",
+      "asOf": "then",
+      "expect": {
+        "remembers": [
+          "/^likes:? spicy/i"
+        ],
+        "stale": [
+          "/^dislikes/i"
+        ]
+      }
+    },
+    {
+      "agent": "nova",
+      "recall": "Suggest some snacks for me",
+      "expect": {
+        "remembers": [
+          "/^dislikes:? spicy/i"
+        ],
+        "stale": [
+          "/^likes:? spicy/i"
+        ]
+      }
+    }
+  ]
+}

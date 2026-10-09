@@ -2,9 +2,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const CATEGORIES = ['cross_agent', 'stale', 'contradiction', 'leakage', 'multi_hop', 'long_conversation', 'exact_match'];
+export const CATEGORIES = ['cross_agent', 'stale', 'contradiction', 'leakage', 'multi_hop', 'long_conversation', 'exact_match', 'temporal'];
 const LANGS = ['vi', 'en', 'ja'];
-const KINDS = ['say', 'recall', 'advance', 'sleep'];
+const KINDS = ['say', 'recall', 'advance', 'sleep', 'mark'];
 const RECALL_CHECKS = ['remembers', 'private', 'stale', 'conflict'];
 const UNITS = { m: 60_000, h: 3_600_000, d: 86_400_000 };
 
@@ -36,6 +36,7 @@ export function validateScenario(s, file, { agents }) {
     err('steps must be a non-empty list');
     return errs;
   }
+  const marks = new Set();
   s.steps.forEach((st, i) => {
     const n = i + 1;
     const kinds = KINDS.filter((k) => st && st[k] !== undefined);
@@ -48,6 +49,15 @@ export function validateScenario(s, file, { agents }) {
     }
     if (kind === 'advance' && parseDuration(st.advance) === null) err('"advance" must look like "45m", "6h" or "2d"', n);
     if (kind === 'sleep' && st.sleep !== true) err('"sleep" must be true', n);
+    if (kind === 'mark') {
+      if (typeof st.mark !== 'string' || !st.mark.trim()) err('"mark" must be a non-empty name', n);
+      else if (marks.has(st.mark)) err(`mark "${st.mark}" is already used`, n);
+      else marks.add(st.mark);
+    }
+    if (st.asOf !== undefined) {
+      if (kind !== 'recall') err('"asOf" is only allowed on recall steps', n);
+      else if (!marks.has(st.asOf)) err(`asOf "${st.asOf}" must refer to an earlier mark`, n);
+    }
     if (st.expect === undefined) return;
     if (typeof st.expect !== 'object' || Array.isArray(st.expect)) return err('expect must be an object', n);
     for (const [k, v] of Object.entries(st.expect)) {

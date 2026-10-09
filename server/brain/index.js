@@ -313,7 +313,8 @@ export class Brain {
     const intent = detectIntent(clean, agent);
     const retrieval = retrieve(this, t, { customerId, agent, query: clean, intent: intent.intent, qvec, asOf, readOnly: true });
     const wm = this.state.working[customerId];
-    const hot = (wm?.turns || []).filter((x) => x.at <= asOf).slice(-6).map((x) => `${x.role === 'user' ? 'Customer' : this.agentName(x.agentId)}: ${x.text}`);
+    // Same privacy filter as the live path (hotTurns), limited to turns before asOf.
+    const hot = wm ? hotTurns(this, { ...wm, turns: wm.turns.filter((x) => x.at <= asOf) }, agent) : [];
     const ctx = { agent, lang, now: asOf, intent: intent.intent, salience: { priority: 'normal', sentiment: 'neutral', urgency: 'normal' }, selected: retrieval.selected, actions: [], skill: null, handoffPkg: null, hot };
     const promptBlock = [`Reply in ${LANGUAGE_NAME[lang]}.`, ...memoryInstructions(), '', contextBlock(ctx)].join('\n');
     audit(this, { op: 'inspect', agentId: agent.id, customerId, traceId: t.id });

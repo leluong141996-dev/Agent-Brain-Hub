@@ -1,0 +1,44 @@
+{
+  "id": "temporal-what-atlas-knew",
+  "category": "temporal",
+  "lang": "en",
+  "description": "When Atlas booked the flight it knew the car was in the shop; ten days later that fact has expired.",
+  "steps": [
+    {
+      "agent": "kai",
+      "say": "My car broke down, it will be in the shop for 3 days"
+    },
+    {
+      "advance": "1d"
+    },
+    {
+      "agent": "atlas",
+      "say": "I need a flight to Da Nang next week"
+    },
+    {
+      "mark": "booking"
+    },
+    {
+      "advance": "10d"
+    },
+    {
+      "agent": "atlas",
+      "recall": "I need a flight to Da Nang next week",
+      "asOf": "booking",
+      "expect": {
+        "remembers": [
+          "no car for 3 days"
+        ]
+      }
+    },
+    {
+      "agent": "atlas",
+      "recall": "I need a flight to Da Nang next week",
+      "expect": {
+        "stale": [
+          "no car for 3 days"
+        ]
+      }
+    }
+  ]
+}

@@ -22,6 +22,7 @@ export async function runScenario(s, makeTarget, { llm = false } = {}) {
   const res = { id: s.id, category: s.category, lang: s.lang, file: s.file, status: 'passed', error: null, checks: [], timings: { say: [], recall: [] }, promptTokens: [] };
   const target = makeTarget(s);
   let n = 0;
+  const marks = new Map(); // name → the target's (simulated) time
   try {
     for (const st of s.steps) {
       n += 1;
@@ -33,12 +34,14 @@ export async function runScenario(s, makeTarget, { llm = false } = {}) {
         res.checks.push(...scoreSay(st.expect, obs, { llm }).map((c) => ({ ...c, step: n })));
       } else if (st.recall !== undefined) {
         const t0 = performance.now();
-        const obs = await target.recall(st.agent, st.recall, st.customer);
+        const obs = await target.recall(st.agent, st.recall, st.customer, st.asOf ? marks.get(st.asOf) : undefined);
         res.timings.recall.push(performance.now() - t0);
         res.promptTokens.push(estimateTokens(obs.promptBlock));
         res.checks.push(...scoreRecall(st.expect, obs).map((c) => ({ ...explain(c, obs), step: n })));
       } else if (st.advance !== undefined) {
         await target.advance(parseDuration(st.advance));
+      } else if (st.mark !== undefined) {
+        marks.set(st.mark, await target.now());
       } else if (st.sleep) {
         await target.sleep(st.customer);
       }

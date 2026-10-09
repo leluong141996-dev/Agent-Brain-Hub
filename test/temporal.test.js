@@ -130,3 +130,13 @@ test('temporal: the new fields survive a restart', async () => {
   assert.ok(h.recordedAt && h.invalidatedAt && h.invalidatedBy);
   s2.close();
 });
+
+test('temporal: looking back never shows another domain\'s private conversation turns', async () => {
+  // Regression: recall({ asOf }) first built recent turns without the privacy
+  // filter, so Sage's conversation reached Atlas. The benchmark caught it.
+  const b = makeBrain();
+  await b.think({ agentId: 'sage', text: 'I am allergic to peanuts and I have diabetes', lang: 'en' });
+  b.advanceClock(1);
+  const r = await b.recall({ agentId: 'atlas', text: 'Book a meal on my flight', lang: 'en', asOf: b.clock.now() });
+  assert.ok(!/peanut|diabetes/i.test(r.promptBlock), r.promptBlock);
+});
