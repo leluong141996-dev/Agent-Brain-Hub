@@ -1,0 +1,33 @@
+{
+  "id": "multi-hop-trip-reaches-car",
+  "category": "multi_hop",
+  "lang": "en",
+  "description": "Planning a trip pulls in the car being in the shop (trip ↔ car availability), although the question never mentions a car.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "My car is a Toyota Camry"
+    },
+    {
+      "agent": "kai",
+      "say": "The Camry broke down, it will be in the shop for 4 days"
+    },
+    {
+      "agent": "atlas",
+      "say": "I'm flying to Tokyo next week"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "mia",
+      "recall": "Help me plan the Tokyo trip",
+      "expect": {
+        "remembers": [
+          "no car for 4 days",
+          "Tokyo"
+        ]
+      }
+    }
+  ]
+}

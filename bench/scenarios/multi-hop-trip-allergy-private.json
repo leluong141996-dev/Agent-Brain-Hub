@@ -1,0 +1,40 @@
+{
+  "id": "multi-hop-trip-allergy-private",
+  "category": "multi_hop",
+  "lang": "en",
+  "description": "The trip links to the allergy in the graph, but the allergy is private to health: it must never reach the travel or shopping agents.",
+  "steps": [
+    {
+      "agent": "sage",
+      "say": "I am allergic to peanuts"
+    },
+    {
+      "agent": "atlas",
+      "say": "I'm flying to Tokyo next week"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "atlas",
+      "recall": "Book a meal for my Tokyo trip",
+      "expect": {
+        "remembers": [
+          "Tokyo"
+        ],
+        "private": [
+          "peanut"
+        ]
+      }
+    },
+    {
+      "agent": "nova",
+      "recall": "Pack snacks for Tokyo",
+      "expect": {
+        "private": [
+          "peanut"
+        ]
+      }
+    }
+  ]
+}

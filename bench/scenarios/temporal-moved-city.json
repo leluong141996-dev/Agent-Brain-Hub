@@ -1,0 +1,50 @@
+{
+  "id": "temporal-moved-city",
+  "category": "temporal",
+  "lang": "en",
+  "description": "Looking back shows the old address, which the present has replaced; the new one did not exist yet.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "I live in Hanoi"
+    },
+    {
+      "mark": "before-move"
+    },
+    {
+      "advance": "10d"
+    },
+    {
+      "agent": "mia",
+      "say": "I moved to Saigon last month"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "atlas",
+      "recall": "Book a taxi from my home",
+      "asOf": "before-move",
+      "expect": {
+        "remembers": [
+          "Hanoi"
+        ],
+        "stale": [
+          "Saigon"
+        ]
+      }
+    },
+    {
+      "agent": "atlas",
+      "recall": "Book a taxi from my home",
+      "expect": {
+        "remembers": [
+          "Saigon"
+        ],
+        "stale": [
+          "/lives in:? hanoi/i"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "id": "vi-multi-hop-xe-civic",
+  "category": "multi_hop",
+  "lang": "vi",
+  "description": "Tiếng Việt: \"chiếc Civic\" chính là chiếc xe đang phải sửa.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "Xe của tôi là Honda Civic"
+    },
+    {
+      "agent": "kai",
+      "say": "Xe hỏng rồi, phải sửa 3 ngày"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "penny",
+      "recall": "Tuần này tôi có nên để dành tiền cho chiếc Civic không?",
+      "expect": {
+        "remembers": [
+          "không có xe 3 ngày"
+        ]
+      }
+    }
+  ]
+}

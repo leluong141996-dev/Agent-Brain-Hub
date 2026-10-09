@@ -25,6 +25,9 @@ import { reflect } from './dmn.js';
 import { emptySleepState, recordSleep } from './sleepScheduler.js';
 import { EmbedQueue } from './embedQueue.js';
 import { MemoryIndex } from './memoryIndex.js';
+import { normalizeFact, stateAt, visibleAt, DEFAULT_HISTORY_DAYS } from './temporal.js';
+import { entityOf, link, CONCRETE, W_ENTITY } from './entities.js';
+import { detectIntent } from './prefrontal.js';
 import { seedGlobal, resolveConflict } from './neocortex.js';
 import { extractFactsRuleBased, factToText, factValue, RELATIONS } from './ontology.js';
 import { templateReply, buildPrompt, contextBlock, memoryInstructions } from './respond.js';
@@ -38,6 +41,13 @@ const err = (message, status) => Object.assign(new Error(message), { status });
 const hashKey = (key) => crypto.createHash('sha256').update(key).digest('hex');
 const newKey = () => `abk_${crypto.randomBytes(18).toString('hex')}`;
 const dayOf = (ts) => new Date(ts).toISOString().slice(0, 10);
+
+// asOf as ms, ISO string or numeric string.
+function parseTime(v) {
+  const n = typeof v === 'number' ? v : /^\d+$/.test(String(v)) ? Number(v) : Date.parse(v);
+  if (!Number.isFinite(n)) throw err('asOf must be a timestamp (ms) or an ISO date', 400);
+  return n;
+}
 
 export class Brain {
   constructor({ store, bus, llm, deterministic = false, embedder = null }) {
@@ -53,6 +63,9 @@ export class Brain {
     this._sleepQueue = Promise.resolve();
     seedGlobal(this);
     seedSkills(this);
+    // Ended facts are kept this long as history (sleep settings can override).
+    this.historyDays = Number(process.env.BRAIN_HISTORY_DAYS ?? DEFAULT_HISTORY_DAYS);
+    for (const f of this.state.facts) normalizeFact(f); // facts stored before v0.5
     for (const a of this.state.agents) {
       a.permissions ||= { ...DEFAULT_PERMISSIONS };
       a.kind ||= 'native';
@@ -244,10 +257,11 @@ export class Brain {
   // ---------------- recall(): context package for a connected agent ----------------
   // diagnostics: in-process callers only (the benchmark). The /v1 route never
   // passes it, because excluded items include other agents' private memories.
-  async recall({ agentId, customerId = 'kh-001', text, lang, diagnostics = false }) {
+  async recall({ agentId, customerId = 'kh-001', text, lang, diagnostics = false, asOf = null }) {
     lang = normLang(lang);
     text = String(text || '').trim();
     if (!text) throw err('text is required', 400);
+    if (asOf !== null && asOf !== undefined) return this.recallAt({ agentId, customerId, text, lang, diagnostics, asOf: parseTime(asOf) });
     const qvec = await this.queryVector(text);
     const t = this.bus.trace('recall', { agentId, customerId, lang });
     const p = this.perceive(t, { agentId, customerId, text, lang, qvec });
@@ -279,13 +293,62 @@ export class Brain {
       salience: { priority: salience.priority, sentiment: salience.sentiment, urgency: salience.urgency, churnRisk: salience.churnRisk, vip: salience.vip },
       handoff: p.handoffPkg,
       playbook: skill ? { id: skill.id, name: skillName(skill, lang), version: skill.version, steps: skill.steps.map((s) => labelOf(s, lang)) } : null,
-      memories: retrieval.selected.map((s) => ({ kind: s.kind, text: s.text, relation: s.relation || null, scope: s.scope, from: s.source || null, updatedAt: s.at || null, validUntil: s.validUntil || null, tier: s.tier, score: s.score, conflicted: s.status === 'conflicted' })),
+      memories: retrieval.selected.map((s) => ({ kind: s.kind, text: s.text, relation: s.relation || null, scope: s.scope, from: s.source || null, updatedAt: s.at || null, validUntil: s.validUntil || null, via: s.via || null, tier: s.tier, score: s.score, conflicted: s.status === 'conflicted' })),
       suggestedActions: actions.map((a) => ({ id: a.id, label: a.label, score: a.score })),
       promptBlock,
       steps: t.steps,
       ms: end.ms,
       ...(diagnostics ? { diagnostics: { excluded: retrieval.excluded } } : {}),
     };
+  }
+
+  // ---------------- recall({ asOf }): what the brain believed then ----------------
+  // Read-only: no working-memory turn, no access counts, no session change. It
+  // audits the look itself ("inspect") and enforces the same permissions.
+  async recallAt({ agentId, customerId, text, lang, diagnostics, asOf }) {
+    const agent = this.getAgent(agentId);
+    const clean = redact(text).text;
+    const qvec = await this.queryVector(text);
+    const t = this.bus.trace('recall', { agentId, customerId, lang, asOf });
+    t.step('thalamus', t.L(`Xem lại bộ nhớ tại ${new Date(asOf).toISOString()}`, `Looking back at ${new Date(asOf).toISOString()}`, `${new Date(asOf).toISOString()} 時点の記憶を参照`), { asOf: new Date(asOf).toISOString(), readOnly: true }, { from: 'input' });
+    const intent = detectIntent(clean, agent);
+    const retrieval = retrieve(this, t, { customerId, agent, query: clean, intent: intent.intent, qvec, asOf, readOnly: true });
+    const wm = this.state.working[customerId];
+    // Same privacy filter as the live path (hotTurns), limited to turns before asOf.
+    const hot = wm ? hotTurns(this, { ...wm, turns: wm.turns.filter((x) => x.at <= asOf) }, agent) : [];
+    const ctx = { agent, lang, now: asOf, intent: intent.intent, salience: { priority: 'normal', sentiment: 'neutral', urgency: 'normal' }, selected: retrieval.selected, actions: [], skill: null, handoffPkg: null, hot };
+    const promptBlock = [`Reply in ${LANGUAGE_NAME[lang]}.`, ...memoryInstructions(), '', contextBlock(ctx)].join('\n');
+    audit(this, { op: 'inspect', agentId: agent.id, customerId, traceId: t.id });
+    const end = t.end({ intent: intent.intent, asOf });
+    return {
+      traceId: t.id,
+      lang,
+      asOf,
+      agent: { id: agent.id, name: agent.name },
+      redactedText: clean,
+      intent,
+      memories: retrieval.selected.map((s) => ({ kind: s.kind, text: s.text, relation: s.relation || null, scope: s.scope, from: s.source || null, updatedAt: s.at || null, validUntil: s.validUntil || null, via: s.via || null, tier: s.tier, score: s.score, conflicted: s.status === 'conflicted' })),
+      suggestedActions: [],
+      promptBlock,
+      steps: t.steps,
+      ms: end.ms,
+      ...(diagnostics ? { diagnostics: { excluded: retrieval.excluded } } : {}),
+    };
+  }
+
+  // The replacement chain a fact belongs to, oldest first: Hanoi → Da Nang → Saigon.
+  factHistory(factId) {
+    const facts = this.state.facts;
+    let f = facts.find((x) => x.id === factId);
+    if (!f) throw err('fact not found', 404);
+    while (true) {
+      const prev = facts.filter((x) => x.invalidatedBy === f.id).sort((a, b) => b.invalidatedAt - a.invalidatedAt)[0];
+      if (!prev) break;
+      f = prev;
+    }
+    const chain = [f];
+    for (let next; (next = f.invalidatedBy && facts.find((x) => x.id === f.invalidatedBy)); f = next) chain.push(next);
+    return chain;
   }
 
   // ---------------- remember(): a connected agent reports the turn ----------------
@@ -616,17 +679,62 @@ export class Brain {
     return this.store.recentAudit(limit).map((e) => ({ ...e, agentName: e.agentId ? this.agentName(e.agentId) : null, sourceName: e.sourceAgentId ? this.agentName(e.sourceAgentId) : null }));
   }
 
+  // The entity graph of one customer (admin view, like snapshot): the customer,
+  // the entities its facts are about, the facts, and the edges RAS spreads
+  // relevance along. asOf: the graph as it stood then. Only facts true at that
+  // time get affinity edges; ended facts stay attached to their entity, greyed.
+  graph(customerId = 'kh-001', lang = 'vi', asOf = null) {
+    lang = normLang(lang);
+    const at = asOf === null || asOf === undefined || asOf === '' ? null : parseTime(asOf);
+    const view = at ?? this.clock.now();
+    const facts = this.state.facts.filter((f) => f.customerId === customerId && stateAt(f, view) !== 'unknown');
+    const entities = new Map();
+    for (const f of facts) {
+      const id = entityOf(f);
+      const e = entities.get(id) || { id, kind: CONCRETE(id) ? id.split(':')[0] : 'profile', key: id.includes(':') ? id.split(':')[1] : id, label: null, facts: 0 };
+      e.facts += 1;
+      // A concrete entity is named by what the customer owns or where they go.
+      if ((f.relation === 'owns_asset' || f.relation === 'trip_destination') && visibleAt(f, view)) e.label = factValue(f, lang);
+      entities.set(id, e);
+    }
+    const nodes = facts.map((f) => {
+      const state = stateAt(f, view);
+      return { id: f.id, entity: entityOf(f), relation: f.relation, text: factToText(f, lang), value: factValue(f, lang), state, scope: f.scope, ownerDomain: f.ownerDomain };
+    });
+    const live = facts.filter((f) => visibleAt(f, view));
+    const edges = [];
+    for (let i = 0; i < live.length; i++)
+      for (let j = i + 1; j < live.length; j++) {
+        const w = link(live[i], live[j]);
+        if (w) edges.push({ from: live[i].id, to: live[j].id, kind: w === W_ENTITY ? 'entity' : 'affinity', weight: w });
+      }
+    return {
+      customer: { id: customerId, name: this.state.customers[customerId]?.name || customerId },
+      asOf: at,
+      now: this.clock.now(),
+      entities: [...entities.values()],
+      facts: nodes,
+      edges,
+    };
+  }
+
   // Everything the visualizer needs to render the memory panels, localized.
-  snapshot(customerId = 'kh-001', lang = 'vi') {
+  // asOf: show memory as it stood then (facts with their state at that time,
+  // episodes that existed then). Everything else is current.
+  snapshot(customerId = 'kh-001', lang = 'vi', asOf = null) {
     lang = normLang(lang);
     const now = this.clock.now();
-    const strip = ({ embedding, ...rest }) => rest;
-    const eps = this.state.episodes.filter((e) => e.customerId === customerId);
+    const at = asOf === null || asOf === undefined || asOf === '' ? null : parseTime(asOf);
+    const view = at ?? now;
+    const strip = ({ embedding, vec, ...rest }) => rest;
+    const eps = this.state.episodes.filter((e) => e.customerId === customerId && (at === null || (e.createdAt <= at && (!e.expiresAt || e.expiresAt > at))));
     const recent = new Set([...eps].sort((a, b) => b.createdAt - a.createdAt).slice(0, 3).map((e) => e.id));
     const tier = (e) => (recent.has(e.id) ? 'hot' : (now - e.createdAt) / 86400000 <= 30 ? 'warm' : 'cold');
     const wm = this.state.working[customerId];
     return {
       now,
+      asOf: at,
+      historyDays: this.state.sleep?.config?.historyDays ?? this.historyDays,
       lang,
       adminProtected: !!process.env.BRAIN_ADMIN_TOKEN,
       llm: { available: this.llm.available, provider: this.llm.provider, model: this.llm.model, label: this.llm.label, lastError: this.llm.lastError },
@@ -638,8 +746,11 @@ export class Brain {
         : null,
       episodes: eps.map((e) => ({ ...strip(e), tier: tier(e) })).sort((a, b) => b.createdAt - a.createdAt),
       facts: this.state.facts
-        .filter((f) => f.customerId === customerId || f.customerId === '*')
-        .map((f) => ({ ...strip(f), text: factToText(f, lang), displayValue: factValue(f, lang), stale: !!(f.validUntil && f.validUntil < now && !f.pinned) })),
+        .filter((f) => (f.customerId === customerId || f.customerId === '*') && stateAt(f, view) !== 'unknown')
+        .map((f) => {
+          const state = stateAt(f, view);
+          return { ...strip(f), text: factToText(f, lang), displayValue: factValue(f, lang), state, stale: state === 'expired', status: state === 'conflicted' ? 'conflicted' : state === 'active' ? 'active' : f.status };
+        }),
       skills: this.state.skills.map((s) => ({ ...s, name: skillName(s, lang), stepLabels: s.steps.map((x) => labelOf(x, lang)) })),
       patterns: Object.values(this.state.patterns),
       bandit: Object.entries(this.state.bandit).map(([k, v]) => ({ key: k, label: actionLabel(k.split('|')[0], lang), ...v })),

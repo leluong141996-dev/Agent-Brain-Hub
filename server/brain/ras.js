@@ -4,6 +4,9 @@
 // token budget. Items hidden by scope are reported as `blocked` for the audit.
 import { embed, cosine } from '../embed.js';
 import { dot } from '../embeddings.js';
+import { DAY } from '../clock.js';
+import { stateAt } from './temporal.js';
+import { link, entityOf, mentionedEntities } from './entities.js';
 import { estimateTokens, truncate } from '../text.js';
 import { visible, hiddenReason, episodeTier } from './neocortex.js';
 import { factToText, factValue } from './ontology.js';
@@ -37,9 +40,11 @@ const TIER_LATENCY = { hot: '0ms', warm: '100–500ms', cold: '1–5s' };
 // qvec: the query embedded by the configured model ({ vec, model, status }), or
 // null. Items that have a vector from that model are compared with it; all
 // others fall back to the local hashing vectors.
-export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, budgetTokens = 700, maxEpisodes = 4, maxFacts = 10 }) {
+// asOf: retrieve what the brain believed at that time (v0.5). readOnly: don't
+// record access (used for asOf and benchmarks, so looking never changes memory).
+export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, asOf = null, readOnly = false, budgetTokens = 700, maxEpisodes = 4, maxFacts = 10 }) {
   const t0 = performance.now();
-  const now = B.clock.now();
+  const now = asOf ?? B.clock.now();
   const lang = t.lang;
   const q = embed(query);
   let byModel = 0;
@@ -84,13 +89,14 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
       blocked.push(item);
       continue;
     }
+    if (e.createdAt > now) continue; // not yet remembered at asOf
     if (e.expiresAt && e.expiresAt < now) {
       excluded.push({ kind: 'episodic', id: e.id, text: truncate(e.text, 70), reason: t.L('hết hạn TTL', 'TTL expired', 'TTL切れ') });
       continue;
     }
     const tier = episodeTier(B, e, recent);
     const sim = similarity(e);
-    const recency = Math.exp(-B.clock.daysSince(e.createdAt) / 30);
+    const recency = Math.exp(-(now - e.createdAt) / DAY / 30);
     const score = 0.6 * sim + 0.25 * recency + 0.15 * e.importance;
     if (tier === 'cold' && sim < 0.3) continue; // cold store only queried on strong match
     epCands.push({ kind: 'episodic', id: e.id, text: e.text, tier, scope: e.scope, owner: e.ownerDomain, source: e.agentId, episodeKind: e.kind, at: e.createdAt, validUntil: e.expiresAt || null, score, parts: { sim, recency, importance: e.importance } });
@@ -105,10 +111,13 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
   // --- Semantic search ---
   const facts = B.memoryIndex.facts(customerId);
   const fCands = [];
+  const factOf = new Map(); // candidate id → fact (for the entity graph)
   for (const f of facts) {
     const text = factToText(f, lang);
-    if (f.status === 'superseded') {
-      excluded.push({ kind: 'semantic', id: f.id, text, reason: t.L('đã bị thay thế (cold)', 'superseded (cold)', '置き換え済み（cold）') });
+    const state = stateAt(f, now);
+    if (state === 'unknown') continue; // learned after asOf
+    if (state === 'superseded' || state === 'resolved') {
+      excluded.push({ kind: 'semantic', id: f.id, text, reason: state === 'resolved' ? t.L('thua khi giải mâu thuẫn', 'lost a resolved conflict', '矛盾の解決で不採用') : t.L('đã bị thay thế (cold)', 'superseded (cold)', '置き換え済み（cold）') });
       continue;
     }
     if (!visible(f, agent)) {
@@ -117,7 +126,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
       blocked.push(item);
       continue;
     }
-    if (f.validUntil && f.validUntil < now && !f.pinned) {
+    if (state === 'expired') {
       excluded.push({ kind: 'semantic', id: f.id, text, reason: t.L('hết hạn (stale)', 'expired (stale)', '期限切れ（stale）') });
       continue;
     }
@@ -126,7 +135,8 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     const profile = PROFILE.has(f.relation) ? (ESSENTIAL.has(f.relation) ? 0.35 : 0.15) : 0;
     const global = f.scope === 'global' ? 0.1 : 0;
     const score = 0.5 * sim + entityHit + profile + global + 0.1 * f.confidence;
-    fCands.push({ kind: 'semantic', id: f.id, text, relation: f.relation, value: factValue(f, lang), tier: 'warm', scope: f.scope, owner: f.ownerDomain, source: f.sourceAgentId, sourceName: f.sourceAgentId ? B.agentName(f.sourceAgentId) : null, at: f.updatedAt || f.createdAt, validUntil: f.validUntil || null, status: f.status, score, parts: { sim, entityHit, profile } });
+    factOf.set(f.id, f);
+    fCands.push({ kind: 'semantic', id: f.id, text, relation: f.relation, value: factValue(f, lang), tier: 'warm', scope: f.scope, owner: f.ownerDomain, source: f.sourceAgentId, sourceName: f.sourceAgentId ? B.agentName(f.sourceAgentId) : null, at: f.updatedAt || f.createdAt, validUntil: f.validUntil || null, status: state, score, parts: { sim, entityHit, profile } });
   }
   t.step('neocortex', t.L(`Semantic: tra ${facts.length} fact theo entity/query`, `Semantic: looked up ${facts.length} facts by entity/query`, `意味記憶：${facts.length}件をエンティティ/クエリで検索`), {
     store: 'semantic (facts)',
@@ -135,6 +145,52 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     conflicted: fCands.filter((f) => f.status === 'conflicted').length,
     blocked: blocked.length,
   }, { from: 'ras', status: blocked.length ? 'warn' : 'ok' });
+
+  // --- Multi-hop (v0.6): spread relevance over the entity graph ---
+  // Seeds are facts the question itself matched (wording or intent). Their
+  // neighbours, the same car or trip, or a related kind of fact, are pulled
+  // in, at most 2 hops. Only candidates that already passed the permission and
+  // time checks take part, so the graph can never reach a private or expired fact.
+  // BRAIN_GRAPH=off turns it off (ablation: `npm run bench -- --no-graph`).
+  const MAX_EXPANSIONS = 6;
+  const graphOn = !['0', 'off', 'false', 'no'].includes(String(process.env.BRAIN_GRAPH ?? '').toLowerCase());
+  const mentioned = graphOn ? mentionedEntities(query, [...factOf.values()]) : new Set();
+  // An entity's name is its owns_asset / trip_destination value ("Honda Civic").
+  const nameOf = new Map();
+  for (const f of factOf.values()) if (f.relation === 'owns_asset' || f.relation === 'trip_destination') nameOf.set(entityOf(f), factValue(f, lang));
+  for (const c of fCands) {
+    const e = entityOf(factOf.get(c.id));
+    if (!mentioned.has(e)) continue;
+    c.parts.mention = 1;
+    c.score = Math.max(c.score, 0.35); // the question names this entity
+    if (nameOf.has(e) && nameOf.get(e) !== c.value) c.via = nameOf.get(e);
+  }
+  const isSeed = (c) => c.score >= 0.2 && (c.parts.entityHit > 0 || c.parts.sim >= 0.15 || c.parts.mention);
+  let frontier = graphOn ? fCands.filter(isSeed).map((c) => ({ c, weight: 1 })) : [];
+  const reached = new Set(frontier.map((x) => x.c.id));
+  const expanded = [];
+  for (let hop = 1; hop <= 2 && frontier.length && expanded.length < MAX_EXPANSIONS; hop++) {
+    const next = [];
+    for (const { c: seed, weight } of frontier) {
+      for (const c of fCands) {
+        if (reached.has(c.id) || c.scope === 'global' || expanded.length >= MAX_EXPANSIONS) continue;
+        const w = link(factOf.get(seed.id), factOf.get(c.id)) * weight;
+        if (w < 0.3) continue; // two hops: one entity edge and one affinity edge at most
+        c.score = Math.max(c.score, seed.score * w);
+        c.via = seed.value ?? seed.text;
+        c.hop = hop;
+        reached.add(c.id);
+        expanded.push(c);
+        next.push({ c, weight: w });
+      }
+    }
+    frontier = next;
+  }
+  if (expanded.length) {
+    t.step('ras', t.L(`Đa bước: kéo thêm ${expanded.length} fact qua đồ thị thực thể`, `Multi-hop: ${expanded.length} facts pulled in through the entity graph`, `多段：エンティティグラフ経由で事実を${expanded.length}件追加`), {
+      expanded: expanded.map((c) => `${c.text} ← ${c.via} (hop ${c.hop})`),
+    }, { status: 'hit' });
+  }
 
   // --- Re-rank + budget ---
   epCands.sort((a, b) => b.score - a.score);
@@ -150,14 +206,14 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     used += cost;
     selected.push({ ...c, score: +c.score.toFixed(3), latency: TIER_LATENCY[c.tier], parts: roundParts(c.parts) });
   };
-  const relevant = (c) => c.score >= 0.2 || c.status === 'conflicted';
+  const relevant = (c) => c.score >= 0.2 || c.status === 'conflicted' || c.hop;
   fCands.filter(relevant).slice(0, maxFacts).forEach(take);
   epCands.filter((c) => c.score >= 0.25).slice(0, maxEpisodes).forEach(take);
   for (const c of fCands.filter(relevant).slice(maxFacts)) excluded.push({ kind: c.kind, id: c.id, text: c.text, reason: t.L('điểm thấp', 'low score', 'スコア不足') });
   for (const c of fCands.filter((x) => !relevant(x))) excluded.push({ kind: c.kind, id: c.id, text: c.text, reason: t.L('dưới ngưỡng liên quan', 'below relevance threshold', '関連度のしきい値未満') });
 
   const sel = new Set(selected.map((s) => s.id));
-  for (const e of mine) {
+  for (const e of readOnly ? [] : mine) {
     if (sel.has(e.id)) {
       e.accessCount += 1;
       e.lastAccess = now;

@@ -25,9 +25,13 @@ export class InProcessTarget {
     return { reply: r.reply, learned: r.learned };
   }
 
-  async recall(agent, text, customer = DEFAULT_CUSTOMER) {
-    const r = await this.brain.recall({ agentId: agent, customerId: customer, text, lang: this.lang, diagnostics: true });
+  async recall(agent, text, customer = DEFAULT_CUSTOMER, asOf) {
+    const r = await this.brain.recall({ agentId: agent, customerId: customer, text, lang: this.lang, diagnostics: true, asOf: asOf ?? null });
     return { memories: r.memories, promptBlock: r.promptBlock, diagnostics: r.diagnostics };
+  }
+
+  async now() {
+    return this.brain.clock.now();
   }
 
   async advance(ms) {

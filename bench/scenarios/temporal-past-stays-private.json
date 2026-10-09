@@ -1,0 +1,40 @@
+{
+  "id": "temporal-past-stays-private",
+  "category": "temporal",
+  "lang": "en",
+  "description": "Looking back in time never shows another domain's private memories.",
+  "steps": [
+    {
+      "agent": "sage",
+      "say": "I am allergic to peanuts and I have diabetes"
+    },
+    {
+      "mark": "after-visit"
+    },
+    {
+      "advance": "2d"
+    },
+    {
+      "agent": "atlas",
+      "recall": "Book a meal on my flight",
+      "asOf": "after-visit",
+      "expect": {
+        "private": [
+          "peanut",
+          "diabetes"
+        ]
+      }
+    },
+    {
+      "agent": "nova",
+      "recall": "Recommend a snack box",
+      "asOf": "after-visit",
+      "expect": {
+        "private": [
+          "peanut",
+          "diabetes"
+        ]
+      }
+    }
+  ]
+}

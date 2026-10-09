@@ -41,7 +41,7 @@ No LLM is needed for development: the hub runs offline with rules and templates.
 ## Pull requests
 
 1. Fork, create a branch, keep the change focused.
-2. Add or update tests in `test/` when you change behaviour. `npm test` must pass, and so must the benchmark gate (`npm run bench -- --gate bench/results/0.4.0.json`). If your change is meant to move a benchmark number, re-save the baseline and explain it in the PR.
+2. Add or update tests in `test/` when you change behaviour. `npm test` must pass, and so must the benchmark gate (`npm run bench -- --gate bench/results/0.6.0.json`). If your change is meant to move a benchmark number, re-save the baseline and explain it in the PR.
 3. User-facing text needs all three languages. Server side uses `L(lang, vi, en, ja)`; UI side uses `public/i18n.js`. If you don't speak one of them, write your best attempt and say so in the PR, and a maintainer will fix it.
 4. Match the surrounding style: ES modules, no new runtime dependencies without discussion, no build step for the UI.
 5. Never commit `data/` (it holds the memory database and API keys).

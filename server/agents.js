@@ -37,7 +37,7 @@ export const DOMAINS = {
     intents: {
       book_flight: ['vé máy bay', 'máy bay', 'chuyến bay', 'bay', 'công tác', 'flight', 'fly', 'plane ticket', 'business trip', 'フライト', '航空券', '飛行機', '出張'],
       book_hotel: ['khách sạn', 'phòng', 'resort', 'homestay', 'hotel', 'room', 'accommodation', 'ホテル', '宿泊', '旅館', '部屋'],
-      ground_transport: ['taxi', 'thuê xe', 'đưa đón', 'sân bay', 'grab', 'rent a car', 'car rental', 'airport transfer', 'ride', 'タクシー', 'レンタカー', '空港', '送迎'],
+      ground_transport: ['taxi', 'thuê xe', 'đưa đón', 'sân bay', 'grab', 'rent a car', 'car rental', 'airport transfer', 'airport', 'ride', 'タクシー', 'レンタカー', '空港', '送迎'],
     },
   },
   health: {

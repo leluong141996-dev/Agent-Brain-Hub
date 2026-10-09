@@ -319,6 +319,9 @@ function drawSleep(box, st) {
         <label class="field"><span>${t('sl_nightly_at')}</span><input id="slAt" type="time" value="${esc(c.nightlyAt)}" />
           <small>${esc(t('sl_tz', { tz: st.timeZone }))}${st.nextNightly ? ` · ${esc(t('sl_next_night', { at: when(st.nextNightly) }))}` : ''}</small></label>
       </div>
+      <div class="grid2">
+        <label class="field"><span>${t('sl_history_days')}</span><input id="slHistory" type="number" min="0" max="3650" step="1" value="${c.historyDays ?? 90}" /><small>${t('sl_history_hint')}</small></label>
+      </div>
       <div class="section-label" style="margin-top:4px">${t('sl_pending')}</div>
       ${pending}
       <div class="section-label" style="margin-top:4px">${t('sl_history')}</div>
@@ -335,6 +338,7 @@ function drawSleep(box, st) {
       idleMinutes: $('#slIdle', box).value,
       maxPendingTurns: $('#slPressure', box).value,
       nightlyAt: $('#slAt', box).value,
+      historyDays: $('#slHistory', box).value,
     };
     try {
       const next = await api('/api/settings/sleep', body, 'PUT');

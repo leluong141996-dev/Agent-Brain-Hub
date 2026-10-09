@@ -4,7 +4,8 @@
 //   npm run bench -- --filter leakage --compare bench/results/0.2.0.json
 //   npm run bench -- --llm --save
 //   npm run bench -- --embed          (configured embedding model; Settings → Semantic search or BRAIN_EMBED_*)
-//   npm run bench -- --gate bench/results/0.4.0.json   (CI: exit 1 if a quality metric got worse)
+//   npm run bench -- --gate bench/results/0.6.0.json   (CI: exit 1 if a quality metric got worse)
+//   npm run bench -- --no-graph       (ablation: the same run without the v0.6 entity graph)
 //   npm run bench -- --url http://localhost:4317 [--token …]  (a running hub, with its own LLM/embedding settings)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,6 +29,8 @@ const opt = (name) => {
   return i >= 0 ? argv[i + 1] : undefined;
 };
 
+if (flag('no-graph')) process.env.BRAIN_GRAPH = 'off';
+
 const agents = DEFAULT_AGENTS.map((a) => a.id);
 const { scenarios: all, errors } = loadScenarios(path.join(here, 'scenarios'), { agents });
 if (errors.length) {
@@ -43,8 +46,8 @@ if (!scenarios.length) {
 
 const url = opt('url');
 const token = opt('token') || process.env.BRAIN_ADMIN_TOKEN || '';
-if (url && (flag('llm') || flag('embed'))) {
-  console.error('--url benchmarks the hub as it is configured; drop --llm / --embed (set them in the hub instead).');
+if (url && (flag('llm') || flag('embed') || flag('no-graph'))) {
+  console.error('--url benchmarks the hub as it is configured; drop --llm / --embed / --no-graph (set them in the hub instead, e.g. BRAIN_GRAPH=off).');
   process.exit(1);
 }
 
@@ -113,7 +116,7 @@ const summary = summarize(results, {
   date: new Date().toISOString(),
   mode: url
     ? [`http`, remote.llm ? `llm: ${remote.llm}` : 'offline', remote.embeddings ? `embeddings: ${remote.embeddings}` : 'hashing'].join(', ')
-    : [llm ? `llm: ${llm.label}` : 'offline', embedder ? `embeddings: ${embedder.modelId}` : 'hashing'].join(', '),
+    : [llm ? `llm: ${llm.label}` : 'offline', embedder ? `embeddings: ${embedder.modelId}` : 'hashing', ...(flag('no-graph') ? ['no graph'] : [])].join(', '),
   node: process.version,
   ...(llm ? { llmUsage: { calls: usage.calls, seconds: +(usage.ms / 1000).toFixed(1) } } : {}),
 });
@@ -148,7 +151,7 @@ if (flag('save')) {
   const slug = (m) => m.replace(/[^a-z0-9.]+/gi, '-');
   const suffix = url
     ? `-http${remote.llm ? '-llm' : ''}${remote.embeddings ? `-embed-${slug(remote.embeddings)}` : ''}`
-    : `${llm ? '-llm' : ''}${embedder ? `-embed-${slug(embedder.modelId)}` : ''}`;
+    : `${llm ? '-llm' : ''}${embedder ? `-embed-${slug(embedder.modelId)}` : ''}${flag('no-graph') ? '-nograph' : ''}`;
   const file = path.join(here, 'results', `${pkg.version}${suffix}.json`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(summary, null, 2) + '\n');

@@ -5,6 +5,65 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-09
+
+### Fixed
+
+- A Vietnamese preference change ("Tôi không thích ăn cay nữa") became a conflict instead of replacing "Tôi thích ăn cay": "nữa" / "nữa rồi" now mark an update ([#23](https://github.com/leluong141996-dev/Agent-Brain-Hub/pull/23), thanks [@nova-loop](https://github.com/nova-loop)).
+- A final full stop or exclamation mark no longer hides an update marker ("…nữa.", "I hate onions now.").
+
+## [0.6.0] - 2026-10-09
+
+Memory that is **connected**: facts are grouped into entities, and retrieval follows the links between them.
+
+### Added
+
+- **Entity graph** (`server/brain/entities.js`). A customer's facts are grouped into entities: a car, laptop, phone or appliance (a vi / en / ja lexicon with brands and models, so "my car" = "xe" = "車" = "Honda Civic"), a trip ("Da Nang" = "Đà Nẵng"), and profile groups (health, finance, travel…). Resolution happens only within one customer; two customers are never merged.
+- **Multi-hop retrieval.** RAS links the entities a question names ("my Civic", "the XPS", "Tokyo") and spreads relevance from the facts the question matched to connected ones: the same car or trip (weight 0.6), or a related kind of fact through an affinity table (trip ↔ car availability, diet, allergy, budget…; 0.5). At most 2 hops and 6 added facts. Only candidates that already passed the permission and time checks take part, so the graph cannot reach a private or expired fact. Profile groups are not hubs.
+- **`via` explains each added fact:** in the prompt (`no car for 3 days (… via: Honda Civic)`), on `/v1/recall` memories, and in the live trace.
+- **`GET /api/graph?customerId&asOf`** returns one customer's entities, facts and edges, at any time.
+- **Graph tab** in the Live brain inspector: entities around the customer, facts around their entity, related-kind edges as dashed curves. Click a fact to see what it connects to and why; a link to a private fact is marked with the only domain that can follow it. Works with *View memory as of*.
+- **Benchmark:** 8 new `multi_hop` scenarios (37 in total), and `npm run bench -- --no-graph` (`BRAIN_GRAPH=off`) to measure what the graph adds:
+
+  | 0.6.0, hashing | With the graph | `--no-graph` |
+  |---|---|---|
+  | multi_hop (10 scenarios) | **100%** | 40% |
+  | All 37 scenarios | **97.3%** | 81.1% |
+  | Prompt tokens (mean) | 427 | 421 |
+
+  Leak rate is 0% in both. With `bge-m3`, all 37 pass with or without the graph: the embedding model already links "the XPS" to "the laptop". Today the graph pays off in the default offline mode, and in explaining *why* a fact was retrieved.
+
+### Fixed
+
+- "I'm flying / travelling / heading to X" was not remembered as a trip, and "airport" questions were not recognised as ground transport.
+- "The Camry broke down" was stored as "no device for 4 days": brands and models now name the asset.
+
+### Not changed
+
+- LongMemEval-S retrieval stays at 52.8% @4: it ranks whole sessions, which the fact graph does not touch.
+
+## [0.5.0] - 2026-10-09
+
+Memory that is **correct over time**: facts are invalidated instead of deleted, and you can ask what the brain believed at any moment.
+
+### Added
+
+- **`recall({ asOf })`** (REST: `asOf` on `/v1/recall`): what the brain believed at that time. It is read-only (no working-memory turn, no access counts), audited as `inspect`, and enforces the same permissions. Debug questions like "what did Atlas know when it booked the flight?".
+- **Facts are invalidated, not deleted.** New fields: `recordedAt`, `validFrom`, `invalidatedAt` / `invalidatedBy` / `invalidReason` (`superseded` or `resolved`), `conflictedAt` / `conflictResolvedAt`. A replaced fact keeps its chain: `GET /api/facts/:id/history` shows Hanoi → Saigon with dates. Older data is converted on load; no migration step.
+- **History retention:** sleep purges expired and replaced facts after **90 days** (Settings → Sleep cycle → *Keep fact history*, or `BRAIN_HISTORY_DAYS`; `0` restores immediate deletion).
+- **UI:** a *View memory as of* bar on the Semantic and Episodic tabs, a clear banner while viewing the past, per-fact history, and translated status badges.
+- **Benchmark:** a `mark` step and `asOf` on recall; new `temporal` category (4 scenarios). The suite now has 29 scenarios. With `bge-m3`, all 29 pass.
+
+### Fixed
+
+- **"I don't like X anymore" kept both "likes X" and "dislikes X anymore"** ([#22](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/22)). Trailing time words (anymore, now, last month, nữa, tháng trước…) are trimmed from values, so the update replaces the old preference. Stale-use rate: 25% → 0%.
+- An expired fact counted as live when a new fact arrived, so "in the shop for 5 days" after an expired "3 days" became a false conflict.
+- LongMemEval script: about 6% of LongMemEval-S sessions are dated after their question. The clock is now set past the last session, so those sessions stay "told" (the retrieval score is unchanged: 52.8% @4).
+
+### Changed
+
+- Expired facts are no longer deleted at the next sleep; retrieval still ignores them, and they are purged after the history period.
+
 ## [0.4.0] - 2026-10-09
 
 Retrieval that scales, keeps exact matches with embeddings on, and a first number on a public dataset.
@@ -108,7 +167,10 @@ First public release.
 - README in English (`README.md`) and Vietnamese (`README.vi.md`), `CONTRIBUTING.md`, issue and PR templates, and a CI workflow (tests on Node 18/20/22, Docker build, end-to-end run).
 - 32 unit tests (including the acceptance QA suite: amnesia, contradiction, staleness, skill promotion, 20k-episode load) and an 11-step end-to-end script (`npm run e2e -- --lang vi|en|ja`).
 
-[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.1.1...v0.2.0

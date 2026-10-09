@@ -149,12 +149,12 @@ test('embeddings: backfill errors are reported and never block writes', async ()
 });
 
 test('embeddings: a paraphrase finds the fact that hashing misses', async () => {
-  // The multi-hop failure from the benchmark: Mia asks about getting to the
-  // airport; the car fact shares no words with the question.
+  // Mia asks about driving; the car fact shares no words with the question.
   const ask = async (b) => {
     await b.think({ agentId: 'kai', text: 'My car broke down, it will be in the shop for 3 days', lang: 'en' });
     await b.embedQueue?.drain();
-    const r = await b.recall({ agentId: 'mia', text: 'Can I drive to the airport tomorrow?', lang: 'en' });
+    // No shared words and no intent keyword: only meaning connects them.
+    const r = await b.recall({ agentId: 'mia', text: 'Can I drive myself to work tomorrow?', lang: 'en' });
     return r.memories.map((m) => m.text);
   };
   const hashing = await ask(makeBrain());

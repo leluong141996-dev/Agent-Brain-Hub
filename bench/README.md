@@ -8,12 +8,15 @@ npm run bench -- --filter leakage                     # one category, or one sce
 npm run bench -- --compare bench/results/0.2.0.json   # adds a delta column
 npm run bench -- --llm                                # with the configured LLM (UI settings or BRAIN_LLM_* env)
 npm run bench -- --save                               # writes bench/results/<version>.json
-npm run bench -- --gate bench/results/0.4.0.json      # what CI runs: exit 1 if a quality metric got worse
+npm run bench -- --gate bench/results/0.6.0.json      # what CI runs: exit 1 if a quality metric got worse
 npm run bench -- --url http://localhost:4317          # a running hub, as it is configured (add --token if it has one)
+npm run bench -- --no-graph                           # ablation: the same run without the v0.6 entity graph
 npm run bench:scale                                   # retrieval latency with 20,000 episodes (--episodes, --customers)
 ```
 
 **The CI gate** fails a PR if scenario pass rate, recall accuracy, stale-use rate, conflict handling or reply accuracy gets worse than the committed baseline, or if anything leaks. Latency and prompt tokens are reported but not gated. If a change is meant to move a number (for example, a new scenario that the current memory fails), re-save the baseline with `--save` in the same PR and say why in the description.
+
+**What the entity graph is worth** (`--no-graph`): the `multi_hop` scenarios are written so the answer needs a link the question does not state: "the XPS" is the laptop at the repair shop, planning a trip should bring up that the car is in the shop, "シビック" is the car being repaired. With hashing, multi_hop passes 100% with the graph and 40% without it (6 of 10 scenarios need it), overall 97.3% vs 81.1%, for about 6 more prompt tokens. `multi-hop-trip-allergy-private` checks the other side: the graph must not carry a private fact to an agent outside its domain.
 
 ## Metrics
 
@@ -47,7 +50,7 @@ Add one JSON file to `bench/scenarios/`. No code changes are needed.
 
 **Fields**
 - `id`: kebab-case and unique.
-- `category`: one of `cross_agent`, `stale`, `contradiction`, `leakage`, `multi_hop`, `long_conversation`.
+- `category`: one of `cross_agent`, `stale`, `contradiction`, `leakage`, `multi_hop`, `long_conversation`, `exact_match`, `temporal`.
 - `lang`: `en`, `vi` or `ja`.
 
 **Steps** (each step has exactly one of these):
@@ -58,8 +61,9 @@ Add one JSON file to `bench/scenarios/`. No code changes are needed.
 | `{ "agent", "recall" }` | an agent asks the memory for context (this is where most checks go) |
 | `{ "advance": "45m" \| "6h" \| "2d" }` | moves the brain's simulated clock |
 | `{ "sleep": true }` | runs a sleep cycle manually |
+| `{ "mark": "before-move" }` | remembers the current (simulated) time under a name; a later `recall` can add `"asOf": "before-move"` to ask what the brain believed then |
 
-Categories also include `exact_match` (order numbers, model names). Agents are `mia` (personal), `kai` (repair), `atlas` (travel), `sage` (health, private), `penny` (finance), `nova` (shopping). Add `"customer": "<id>"` to a step to use more than one customer; by default every scenario has its own customer.
+Categories also include `exact_match` (order numbers, model names) and `temporal` (looking back with `asOf`). Agents are `mia` (personal), `kai` (repair), `atlas` (travel), `sage` (health, private), `penny` (finance), `nova` (shopping). Add `"customer": "<id>"` to a step to use more than one customer; by default every scenario has its own customer.
 
 Automatic sleep runs after every step, as it does in production (idle and pressure triggers; the nightly trigger is off because it depends on wall-clock time).
 

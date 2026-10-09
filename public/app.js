@@ -19,6 +19,7 @@ const store = (k, v) => {
 
 const ui = {
   snap: null,
+  asOf: null, // v0.5: view memory as it was at this time (ms), or null for now
   view: 'brain',
   agentId: 'kai',
   customerId: store('brain.customer') || 'kh-001',
@@ -162,7 +163,7 @@ function renderCurrentView() {
 }
 
 async function refresh() {
-  ui.snap = await api(`/api/state?customerId=${encodeURIComponent(ui.customerId)}&lang=${lang()}`);
+  ui.snap = await api(`/api/state?customerId=${encodeURIComponent(ui.customerId)}&lang=${lang()}${ui.asOf ? `&asOf=${ui.asOf}` : ''}`);
   renderShell();
   renderCurrentView();
 }
@@ -557,19 +558,24 @@ const TABS = {
   },
   semantic() {
     const facts = ui.snap?.facts || [];
-    if (!facts.length) return emptyBox('database', t('s_empty'));
-    return `<table class="table"><thead><tr><th>${t('th_relation')}</th><th>${t('th_value')}</th><th>${t('th_scope')}</th><th>${t('th_writer')}</th><th>${t('th_from')}</th><th>${t('th_status')}</th><th>${t('th_conf')}</th><th>${t('th_exp')}</th><th></th></tr></thead><tbody>
+    if (!facts.length) return timeBar() + emptyBox('database', t('s_empty'));
+    const past = !!ui.snap.asOf;
+    return `${timeBar()}<table class="table"><thead><tr><th>${t('th_relation')}</th><th>${t('th_value')}</th><th>${t('th_scope')}</th><th>${t('th_writer')}</th><th>${t('th_from')}</th><th>${t('th_status')}</th><th>${t('th_conf')}</th><th>${t('th_exp')}</th><th></th></tr></thead><tbody>
       ${facts
         .map((f) => `<tr><td><code class="muted">${esc(f.entity)}.</code><code>${esc(f.relation)}</code></td><td class="status-${f.status}">${esc(f.displayValue)}</td><td>${scopeTag(f.scope)}</td><td>${esc(f.ownerDomain)}</td><td>${esc(nameOf(f.sourceAgentId))}</td>
-        <td>${f.stale ? `<span class="badge warning">stale</span>` : f.status === 'conflicted' ? `<span class="badge warning">${icon('alert', 12)}conflict</span>` : f.status === 'superseded' ? `<span class="badge">superseded</span>` : `<span class="badge success">active</span>`}${f.pinned ? ' <span class="badge accent">pinned</span>' : ''}</td><td>${meter(f.confidence)}</td><td class="time-cell">${fmtDate(f.validUntil, lang())}</td>
-        <td><div class="row-actions">${f.status === 'conflicted' ? `<button class="btn sm" data-resolve="${f.id}">${t('keep_this')}</button>` : ''}${f.customerId !== '*' ? `<button class="btn sm ghost" data-pin="${f.id}" data-pinned="${!f.pinned}">${f.pinned ? t('unpin') : t('pin')}</button>` : ''}</div></td></tr>`)
+        <td>${stateBadge(f.state)}${f.pinned ? ` <span class="badge accent">${t('st_pinned')}</span>` : ''}</td><td>${meter(f.confidence)}</td><td class="time-cell">${fmtDate(f.validUntil, lang())}</td>
+        <td><div class="row-actions">${!past && f.state === 'conflicted' ? `<button class="btn sm" data-resolve="${f.id}">${t('keep_this')}</button>` : ''}${!past && f.customerId !== '*' ? `<button class="btn sm ghost" data-pin="${f.id}" data-pinned="${!f.pinned}">${f.pinned ? t('unpin') : t('pin')}</button>` : ''}${f.customerId !== '*' ? `<button class="btn sm ghost" data-history="${f.id}" title="${esc(t('hist_btn'))}">${icon('clock', 13)}</button>` : ''}</div></td></tr>
+        <tr class="history-row" id="hist-${f.id}" hidden><td colspan="9"></td></tr>`)
         .join('')}
     </tbody></table>`;
   },
+  graph() {
+    return `${timeBar()}<div id="graphBox" class="graph-box"><div class="muted small">…</div></div>`;
+  },
   episodic() {
     const eps = ui.snap?.episodes || [];
-    if (!eps.length) return emptyBox('book', t('e_empty'));
-    return `<table class="table"><thead><tr><th>${t('th_kind')}</th><th>${t('th_tier')}</th><th>${t('th_scope')}</th><th>${t('th_content')}</th><th>${t('th_importance')}</th><th class="num">${t('th_access')}</th><th>${t('th_created')}</th><th>${t('th_exp')}</th></tr></thead><tbody>
+    if (!eps.length) return timeBar() + emptyBox('book', t('e_empty'));
+    return `${timeBar()}<table class="table"><thead><tr><th>${t('th_kind')}</th><th>${t('th_tier')}</th><th>${t('th_scope')}</th><th>${t('th_content')}</th><th>${t('th_importance')}</th><th class="num">${t('th_access')}</th><th>${t('th_created')}</th><th>${t('th_exp')}</th></tr></thead><tbody>
       ${eps.map((e) => `<tr><td><span class="badge">${esc(e.kind)}</span></td><td>${tierTag(e.tier)}</td><td>${scopeTag(e.scope)}</td><td>${esc(e.text)}</td><td>${meter(e.importance)}</td><td class="num">${e.accessCount}</td><td class="time-cell">${fmtDate(e.createdAt, lang())}</td><td class="time-cell">${fmtDate(e.expiresAt, lang())}</td></tr>`).join('')}
     </tbody></table>`;
   },
@@ -613,6 +619,169 @@ function renderTab() {
   $$('#tabBody [data-resolve]').forEach((b) => (b.onclick = () => api('/api/facts/resolve', { factId: b.dataset.resolve }).then(refresh)));
   $$('#tabBody [data-pin]').forEach((b) => (b.onclick = () => api('/api/facts/pin', { factId: b.dataset.pin, pinned: b.dataset.pinned === 'true' }).then(refresh)));
   $$('#tabBody [data-rollback]').forEach((b) => (b.onclick = () => api('/api/skills/rollback', { skillId: b.dataset.rollback }).then(refresh)));
+  $$('#tabBody [data-history]').forEach((b) => (b.onclick = () => showHistory(b.dataset.history)));
+  const at = $('#asOfInput');
+  if (at) {
+    at.onchange = () => {
+      const ms = at.value ? new Date(at.value).getTime() : NaN;
+      ui.asOf = Number.isFinite(ms) ? ms : null;
+      refresh();
+    };
+    const now = $('#asOfNow');
+    if (now) now.onclick = () => ((ui.asOf = null), refresh());
+  }
+  if (ui.tab === 'graph') loadGraph();
+}
+
+// ---- v0.5: memory over time ----
+const STATE_BADGE = { active: 'success', conflicted: 'warning', expired: 'warning', superseded: '', resolved: '' };
+function stateBadge(state = 'active') {
+  return `<span class="badge ${STATE_BADGE[state] ?? ''}">${state === 'conflicted' ? icon('alert', 12) : ''}${esc(t('st_' + state))}</span>`;
+}
+
+// <input type="datetime-local"> wants local time without seconds.
+const localInput = (ms) => {
+  const d = new Date(ms);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+};
+
+function timeBar() {
+  const s = ui.snap;
+  const at = s.asOf ?? s.now;
+  return `<div class="time-bar ${s.asOf ? 'past' : ''}">
+    <label class="field-inline">${icon('clock', 14)}<span>${t('asof_label')}</span><input type="datetime-local" id="asOfInput" value="${localInput(at)}" /></label>
+    ${s.asOf ? `<button class="btn sm" id="asOfNow">${t('asof_now')}</button><span class="small">${esc(t('asof_banner', { at: new Date(s.asOf).toLocaleString() }))}</span>` : `<span class="muted small">${esc(t('asof_hint', { n: s.historyDays }))}</span>`}
+  </div>`;
+}
+
+// ---- v0.6: entity graph ----
+// The customer in the centre, the entities its facts are about on an inner
+// ring, the facts around their entity. Dashed curves are affinity edges (a
+// related kind of fact); the spokes are "same entity". RAS spreads relevance
+// along exactly these edges, and only between facts the asking agent may see.
+async function loadGraph() {
+  const box = $('#graphBox');
+  if (!box) return;
+  try {
+    ui.graph = await api(`/api/graph?customerId=${encodeURIComponent(ui.customerId)}&lang=${lang()}${ui.asOf ? `&asOf=${ui.asOf}` : ''}`);
+    if (!ui.graph.facts.some((f) => f.id === ui.graphSel)) ui.graphSel = null;
+    drawGraph();
+  } catch (err) {
+    box.innerHTML = `<div class="muted small">${esc(err.message)}</div>`;
+  }
+}
+
+const ENDED = new Set(['expired', 'superseded', 'resolved']);
+const clip = (s, n = 24) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
+function entityLabel(e) {
+  if (e.kind === 'trip') return e.label || e.key;
+  if (e.kind === 'asset') return e.label || t('g_asset_' + e.key);
+  return t('g_ent_' + e.key);
+}
+
+function drawGraph() {
+  const box = $('#graphBox');
+  const g = ui.graph;
+  if (!box || !g) return;
+  if (!g.facts.length) return void (box.innerHTML = emptyBox('workflow', t('g_empty')));
+  const W = 760, H = 480, cx = W / 2, cy = H / 2;
+  const pos = new Map();
+  const ents = [...g.entities].sort((a, b) => (a.kind === 'profile') - (b.kind === 'profile') || a.id.localeCompare(b.id));
+  const step = (2 * Math.PI) / ents.length;
+  ents.forEach((e, i) => {
+    const a = -Math.PI / 2 + i * step;
+    pos.set(e.id, { x: cx + 150 * Math.cos(a), y: cy + 105 * Math.sin(a), a });
+    const fs = g.facts.filter((f) => f.entity === e.id);
+    const spread = Math.min(step * 0.8, (fs.length - 1) * 0.2);
+    fs.forEach((f, j) => {
+      const b = a - spread / 2 + (fs.length > 1 ? (j * spread) / (fs.length - 1) : 0);
+      pos.set(f.id, { x: cx + 290 * Math.cos(b), y: cy + 195 * Math.sin(b), a: b });
+    });
+  });
+  const sel = ui.graphSel;
+  const near = new Set(sel ? [sel] : []);
+  if (sel) for (const e of g.edges) if (e.from === sel || e.to === sel) near.add(e.from === sel ? e.to : e.from);
+  const dim = (id) => (sel && !near.has(id) ? ' dim' : '');
+  const line = (a, b, cls) => `<line class="${cls}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}"/>`;
+  const centre = { x: cx, y: cy };
+  const spokes = ents.map((e) => line(centre, pos.get(e.id), 'g-spoke' + (sel ? ' dim' : ''))).join('');
+  const members = g.facts.map((f) => line(pos.get(f.entity), pos.get(f.id), `g-member${ENDED.has(f.state) ? ' ended' : ''}${dim(f.id)}`)).join('');
+  const affinity = g.edges
+    .filter((e) => e.kind === 'affinity')
+    .map((e) => {
+      const a = pos.get(e.from), b = pos.get(e.to);
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      const c = { x: mx + (cx - mx) * 0.55, y: my + (cy - my) * 0.55 };
+      const on = sel && (e.from === sel || e.to === sel);
+      return `<path class="g-affinity${on ? ' on' : sel ? ' dim' : ''}" d="M${a.x.toFixed(1)},${a.y.toFixed(1)} Q${c.x.toFixed(1)},${c.y.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}"/>`;
+    })
+    .join('');
+  const entNodes = ents
+    .map((e) => {
+      const p = pos.get(e.id);
+      return `<g class="g-entity ${e.kind}${sel ? ' dim' : ''}"><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${e.kind === 'profile' ? 15 : 18}"/><text x="${p.x.toFixed(1)}" y="${(p.y + 32).toFixed(1)}" text-anchor="middle">${esc(clip(entityLabel(e), 20))}</text></g>`;
+    })
+    .join('');
+  const factNodes = g.facts
+    .map((f) => {
+      const p = pos.get(f.id);
+      const right = Math.cos(p.a) >= 0;
+      const cls = `g-fact ${ENDED.has(f.state) ? 'ended' : f.state}${f.scope === 'private' ? ' private' : ''}${f.id === sel ? ' sel' : ''}${dim(f.id)}`;
+      return `<g class="${cls}" data-fact="${f.id}" tabindex="0" role="button"><title>${esc(f.text)}</title><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="7"/><text x="${(p.x + (right ? 11 : -11)).toFixed(1)}" y="${(p.y + 4).toFixed(1)}" text-anchor="${right ? 'start' : 'end'}">${esc(clip(f.value))}</text></g>`;
+    })
+    .join('');
+  const hub = `<g class="g-customer"><circle cx="${cx}" cy="${cy}" r="20"/><text x="${cx}" y="${cy + 36}" text-anchor="middle">${esc(clip(g.customer.name, 20))}</text></g>`;
+  const counts = t('g_counts', { e: g.entities.length, f: g.facts.length, a: g.edges.filter((e) => e.kind === 'affinity').length });
+  box.innerHTML = `<div class="graph-legend small"><span>${esc(counts)}</span>
+      <span><i class="lg-dot"></i>${t('g_lg_fact')}</span><span><i class="lg-dot private"></i>${t('g_lg_private')}</span><span><i class="lg-dot ended"></i>${t('g_lg_ended')}</span><span><i class="lg-dash"></i>${t('g_lg_affinity')}</span><span><i class="lg-ring"></i>${t('g_lg_profile')}</span></div>
+    <svg class="graph-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('tab_graph'))}">${spokes}${members}${affinity}${entNodes}${hub}${factNodes}</svg>
+    <div id="graphInfo">${graphInfo()}</div>`;
+  $$('#graphBox [data-fact]').forEach((n) => {
+    const pick = (ev) => {
+      ev.stopPropagation();
+      ui.graphSel = ui.graphSel === n.dataset.fact ? null : n.dataset.fact;
+      drawGraph();
+    };
+    n.onclick = pick;
+    n.onkeydown = (ev) => (ev.key === 'Enter' || ev.key === ' ') && (ev.preventDefault(), pick(ev));
+  });
+  $('#graphBox svg').onclick = () => ui.graphSel && ((ui.graphSel = null), drawGraph());
+}
+
+function graphInfo() {
+  const g = ui.graph;
+  const f = g.facts.find((x) => x.id === ui.graphSel);
+  if (!f) return `<p class="hint">${t('g_hint')}</p>`;
+  const byId = new Map(g.facts.map((x) => [x.id, x]));
+  const ent = g.entities.find((e) => e.id === f.entity);
+  const links = g.edges
+    .filter((e) => e.from === f.id || e.to === f.id)
+    .map((e) => {
+      const o = byId.get(e.from === f.id ? e.to : e.from);
+      const why = e.kind === 'entity' ? t('g_same', { name: entityLabel(ent) }) : t('g_related', { a: f.relation, b: o.relation });
+      // A private fact is only reachable from its own domain's agents.
+      const p = [f, o].find((x) => x.scope === 'private');
+      const lock = p ? ` <span class="badge scope private">${icon('lock', 11)}${esc(t('g_only', { domain: p.ownerDomain }))}</span>` : '';
+      return `<li>${esc(o.text)} <span class="muted small">· ${esc(why)} · ${e.weight}</span>${lock}</li>`;
+    })
+    .join('');
+  return `<div class="info-card"><h4 class="graph-title">${esc(f.text)}</h4>
+    <div class="small" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px">${stateBadge(f.state)}${scopeTag(f.scope)}<span class="muted">${esc(f.ownerDomain)} · ${esc(entityLabel(ent))}</span></div>
+    ${links ? `<div class="section-label">${t('g_links')}</div><ul class="graph-links">${links}</ul>` : `<div class="muted small">${t(ENDED.has(f.state) ? 'g_ended' : 'g_alone')}</div>`}</div>`;
+}
+
+async function showHistory(id) {
+  const row = $(`#hist-${id}`);
+  if (!row) return;
+  if (!row.hidden) return void (row.hidden = true);
+  const { history } = await api(`/api/facts/${encodeURIComponent(id)}/history?lang=${lang()}`);
+  const when = (ms) => (ms ? new Date(ms).toLocaleString() : '');
+  row.firstElementChild.innerHTML = `<div class="history-chain"><span class="section-label">${t('hist_title')}</span>${history
+    .map((f) => `<span class="hist-item ${f.invalidatedAt ? 'old' : ''}"><b>${esc(f.text)}</b><small>${esc(when(f.recordedAt))}${f.invalidatedAt ? ` → ${esc(when(f.invalidatedAt))} · ${esc(t('hist_' + (f.invalidReason || 'superseded')))}` : ` · ${esc(t('hist_current'))}`}</small></span>`)
+    .join(`<span class="muted">→</span>`)}</div>`;
+  row.hidden = false;
 }
 
 // ======================= Wiring =======================

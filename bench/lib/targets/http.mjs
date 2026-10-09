@@ -52,10 +52,14 @@ export class HttpTarget {
     return { reply: r.reply, learned: r.learned };
   }
 
-  async recall(agent, text, customer) {
+  async recall(agent, text, customer, asOf) {
     const a = await this.agent(agent);
-    const r = await this.call('POST', '/v1/recall', { customerId: this.customer(customer), text, lang: this.lang }, a.key);
+    const r = await this.call('POST', '/v1/recall', { customerId: this.customer(customer), text, lang: this.lang, ...(asOf ? { asOf } : {}) }, a.key);
     return { memories: r.memories, promptBlock: r.promptBlock };
+  }
+
+  async now() {
+    return (await this.call('GET', '/api/state')).now;
   }
 
   async advance(ms) {

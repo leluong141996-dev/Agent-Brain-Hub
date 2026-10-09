@@ -196,6 +196,8 @@ test('bench: the HTTP target scores a running hub and cleans up after itself', a
     const state = await fetch(`${url}/api/state`, { headers: { 'x-admin-token': 'bench-token' } }).then((x) => x.json());
     assert.ok(!state.agents.some((a) => /^bench-/.test(a.name)), 'temporary agents are deleted');
     assert.equal(state.agents.length, 6, 'built-in agents untouched');
+    const graph = await fetch(`${url}/api/graph?lang=en`, { headers: { 'x-admin-token': 'bench-token' } }).then((x) => x.json());
+    assert.ok(Array.isArray(graph.entities) && Array.isArray(graph.edges), 'GET /api/graph answers');
   } finally {
     hub.kill();
   }
@@ -227,4 +229,33 @@ test('bench: LongMemEval script ranks the evidence session (tiny dataset, same f
   const out = execFileSync(process.execPath, [path.join(here, '..', 'bench', 'longmemeval.mjs'), '--file', file], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   assert.match(out, /hashing, 2 questions/, 'abstention questions are skipped');
   assert.match(out, /\| \*\*Overall\*\* \| 100\.0% \|/, out);
+});
+
+test('bench: mark + asOf steps are validated and look back in time', async () => {
+  const errs = validateScenario({ id: 't', category: 'temporal', lang: 'en', steps: [
+    { agent: 'mia', recall: 'x', asOf: 'later' },
+    { mark: 'later' },
+    { mark: 'later' },
+    { mark: '' },
+  ] }, 't.json', { agents: AGENTS });
+  const has = (re) => assert.ok(errs.some((e) => re.test(e)), `${re}\n${errs.join('\n')}`);
+  has(/step 1: asOf "later" must refer to an earlier mark/);
+  has(/step 3: mark "later" is already used/);
+  has(/step 4: "mark" must be a non-empty name/);
+
+  const scenario = {
+    id: 'moved',
+    category: 'temporal',
+    lang: 'en',
+    steps: [
+      { agent: 'mia', say: 'I live in Hanoi' },
+      { mark: 'before-move' },
+      { advance: '10d' },
+      { agent: 'mia', say: 'I moved to Saigon last month' },
+      { agent: 'atlas', recall: 'Book a taxi from my home', asOf: 'before-move', expect: { remembers: ['Hanoi'], stale: ['Saigon'] } },
+      { agent: 'atlas', recall: 'Book a taxi from my home', expect: { remembers: ['Saigon'], stale: ['/lives in:? hanoi/i'] } },
+    ],
+  };
+  const r = await runScenario(scenario, () => new InProcessTarget({ lang: 'en' }));
+  assert.equal(r.status, 'passed', JSON.stringify(r.checks.filter((c) => !c.passed)));
 });

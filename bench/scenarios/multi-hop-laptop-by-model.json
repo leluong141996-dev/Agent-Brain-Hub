@@ -1,0 +1,28 @@
+{
+  "id": "multi-hop-laptop-by-model",
+  "category": "multi_hop",
+  "lang": "en",
+  "description": "The question names the model (\"the XPS\"); the repair was reported about \"the laptop\". The graph links them.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "My laptop is a Dell XPS 13"
+    },
+    {
+      "agent": "kai",
+      "say": "The laptop screen cracked, it will be at the repair shop for 5 days"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "penny",
+      "recall": "Should I set money aside for the XPS this month?",
+      "expect": {
+        "remembers": [
+          "no laptop for 5 days"
+        ]
+      }
+    }
+  ]
+}

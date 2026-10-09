@@ -3,6 +3,7 @@
 // scope:   private (only the writer domain sees it) | shared | global
 // writer:  the single domain allowed to write this relation (single-writer-per-entity)
 // card:    'one' → a new different value is a candidate contradiction; 'many' → a set
+import { assetType } from './entities.js';
 import { stripDiacritics, norm } from '../text.js';
 import { tr } from '../i18n.js';
 
@@ -90,7 +91,7 @@ const RULES = [
   { rel: 'diet', re: new RegExp(`(?:${ME} an |i am |i'm )(chay|kieng [a-z ]{2,15}?|vegetarian|vegan|keto)${END}`) },
   { rel: 'owns_asset', re: new RegExp(`(?:(?:xe|o to|laptop|may tinh|dien thoai) (?:cua )?${ME} la|${ME} (?:dang )?(?:di|lai|co|dung|xai) (?:mot )?(?:chiec |cai |xe |o to |laptop |dien thoai )?|my (?:car|laptop|phone|computer) is (?:an? )?|i (?:drive|own|use|have) (?:an? )?)\\s*((?:${BRANDS})[a-z0-9 -]{0,15}?)${END}`) },
   { rel: 'asset_issue', re: new RegExp(`(?:xe|phanh|lop|may|man hinh|pin|dieu hoa|dong co|ac quy|car|laptop|phone|screen|engine|brakes?|battery)[a-z ]{0,10}? (?:bi |co tieng |dang |is |keeps |has )((?:keu|hong|ro ri|chet may|mat phanh|nong|yeu|xit|ket|vo|sap nguon|broken|cracked|making noise|overheating|not charging|leaking|dead)[a-z ]{0,20}?)${END}`) },
-  { rel: 'trip_destination', re: new RegExp(`(?:bay|di cong tac|cong tac|di du lich|du lich|dat ve|ve may bay|fly|flight|trip|travel|going)(?: di| ra| vao| toi| den| o| sang| to)?\\s+(${CITIES})\\b`) },
+  { rel: 'trip_destination', re: new RegExp(`(?:bay|di cong tac|cong tac|di du lich|du lich|dat ve|ve may bay|flying|fly|flight|trip|travell?ing|travel|going|heading|visiting)(?: di| ra| vao| toi| den| o| sang| to)?\\s+(${CITIES})\\b`) },
   { rel: 'prefers_seat', re: /(?:ghe (canh cua so|loi di)|(window|aisle) seat)/ },
   { rel: 'has_children', re: /(?:(?:toi|minh|em) co (\d+|mot|hai|ba|bon) (?:dua |be )?(?:con|chau|be)|i have (\d+|one|two|three|four) (?:kids|children))/ },
   { rel: 'occupation', re: new RegExp(`(?:${ME} (?:la|lam)(?: nghe)? |i am an? |i'm an? |i work as an? )(bac si|ky su|giao vien|lap trinh vien|ke toan|doanh nhan|sinh vien|luat su|kien truc su|y ta|engineer|doctor|teacher|developer|accountant|architect|lawyer|nurse|student|designer)${END}`) },
@@ -107,12 +108,17 @@ const ASSET_NOUNS = [
   ['o to', 'xe', 'car'], ['xe', 'xe', 'car'], ['laptop', 'laptop', 'laptop'], ['may tinh', 'máy tính', 'computer'],
   ['dien thoai', 'điện thoại', 'phone'], ['car', 'xe', 'car'], ['phone', 'điện thoại', 'phone'], ['computer', 'máy tính', 'computer'],
 ];
+// No noun in the sentence ("The Camry broke down"): the entity lexicon knows
+// brands and models, so the value still says "car".
+const TYPE_NOUN = { car: ['xe', 'car', '車'], laptop: ['laptop', 'laptop', 'パソコン'], phone: ['điện thoại', 'phone', 'スマホ'] };
 const assetNoun = (low, lang) => {
   const hit = ASSET_NOUNS.find(([k]) => new RegExp(`\\b${k}\\b`).test(low));
-  return hit ? (lang === 'en' ? hit[2] : hit[1]) : lang === 'en' ? 'device' : 'thiết bị';
+  if (hit) return lang === 'en' ? hit[2] : hit[1];
+  const t = TYPE_NOUN[assetType(low)];
+  return t ? (lang === 'en' ? t[1] : t[0]) : lang === 'en' ? 'device' : 'thiết bị';
 };
 const JA_NOUNS = [['車', '車'], ['ノートパソコン', 'パソコン'], ['パソコン', 'パソコン'], ['スマホ', 'スマホ'], ['携帯', '携帯']];
-const jaNoun = (text) => (JA_NOUNS.find(([k]) => text.includes(k)) || [null, 'デバイス'])[1];
+const jaNoun = (text) => (JA_NOUNS.find(([k]) => text.includes(k)) || [null, TYPE_NOUN[assetType(text)]?.[2] || 'デバイス'])[1];
 
 function shadow(text) {
   // Same length as `text` (NFC), lowercase and without diacritics.
@@ -124,16 +130,18 @@ function shadow(text) {
   return out;
 }
 
-
-// Trailing time/update words that speakers attach to a preference change
-// ("I don't like X anymore"). Keep them in the sentence so UPDATE_MARKERS
-// still fire; strip them from the stored value so opposite-fact matching works.
-const TEMPORAL_TAIL = /(?:\s+(?:anymore|any\s+more|now|these\s+days|nowadays|nữa\s+rồi|nua\s+roi|nữa|nua|rồi|roi))+$/iu;
-
-function stripTemporalTail(value) {
-  const next = String(value || '').replace(TEMPORAL_TAIL, '').trim();
-  return next || String(value || '').trim();
-}
+// Time and update words that end a sentence but aren't part of the value:
+// "I don't like spicy food anymore" → "spicy food" (#22). Kept in the sentence,
+// so the message still counts as an update and replaces the old preference.
+const TRAILING = /(?:\s+(?:any ?more|now|nowadays|these days|lately|recently|at all|either|yesterday|last (?:week|month|year)|this (?:week|month|year)|nữa|rồi|bây giờ|giờ đây|luôn|hôm qua|gần đây|(?:tuần|tháng) (?:trước|này)|năm (?:ngoái|nay)))+\s*$/iu;
+const trimTrailing = (v) => {
+  let out = v;
+  for (let prev; prev !== out; ) {
+    prev = out;
+    out = out.replace(TRAILING, '').trim();
+  }
+  return out || v;
+};
 
 export function extractFactsRuleBased(rawText) {
   const text = rawText.normalize('NFC');
@@ -146,9 +154,8 @@ export function extractFactsRuleBased(rawText) {
     const g = m.indices.findIndex((ix, i) => i > 0 && ix);
     if (g < 1) continue;
     const [s, e] = m.indices[g];
-    let value = text.slice(s, e).trim();
+    let value = trimTrailing(text.slice(s, e).trim());
     if (rel === 'name') value = value.replace(/(^|\s)(\p{L})/gu, (_, sp, c) => sp + c.toUpperCase());
-    if (rel === 'prefers' || rel === 'dislikes') value = stripTemporalTail(value);
     facts.push({ entity: RELATIONS[rel].entity, relation: rel, value, evidence: text.slice(m.index, m.index + m[0].length) });
   }
   // "xe phải sửa 3 ngày" / "my car is in the shop for 3 days" → temporary unavailability
@@ -171,7 +178,9 @@ export function extractFactsRuleBased(rawText) {
       facts.push({ entity: 'asset', relation: 'asset_unavailable', value: `${jaNoun(text)}が故障中`, evidence: 'broken' });
     }
   }
-  const isUpdate = UPDATE_MARKERS.some((k) => ` ${low} `.includes(k));
+  // Punctuation must not hide a marker at the end: "… nữa." / "… now!"
+  const padded = ` ${low.replace(/[.,!?;:…。、！？]+/g, ' ')} `;
+  const isUpdate = UPDATE_MARKERS.some((k) => padded.includes(k));
   return facts.map((f) => ({ ...f, isUpdate }));
 }
 

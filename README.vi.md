@@ -108,7 +108,7 @@ Màn hình Agents có sẵn cấu hình `mcpServers` cho Claude Desktop/Cursor, 
 | Method | Path | Body / query | Trả về |
 |---|---|---|---|
 | GET | `/v1/me` | | agent, domain, kind, permissions |
-| POST | `/v1/recall` | `{customerId, text, lang}` | `traceId, intent, salience, handoff, playbook, memories[]` (mỗi mục có `from`, `updatedAt`, `validUntil`), `suggestedActions[], promptBlock, redactedText` |
+| POST | `/v1/recall` | `{customerId, text, lang, asOf?}` | `traceId, intent, salience, handoff, playbook, memories[]` (mỗi mục có `from`, `updatedAt`, `validUntil`, và `via` khi được kéo vào qua đồ thị thực thể), `suggestedActions[], promptBlock, redactedText` |
 | POST | `/v1/remember` | `{traceId \| userText, reply, facts?: [{relation, value}], outcome?: {actionId, accepted}, lang}` | `learned[]`, feedback |
 | POST | `/v1/chat` | `{customerId, text, lang}` | bộ não tự trả lời (native qua API) |
 | POST | `/v1/feedback` | `{traceId, actionId, accepted}` | bandit + skill promotion |
@@ -283,6 +283,38 @@ Ghi chú về vLLM:
 - Image `latest` cần driver ≥ 575. Đổi bằng `VLLM_IMAGE=…`.
 - Request JSON dùng `temperature 0.1` để né lỗi CUDA của vLLM 0.10.2 khi gộp batch.
 
+### Bộ nhớ theo thời gian
+
+Fact **bị vô hiệu chứ không bị xoá**. Khi "tôi chuyển đến Sài Gòn" thay cho "tôi sống ở Hà Nội", fact cũ vẫn giữ ngày tháng và liên kết tới fact mới; khi fact hết TTL, truy xuất ngừng dùng nó. Vòng ngủ xoá hẳn các fact đã kết thúc sau một khoảng giữ lịch sử: mặc định 90 ngày, chỉnh trong **Cài đặt → Vòng ngủ** hoặc qua `BRAIN_HISTORY_DAYS` (`0` thì xoá ngay như trước v0.5).
+
+Bạn có thể hỏi **bộ não đã tin gì vào một thời điểm bất kỳ**:
+
+```js
+await brain.recall({ customerId, text: 'Đặt taxi từ nhà tôi', asOf: '2026-10-01T09:00:00Z' });
+// → địa chỉ bộ não biết lúc đó, không phải địa chỉ hiện tại
+```
+
+![Xem bộ nhớ tại một thời điểm: địa chỉ bị thay thế, fact hết hạn và chuỗi lịch sử](docs/memory-over-time.png)
+
+`asOf` dùng được trên `POST /v1/recall` và trên tab Semantic, Episodic của màn hình Bộ não (*Xem bộ nhớ tại*). Việc xem quá khứ chỉ đọc: không thay đổi ký ức, được ghi vào audit log, và tuân theo đúng quyền đọc. Chuỗi thay thế của mỗi fact có ở `GET /api/facts/:id/history`.
+
+### Bộ nhớ có liên kết (đồ thị thực thể)
+
+Trong mỗi khách hàng, các fact được gom thành **thực thể**: "xe của tôi", "my car", "車" và "Honda Civic" là một chiếc xe; "Đà Nẵng" và "Da Nang" là một chuyến đi. Khi câu hỏi nhắc tới một thực thể hoặc khớp một fact, bước truy xuất đi theo liên kết sang các fact nối với nó, tối đa hai bước:
+
+```text
+Penny (tài chính): "Tuần này tôi có nên để dành tiền cho chiếc Civic không?"
+→ "Civic" là chiếc xe, và chiếc xe đang phải sửa. Prompt nhận được:
+  - sở hữu: Honda Civic (from Mia, 2 hours ago)
+  - tình trạng: không có xe 3 ngày (from Kai, 2 hours ago, expires in 4 days, via: Honda Civic)
+```
+
+Liên kết là cùng một thực thể (chiếc Civic và việc sửa xe) hoặc hai loại fact liên quan (chuyến đi và việc không có xe, chuyến đi và chế độ ăn hay ngân sách). Đồ thị chỉ chạy trên những ký ức agent đang hỏi vốn đã được phép thấy, nên không bao giờ mang fact private sang miền khác, và bỏ qua fact đã hết hiệu lực. Hai khách hàng không bao giờ bị gộp.
+
+![Tab Đồ thị: chuyến đi nối với chiếc xe đang sửa, ngân sách, thành phố đang sống, và một dị ứng private chỉ agent sức khỏe đi theo được](docs/entity-graph.png)
+
+Tab **Đồ thị** trong màn hình Bộ não hiển thị thực thể và liên kết của một khách, xem được cả ở thời điểm trong quá khứ; `GET /api/graph?customerId=&asOf=` trả về cùng dữ liệu. `npm run bench -- --no-graph` đo phần đồ thị mang lại (xem mục Benchmark).
+
 ### Tìm kiếm theo ngữ nghĩa (embeddings)
 
 Mặc định, ký ức được so khớp bằng vector feature hashing chạy local: không cần mạng, không cần cài đặt, nhưng chỉ bắt được từ trùng nhau. Muốn tìm được cả câu diễn đạt khác ("Mai tôi tự lái ra sân bay được không?" → "không có xe 3 ngày"), hãy chọn model embedding trong **Cài đặt → Tìm kiếm theo ngữ nghĩa**: OpenAI, Gemini, Ollama, vLLM, LM Studio hoặc bất kỳ endpoint `/embeddings` tương thích OpenAI nào. Với tiếng Việt và tiếng Nhật, `bge-m3` chạy qua Ollama là lựa chọn local tốt.
@@ -294,19 +326,20 @@ Mặc định, ký ức được so khớp bằng vector feature hashing chạy 
 
 ## Benchmark
 
-`npm run bench` chấm bộ nhớ dùng chung trên 25 kịch bản nhiều agent: nhớ chéo giữa agent, fact hết hạn, mâu thuẫn, rò rỉ dữ liệu private, câu hỏi nhiều bước, hội thoại dài và khớp chính xác (mã đơn hàng, tên model), bằng tiếng Anh kèm các ca tiếng Việt và tiếng Nhật. Chạy offline dưới một giây, và CI chặn mọi thay đổi làm tụt một chỉ số chất lượng ([bench/README.md](bench/README.md)).
+`npm run bench` chấm bộ nhớ dùng chung trên 37 kịch bản nhiều agent: nhớ chéo giữa agent, fact hết hạn, mâu thuẫn, rò rỉ dữ liệu private, câu hỏi nhiều bước, hội thoại dài, khớp chính xác (mã đơn hàng, tên model) và xem lại quá khứ, bằng tiếng Anh kèm các ca tiếng Việt và tiếng Nhật. Chạy offline dưới một giây, và CI chặn mọi thay đổi làm tụt một chỉ số chất lượng ([bench/README.md](bench/README.md)).
 
-| v0.4.0 | Hashing (mặc định, offline) | Lai với `bge-m3` (Ollama, CPU) |
+| v0.6.0 | Hashing (mặc định, offline) | Lai với `bge-m3` (Ollama, CPU) |
 |---|---|---|
-| Scenario pass rate | 84,0% | **96,0%** |
-| Recall accuracy | 89,7% | **100%** |
+| Scenario pass rate | 97,3% | **100%** |
+| Recall accuracy | 97,7% | **100%** |
+| Câu hỏi nhiều bước | **100%** (40% khi tắt đồ thị) | **100%** |
 | Leak rate | **0%** | **0%** |
-| Stale-use rate | 25,0% | 25,0% |
+| Stale-use rate | **0%** | **0%** |
 | Conflict handling | 100% | 100% |
-| Độ trễ recall (p50) | 0,5 ms | 96 ms |
-| Prompt tokens (trung bình) | 426 | 513 |
+| Độ trễ recall (p50) | 0,4 ms | 96 ms |
+| Prompt tokens (trung bình) | 427 | 508 |
 
-Đây là kịch bản do dự án tự viết, nên dùng để so các phiên bản của chính dự án. Lỗi stale-use còn lại là lỗi đã biết ([#22](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/22)).
+Đây là kịch bản do dự án tự viết, nên dùng để so các phiên bản của chính dự án. Đồ thị thực thể nâng tỷ lệ đạt khi chạy offline từ 81,1% lên 97,3%, đổi lại mỗi prompt tốn thêm khoảng 6 token (`--no-graph` chạy cùng bộ kịch bản khi tắt đồ thị). Với `bge-m3`, các kịch bản nhiều bước vẫn đạt kể cả khi tắt đồ thị, vì model đã tự nối "con XPS" với "chiếc laptop"; khi đó đồ thị thêm phần giải thích `via`. Kịch bản duy nhất còn trượt khi chạy offline là một câu diễn đạt khác, không có từ nào trùng với ký ức.
 
 **Trên bộ dữ liệu công khai.** `npm run bench:longmemeval` chấm khả năng truy xuất trên [LongMemEval-S](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned) (MIT, 470 câu hỏi, mỗi câu khoảng 50 phiên): phiên chứa câu trả lời có nằm gần đầu không? Với hashing local, nó nằm trong top 4 ở **52,8%** câu hỏi và trong top 10 ở **71,3%**. Điểm yếu là câu hỏi về sở thích (20% @4) và câu cần đủ mọi phiên bằng chứng. Độ chính xác của câu trả lời chưa được đo.
 
@@ -314,15 +347,16 @@ Mặc định, ký ức được so khớp bằng vector feature hashing chạy 
 
 ## Test
 
-- `npm test`: 70 unit test, gồm:
+- `npm test`: 92 unit test, gồm:
   - bộ QA nghiệm thu của tài liệu: amnesia, contradiction, staleness, skill promotion, load 20k episode;
   - phân quyền và rò rỉ prompt;
   - tiếng Anh, tiếng Nhật;
   - agent connected (recall/remember), governance, xoay key, báo cáo giá trị;
   - lớp LLM: danh mục nhà cung cấp, tự thích nghi với một server giả lập khó tính kiểu OpenAI, lưu/ẩn key, tải danh sách model;
   - lưu trữ SQLite: mở lại thì dữ liệu còn nguyên (kể cả embedding), chỉ ghi các dòng thay đổi, audit không bị cắt và số liệu SQL khớp với cách tính trong bộ nhớ, nhập từ JSON cũ, reset;
-  - vòng ngủ tự động (im lặng, áp lực, ban đêm), nguồn gốc và tuổi của fact trong prompt, nhà cung cấp embedding (với server giả lập), và chính bộ benchmark.
-- `npm run bench`: benchmark bộ nhớ. 25 kịch bản nhiều agent (nhớ chéo, fact hết hạn, mâu thuẫn, rò rỉ, nhiều bước, hội thoại dài, khớp chính xác), chấm offline dưới một giây. Ngoài ra có `npm run bench:longmemeval` (bộ dữ liệu công khai, truy xuất) và `npm run bench:scale` (độ trễ khi bộ nhớ lớn). Xem [bench/README.md](bench/README.md); thêm kịch bản chỉ cần một file JSON.
+  - vòng ngủ tự động (im lặng, áp lực, ban đêm), nguồn gốc và tuổi của fact trong prompt, nhà cung cấp embedding (với server giả lập), và chính bộ benchmark;
+  - bộ nhớ theo thời gian (`asOf`, lịch sử) và đồ thị thực thể: gộp thực thể, truy xuất nhiều bước không bao giờ chạm tới fact private hay đã hết hạn, API đồ thị.
+- `npm run bench`: benchmark bộ nhớ. 37 kịch bản nhiều agent (nhớ chéo, fact hết hạn, mâu thuẫn, rò rỉ, nhiều bước, hội thoại dài, khớp chính xác, xem lại quá khứ), chấm offline dưới một giây. Ngoài ra có `npm run bench:longmemeval` (bộ dữ liệu công khai, truy xuất) và `npm run bench:scale` (độ trễ khi bộ nhớ lớn). Xem [bench/README.md](bench/README.md); thêm kịch bản chỉ cần một file JSON.
 - `npm run e2e -- --lang vi|en|ja`: 11 bước chạy trên server đang chạy, với bất kỳ cấu hình LLM nào (offline, Claude, GPT, model local…). Bao gồm cả agent connected qua SDK và MCP server qua stdio. Bài test dùng một khách hàng mới nên không đụng dữ liệu đang có, nhưng tua đồng hồ mô phỏng thêm 7 ngày.
 
 ## Cấu trúc
@@ -362,9 +396,10 @@ Mục tiêu: **lớp bộ nhớ cho hệ nhiều agent — đúng theo thời gi
 |---|---|
 | ✅ **v0.3** | Benchmark bộ nhớ có cổng chặn trong CI; model embedding thay thế được |
 | ✅ **v0.4** | Tìm kiếm lai, chỉ mục theo khách hàng, LongMemEval, benchmark một hub đang chạy |
-| **v0.5** | Đồ thị tri thức hai trục thời gian: `recall({ asOf })` theo thời điểm, gộp thực thể, truy xuất nhiều bước |
-| **v0.6** | Trích xuất schema mở, chính sách giải quyết khi ghi trùng, điểm tin cậy cho agent |
-| **v0.7** | Quản trị bằng chính sách khai báo, PostgreSQL + pgvector, OpenTelemetry, multi-tenant |
+| ✅ **v0.5** | Bộ nhớ theo thời gian: fact bị vô hiệu thay vì xoá, `recall({ asOf })`, lịch sử fact |
+| ✅ **v0.6** | Đồ thị thực thể: thực thể theo từng khách, truy xuất nhiều bước kèm `via`, giao diện đồ thị |
+| **v0.7** | Trích xuất schema mở, chính sách giải quyết khi ghi trùng, điểm tin cậy cho agent |
+| **v0.8** | Quản trị bằng chính sách khai báo, PostgreSQL + pgvector, OpenTelemetry, multi-tenant |
 
 Chi tiết, nguyên tắc và những gì không nằm trong kế hoạch: [ROADMAP.md](ROADMAP.md) (tiếng Anh).
 

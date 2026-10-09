@@ -1,0 +1,28 @@
+{
+  "id": "vi-multi-hop-laptop-xps",
+  "category": "multi_hop",
+  "lang": "vi",
+  "description": "Tiếng Việt: \"con XPS\" chính là chiếc laptop đang phải sửa.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "Laptop của tôi là Dell XPS 13"
+    },
+    {
+      "agent": "kai",
+      "say": "Laptop bị vỡ màn hình, phải sửa 5 ngày"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "penny",
+      "recall": "Tháng này tôi có nên để dành tiền cho con XPS không?",
+      "expect": {
+        "remembers": [
+          "không có laptop 5 ngày"
+        ]
+      }
+    }
+  ]
+}

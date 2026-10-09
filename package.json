@@ -1,6 +1,6 @@
 {
   "name": "agent-brain-hub",
-  "version": "0.4.0",
+  "version": "0.6.1",
   "description": "A centralized, brain-inspired memory hub shared by many AI agents — native or connected via REST, SDK or MCP — with a live visualizer, governance and business-value dashboard (vi/en/ja)",
   "type": "module",
   "private": true,

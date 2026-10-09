@@ -153,6 +153,7 @@ function provenance(m, now) {
   if (m.kind === 'semantic' && m.sourceName) parts.push(`from ${m.sourceName}`);
   if (m.at) parts.push(`${span(Math.max(0, now - m.at))} ago`);
   if (m.kind === 'semantic' && m.validUntil && m.validUntil > now) parts.push(`expires in ${span(m.validUntil - now)}`);
+  if (m.via) parts.push(`via: ${m.via}`);
   return parts.length ? ` (${parts.join(', ')})` : '';
 }
 

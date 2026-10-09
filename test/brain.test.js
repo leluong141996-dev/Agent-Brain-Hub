@@ -70,7 +70,7 @@ test('Negation is a contradiction (thích X vs không thích X)', async () => {
   assert.ok(r.learned.some((l) => l.action === 'conflict'));
 });
 
-test('Staleness test — expired facts stop being used and are forgotten', async () => {
+test('Staleness test — expired facts stop being used, are kept as history, then forgotten', async () => {
   const b = makeBrain();
   await b.think({ agentId: 'kai', text: 'Xe phải sửa 3 ngày' });
   b.advanceClock(5);
@@ -78,7 +78,12 @@ test('Staleness test — expired facts stop being used and are forgotten', async
   assert.ok(!r.retrieval.selected.some((s) => s.relation === 'asset_unavailable'));
   assert.ok(r.retrieval.excluded.some((s) => /stale/.test(s.reason)));
   await b.sleep();
-  assert.ok(!b.state.facts.some((f) => f.relation === 'asset_unavailable'), 'forgetting engine removed it for real');
+  // v0.5: kept as history for recall({ asOf }) until historyDays have passed.
+  const kept = b.state.facts.find((f) => f.relation === 'asset_unavailable');
+  assert.ok(kept, 'still stored as history');
+  b.advanceClock(91);
+  await b.sleep();
+  assert.ok(!b.state.facts.some((f) => f.relation === 'asset_unavailable'), 'forgetting engine removed it for real after 90 days');
 });
 
 test('Skill promotion test — 3 successes, 4th time uses the learned playbook', async () => {
@@ -349,6 +354,25 @@ test('Value report — cross-agent reuse, knowledge flow matrix, leaks blocked',
   assert.ok(v.daily.at(-1).turns >= 3, 'today is the last bucket');
 });
 
+test('#22: "I don\'t like X anymore" stores X and replaces "I like X"', async () => {
+  const { extractFactsRuleBased } = await import('../server/brain/ontology.js');
+  const value = (s) => extractFactsRuleBased(s).map((f) => `${f.relation}=${f.value}`);
+  assert.deepEqual(value("I don't like spicy food anymore"), ['dislikes=spicy food']);
+  assert.deepEqual(value('I hate onions now'), ['dislikes=onions']);
+  assert.deepEqual(value('tôi không thích ăn cay nữa'), ['dislikes=ăn cay']);
+  assert.deepEqual(value('tôi không thích hành nữa rồi'), ['dislikes=hành']);
+  assert.deepEqual(value('I really like hiking now'), ['prefers=hiking'], 'also on positive preferences');
+  assert.deepEqual(value('I moved to Saigon last month'), ['lives_in=Saigon'], 'and on other relations');
+  assert.deepEqual(value('tôi mới chuyển đến Đà Nẵng tháng trước'), ['lives_in=Đà Nẵng']);
+
+  const b = makeBrain();
+  await b.think({ agentId: 'mia', text: 'I love spicy food', lang: 'en' });
+  const r = await b.think({ agentId: 'mia', text: "I don't like spicy food anymore", lang: 'en' });
+  assert.ok(r.learned.some((l) => l.action === 'superseded'), JSON.stringify(r.learned));
+  const live = b.state.facts.filter((f) => /spicy/.test(f.value) && f.status === 'active');
+  assert.deepEqual(live.map((f) => `${f.relation}=${f.value}`), ['dislikes=spicy food']);
+});
+
 
 test('strip trailing temporal markers from prefers/dislikes values (#22)', () => {
   const cases = [
@@ -377,4 +401,14 @@ test('anymore preference change supersedes the old like (#22)', async () => {
   const dislikes = b.state.facts.filter((f) => f.relation === 'dislikes' && /spicy/i.test(f.value));
   assert.ok(likes.every((f) => f.status === 'superseded'));
   assert.ok(dislikes.some((f) => f.status === 'active' && f.value === 'spicy food'));
+});
+
+test('an update marker still counts before final punctuation (#22)', async () => {
+  for (const text of ['Tôi không thích ăn cay nữa.', "I don't like spicy food anymore!", 'I hate onions now.']) {
+    assert.ok(extractFactsRuleBased(text).every((f) => f.isUpdate), text);
+  }
+  const b = makeBrain();
+  await b.think({ agentId: 'mia', text: 'Tôi thích ăn cay', lang: 'vi' });
+  const r = await b.think({ agentId: 'mia', text: 'Tôi không thích ăn cay nữa.', lang: 'vi' });
+  assert.ok(r.learned.some((l) => l.action === 'superseded'), JSON.stringify(r.learned));
 });

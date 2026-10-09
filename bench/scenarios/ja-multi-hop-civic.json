@@ -1,0 +1,28 @@
+{
+  "id": "ja-multi-hop-civic",
+  "category": "multi_hop",
+  "lang": "ja",
+  "description": "日本語：「シビック」は修理中の車のこと。",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "私の車はホンダのシビックです"
+    },
+    {
+      "agent": "kai",
+      "say": "車が故障して、3日間修理に出します"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "penny",
+      "recall": "今週シビックのためにお金を取っておくべき？",
+      "expect": {
+        "remembers": [
+          "車が故障中"
+        ]
+      }
+    }
+  ]
+}
