@@ -68,3 +68,50 @@ test('graph/B: the customer profile is not a hub that drags everything in', asyn
   const r = await b.recall({ agentId: 'kai', text: 'My laptop screen is cracked', lang: 'en' });
   assert.ok(!r.memories.some((m) => m.via && /jazz|vegetarian|Hanoi/.test(m.text)), r.memories.map((m) => `${m.text} via ${m.via}`).join(' | '));
 });
+
+test('graph/C: the graph API groups facts into entities and lists the edges RAS uses', async () => {
+  const b = makeBrain();
+  await b.think({ agentId: 'mia', text: 'My car is a Honda Civic', lang: 'en' });
+  await b.think({ agentId: 'kai', text: 'The car broke down, it will be in the shop for 3 days', lang: 'en' });
+  await b.think({ agentId: 'atlas', text: "I'm flying to Da Nang next week", lang: 'en' });
+  const g = b.graph('kh-001', 'en');
+  const car = g.entities.find((e) => e.id === 'asset:car');
+  assert.equal(car.label, 'Honda Civic');
+  assert.equal(car.facts, 2);
+  assert.ok(g.entities.some((e) => e.id === 'trip:da-nang' && e.kind === 'trip'));
+  const id = (re) => g.facts.find((f) => re.test(f.text)).id;
+  const [civic, shop, trip] = [id(/Civic/), id(/no car/), id(/Da Nang/)];
+  const edge = (a, c) => g.edges.find((e) => (e.from === a && e.to === c) || (e.from === c && e.to === a));
+  assert.equal(edge(civic, shop).kind, 'entity');
+  assert.equal(edge(trip, shop).kind, 'affinity');
+  assert.ok(!edge(civic, trip), 'no edge between unrelated facts');
+  await b.think({ agentId: 'penny', text: 'My budget is 800 USD and I usually pay by credit card', lang: 'en' });
+  const g2 = b.graph('kh-001', 'en');
+  const fin = g2.facts.filter((f) => f.entity === 'finance').map((f) => f.id);
+  assert.equal(fin.length, 2);
+  assert.equal(g2.edges.find((e) => fin.includes(e.from) && fin.includes(e.to)).kind, 'affinity', 'a profile is not an entity hub');
+});
+
+test('graph/C: asOf shows the graph as it stood then; ended facts lose their edges', async () => {
+  const b = makeBrain();
+  await b.think({ agentId: 'atlas', text: "I'm flying to Da Nang next week", lang: 'en' });
+  const before = b.clock.now();
+  b.advanceClock(1);
+  await b.think({ agentId: 'kai', text: 'My car broke down, it will be in the shop for 3 days', lang: 'en' });
+  assert.ok(!b.graph('kh-001', 'en', before).entities.some((e) => e.id === 'asset:car'), 'the car was not known yet');
+  assert.equal(b.graph('kh-001', 'en').edges.length, 1);
+  b.advanceClock(5);
+  const later = b.graph('kh-001', 'en');
+  assert.equal(later.facts.find((f) => /no car/.test(f.text)).state, 'expired');
+  assert.equal(later.edges.length, 0, 'an expired fact no longer connects anything');
+});
+
+test('graph/C: one customer\'s graph never contains another customer\'s facts', async () => {
+  const b = makeBrain();
+  const other = b.createCustomer({ name: 'Other' });
+  await b.think({ agentId: 'mia', customerId: other.id, text: 'My car is a Toyota Vios', lang: 'en' });
+  await b.think({ agentId: 'mia', text: 'My car is a Honda Civic', lang: 'en' });
+  const g = b.graph('kh-001', 'en');
+  assert.ok(!g.facts.some((f) => /Vios/.test(f.text)));
+  assert.equal(g.entities.find((e) => e.id === 'asset:car').label, 'Honda Civic');
+});

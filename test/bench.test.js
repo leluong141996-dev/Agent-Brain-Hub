@@ -196,6 +196,8 @@ test('bench: the HTTP target scores a running hub and cleans up after itself', a
     const state = await fetch(`${url}/api/state`, { headers: { 'x-admin-token': 'bench-token' } }).then((x) => x.json());
     assert.ok(!state.agents.some((a) => /^bench-/.test(a.name)), 'temporary agents are deleted');
     assert.equal(state.agents.length, 6, 'built-in agents untouched');
+    const graph = await fetch(`${url}/api/graph?lang=en`, { headers: { 'x-admin-token': 'bench-token' } }).then((x) => x.json());
+    assert.ok(Array.isArray(graph.entities) && Array.isArray(graph.edges), 'GET /api/graph answers');
   } finally {
     hub.kill();
   }

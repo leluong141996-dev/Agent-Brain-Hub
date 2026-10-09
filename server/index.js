@@ -72,6 +72,7 @@ const q = (url, k) => url.searchParams.get(k);
 // ---------- Admin API (hub UI) ----------
 const admin = {
   'GET /api/state': (req, url) => ({ ...brain.snapshot(q(url, 'customerId') || 'kh-001', q(url, 'lang'), q(url, 'asOf')), hubRoot: ROOT, autoSleep: { enabled: sleeper.config.enabled, nextNightly: sleeper.nextNightly() } }),
+  'GET /api/graph': (req, url) => brain.graph(q(url, 'customerId') || 'kh-001', q(url, 'lang'), q(url, 'asOf')),
   'GET /api/value': (req, url) => brain.valueReport(q(url, 'lang')),
   'GET /api/audit': (req, url) => brain.auditLog(Math.min(5000, Number(q(url, 'limit') || 100))),
   'GET /api/storage': () => store.info(),

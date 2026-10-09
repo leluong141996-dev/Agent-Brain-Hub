@@ -569,6 +569,9 @@ const TABS = {
         .join('')}
     </tbody></table>`;
   },
+  graph() {
+    return `${timeBar()}<div id="graphBox" class="graph-box"><div class="muted small">…</div></div>`;
+  },
   episodic() {
     const eps = ui.snap?.episodes || [];
     if (!eps.length) return timeBar() + emptyBox('book', t('e_empty'));
@@ -627,6 +630,7 @@ function renderTab() {
     const now = $('#asOfNow');
     if (now) now.onclick = () => ((ui.asOf = null), refresh());
   }
+  if (ui.tab === 'graph') loadGraph();
 }
 
 // ---- v0.5: memory over time ----
@@ -649,6 +653,123 @@ function timeBar() {
     <label class="field-inline">${icon('clock', 14)}<span>${t('asof_label')}</span><input type="datetime-local" id="asOfInput" value="${localInput(at)}" /></label>
     ${s.asOf ? `<button class="btn sm" id="asOfNow">${t('asof_now')}</button><span class="small">${esc(t('asof_banner', { at: new Date(s.asOf).toLocaleString() }))}</span>` : `<span class="muted small">${esc(t('asof_hint', { n: s.historyDays }))}</span>`}
   </div>`;
+}
+
+// ---- v0.6: entity graph ----
+// The customer in the centre, the entities its facts are about on an inner
+// ring, the facts around their entity. Dashed curves are affinity edges (a
+// related kind of fact); the spokes are "same entity". RAS spreads relevance
+// along exactly these edges, and only between facts the asking agent may see.
+async function loadGraph() {
+  const box = $('#graphBox');
+  if (!box) return;
+  try {
+    ui.graph = await api(`/api/graph?customerId=${encodeURIComponent(ui.customerId)}&lang=${lang()}${ui.asOf ? `&asOf=${ui.asOf}` : ''}`);
+    if (!ui.graph.facts.some((f) => f.id === ui.graphSel)) ui.graphSel = null;
+    drawGraph();
+  } catch (err) {
+    box.innerHTML = `<div class="muted small">${esc(err.message)}</div>`;
+  }
+}
+
+const ENDED = new Set(['expired', 'superseded', 'resolved']);
+const clip = (s, n = 24) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
+function entityLabel(e) {
+  if (e.kind === 'trip') return e.label || e.key;
+  if (e.kind === 'asset') return e.label || t('g_asset_' + e.key);
+  return t('g_ent_' + e.key);
+}
+
+function drawGraph() {
+  const box = $('#graphBox');
+  const g = ui.graph;
+  if (!box || !g) return;
+  if (!g.facts.length) return void (box.innerHTML = emptyBox('workflow', t('g_empty')));
+  const W = 760, H = 480, cx = W / 2, cy = H / 2;
+  const pos = new Map();
+  const ents = [...g.entities].sort((a, b) => (a.kind === 'profile') - (b.kind === 'profile') || a.id.localeCompare(b.id));
+  const step = (2 * Math.PI) / ents.length;
+  ents.forEach((e, i) => {
+    const a = -Math.PI / 2 + i * step;
+    pos.set(e.id, { x: cx + 150 * Math.cos(a), y: cy + 105 * Math.sin(a), a });
+    const fs = g.facts.filter((f) => f.entity === e.id);
+    const spread = Math.min(step * 0.8, (fs.length - 1) * 0.2);
+    fs.forEach((f, j) => {
+      const b = a - spread / 2 + (fs.length > 1 ? (j * spread) / (fs.length - 1) : 0);
+      pos.set(f.id, { x: cx + 290 * Math.cos(b), y: cy + 195 * Math.sin(b), a: b });
+    });
+  });
+  const sel = ui.graphSel;
+  const near = new Set(sel ? [sel] : []);
+  if (sel) for (const e of g.edges) if (e.from === sel || e.to === sel) near.add(e.from === sel ? e.to : e.from);
+  const dim = (id) => (sel && !near.has(id) ? ' dim' : '');
+  const line = (a, b, cls) => `<line class="${cls}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}"/>`;
+  const centre = { x: cx, y: cy };
+  const spokes = ents.map((e) => line(centre, pos.get(e.id), 'g-spoke' + (sel ? ' dim' : ''))).join('');
+  const members = g.facts.map((f) => line(pos.get(f.entity), pos.get(f.id), `g-member${ENDED.has(f.state) ? ' ended' : ''}${dim(f.id)}`)).join('');
+  const affinity = g.edges
+    .filter((e) => e.kind === 'affinity')
+    .map((e) => {
+      const a = pos.get(e.from), b = pos.get(e.to);
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      const c = { x: mx + (cx - mx) * 0.55, y: my + (cy - my) * 0.55 };
+      const on = sel && (e.from === sel || e.to === sel);
+      return `<path class="g-affinity${on ? ' on' : sel ? ' dim' : ''}" d="M${a.x.toFixed(1)},${a.y.toFixed(1)} Q${c.x.toFixed(1)},${c.y.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}"/>`;
+    })
+    .join('');
+  const entNodes = ents
+    .map((e) => {
+      const p = pos.get(e.id);
+      return `<g class="g-entity ${e.kind}${sel ? ' dim' : ''}"><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${e.kind === 'profile' ? 15 : 18}"/><text x="${p.x.toFixed(1)}" y="${(p.y + 32).toFixed(1)}" text-anchor="middle">${esc(clip(entityLabel(e), 20))}</text></g>`;
+    })
+    .join('');
+  const factNodes = g.facts
+    .map((f) => {
+      const p = pos.get(f.id);
+      const right = Math.cos(p.a) >= 0;
+      const cls = `g-fact ${ENDED.has(f.state) ? 'ended' : f.state}${f.scope === 'private' ? ' private' : ''}${f.id === sel ? ' sel' : ''}${dim(f.id)}`;
+      return `<g class="${cls}" data-fact="${f.id}" tabindex="0" role="button"><title>${esc(f.text)}</title><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="7"/><text x="${(p.x + (right ? 11 : -11)).toFixed(1)}" y="${(p.y + 4).toFixed(1)}" text-anchor="${right ? 'start' : 'end'}">${esc(clip(f.value))}</text></g>`;
+    })
+    .join('');
+  const hub = `<g class="g-customer"><circle cx="${cx}" cy="${cy}" r="20"/><text x="${cx}" y="${cy + 36}" text-anchor="middle">${esc(clip(g.customer.name, 20))}</text></g>`;
+  const counts = t('g_counts', { e: g.entities.length, f: g.facts.length, a: g.edges.filter((e) => e.kind === 'affinity').length });
+  box.innerHTML = `<div class="graph-legend small"><span>${esc(counts)}</span>
+      <span><i class="lg-dot"></i>${t('g_lg_fact')}</span><span><i class="lg-dot private"></i>${t('g_lg_private')}</span><span><i class="lg-dot ended"></i>${t('g_lg_ended')}</span><span><i class="lg-dash"></i>${t('g_lg_affinity')}</span><span><i class="lg-ring"></i>${t('g_lg_profile')}</span></div>
+    <svg class="graph-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('tab_graph'))}">${spokes}${members}${affinity}${entNodes}${hub}${factNodes}</svg>
+    <div id="graphInfo">${graphInfo()}</div>`;
+  $$('#graphBox [data-fact]').forEach((n) => {
+    const pick = (ev) => {
+      ev.stopPropagation();
+      ui.graphSel = ui.graphSel === n.dataset.fact ? null : n.dataset.fact;
+      drawGraph();
+    };
+    n.onclick = pick;
+    n.onkeydown = (ev) => (ev.key === 'Enter' || ev.key === ' ') && (ev.preventDefault(), pick(ev));
+  });
+  $('#graphBox svg').onclick = () => ui.graphSel && ((ui.graphSel = null), drawGraph());
+}
+
+function graphInfo() {
+  const g = ui.graph;
+  const f = g.facts.find((x) => x.id === ui.graphSel);
+  if (!f) return `<p class="hint">${t('g_hint')}</p>`;
+  const byId = new Map(g.facts.map((x) => [x.id, x]));
+  const ent = g.entities.find((e) => e.id === f.entity);
+  const links = g.edges
+    .filter((e) => e.from === f.id || e.to === f.id)
+    .map((e) => {
+      const o = byId.get(e.from === f.id ? e.to : e.from);
+      const why = e.kind === 'entity' ? t('g_same', { name: entityLabel(ent) }) : t('g_related', { a: f.relation, b: o.relation });
+      // A private fact is only reachable from its own domain's agents.
+      const p = [f, o].find((x) => x.scope === 'private');
+      const lock = p ? ` <span class="badge scope private">${icon('lock', 11)}${esc(t('g_only', { domain: p.ownerDomain }))}</span>` : '';
+      return `<li>${esc(o.text)} <span class="muted small">· ${esc(why)} · ${e.weight}</span>${lock}</li>`;
+    })
+    .join('');
+  return `<div class="info-card"><h4 class="graph-title">${esc(f.text)}</h4>
+    <div class="small" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px">${stateBadge(f.state)}${scopeTag(f.scope)}<span class="muted">${esc(f.ownerDomain)} · ${esc(entityLabel(ent))}</span></div>
+    ${links ? `<div class="section-label">${t('g_links')}</div><ul class="graph-links">${links}</ul>` : `<div class="muted small">${t(ENDED.has(f.state) ? 'g_ended' : 'g_alone')}</div>`}</div>`;
 }
 
 async function showHistory(id) {

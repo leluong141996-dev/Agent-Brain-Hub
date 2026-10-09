@@ -25,7 +25,8 @@ import { reflect } from './dmn.js';
 import { emptySleepState, recordSleep } from './sleepScheduler.js';
 import { EmbedQueue } from './embedQueue.js';
 import { MemoryIndex } from './memoryIndex.js';
-import { normalizeFact, stateAt, DEFAULT_HISTORY_DAYS } from './temporal.js';
+import { normalizeFact, stateAt, visibleAt, DEFAULT_HISTORY_DAYS } from './temporal.js';
+import { entityOf, link, CONCRETE, W_ENTITY } from './entities.js';
 import { detectIntent } from './prefrontal.js';
 import { seedGlobal, resolveConflict } from './neocortex.js';
 import { extractFactsRuleBased, factToText, factValue, RELATIONS } from './ontology.js';
@@ -676,6 +677,45 @@ export class Brain {
 
   auditLog(limit = 100) {
     return this.store.recentAudit(limit).map((e) => ({ ...e, agentName: e.agentId ? this.agentName(e.agentId) : null, sourceName: e.sourceAgentId ? this.agentName(e.sourceAgentId) : null }));
+  }
+
+  // The entity graph of one customer (admin view, like snapshot): the customer,
+  // the entities its facts are about, the facts, and the edges RAS spreads
+  // relevance along. asOf: the graph as it stood then. Only facts true at that
+  // time get affinity edges; ended facts stay attached to their entity, greyed.
+  graph(customerId = 'kh-001', lang = 'vi', asOf = null) {
+    lang = normLang(lang);
+    const at = asOf === null || asOf === undefined || asOf === '' ? null : parseTime(asOf);
+    const view = at ?? this.clock.now();
+    const facts = this.state.facts.filter((f) => f.customerId === customerId && stateAt(f, view) !== 'unknown');
+    const entities = new Map();
+    for (const f of facts) {
+      const id = entityOf(f);
+      const e = entities.get(id) || { id, kind: CONCRETE(id) ? id.split(':')[0] : 'profile', key: id.includes(':') ? id.split(':')[1] : id, label: null, facts: 0 };
+      e.facts += 1;
+      // A concrete entity is named by what the customer owns or where they go.
+      if ((f.relation === 'owns_asset' || f.relation === 'trip_destination') && visibleAt(f, view)) e.label = factValue(f, lang);
+      entities.set(id, e);
+    }
+    const nodes = facts.map((f) => {
+      const state = stateAt(f, view);
+      return { id: f.id, entity: entityOf(f), relation: f.relation, text: factToText(f, lang), value: factValue(f, lang), state, scope: f.scope, ownerDomain: f.ownerDomain };
+    });
+    const live = facts.filter((f) => visibleAt(f, view));
+    const edges = [];
+    for (let i = 0; i < live.length; i++)
+      for (let j = i + 1; j < live.length; j++) {
+        const w = link(live[i], live[j]);
+        if (w) edges.push({ from: live[i].id, to: live[j].id, kind: w === W_ENTITY ? 'entity' : 'affinity', weight: w });
+      }
+    return {
+      customer: { id: customerId, name: this.state.customers[customerId]?.name || customerId },
+      asOf: at,
+      now: this.clock.now(),
+      entities: [...entities.values()],
+      facts: nodes,
+      edges,
+    };
   }
 
   // Everything the visualizer needs to render the memory panels, localized.
