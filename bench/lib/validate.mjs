@@ -2,9 +2,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const CATEGORIES = ['cross_agent', 'stale', 'contradiction', 'leakage', 'multi_hop', 'long_conversation', 'exact_match', 'temporal'];
+export const CATEGORIES = ['cross_agent', 'stale', 'contradiction', 'leakage', 'multi_hop', 'long_conversation', 'exact_match', 'temporal', 'open_schema', 'arbitration'];
 const LANGS = ['vi', 'en', 'ja'];
-const KINDS = ['say', 'recall', 'advance', 'sleep', 'mark'];
+const KINDS = ['say', 'recall', 'remember', 'advance', 'sleep', 'mark', 'promote'];
 const RECALL_CHECKS = ['remembers', 'private', 'stale', 'conflict'];
 const UNITS = { m: 60_000, h: 3_600_000, d: 86_400_000 };
 
@@ -32,6 +32,7 @@ export function validateScenario(s, file, { agents }) {
   if (typeof s.id !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(s.id)) err('id must be kebab-case, e.g. "cross-agent-car"');
   if (!CATEGORIES.includes(s.category)) err(`category must be one of ${CATEGORIES.join(', ')}`);
   if (!LANGS.includes(s.lang)) err(`lang must be one of ${LANGS.join(', ')}`);
+  if (s.requires !== undefined && s.requires !== 'llm') err('requires must be "llm"');
   if (!Array.isArray(s.steps) || !s.steps.length) {
     err('steps must be a non-empty list');
     return errs;
@@ -46,6 +47,15 @@ export function validateScenario(s, file, { agents }) {
       if (!agents.includes(st.agent)) err(`unknown agent "${st.agent}" (known: ${agents.join(', ')})`, n);
       if (typeof st[kind] !== 'string' || !st[kind].trim()) err(`"${kind}" must be a non-empty string`, n);
       if (st.customer !== undefined && (typeof st.customer !== 'string' || !st.customer)) err('"customer" must be a non-empty string', n);
+    }
+    if (kind === 'remember') {
+      if (!agents.includes(st.agent)) err(`unknown agent "${st.agent}" (known: ${agents.join(', ')})`, n);
+      const facts = st.remember?.facts;
+      if (!Array.isArray(facts) || !facts.length || facts.some((f) => !f || typeof f.relation !== 'string' || !f.relation || f.value === undefined)) err('remember.facts must be a non-empty list of {relation, value}', n);
+    }
+    if (kind === 'promote') {
+      if (typeof st.promote?.relation !== 'string' || !st.promote.relation) err('promote.relation must be a relation name', n);
+      if (st.promote?.scope !== undefined && !['private', 'shared'].includes(st.promote.scope)) err('promote.scope must be private or shared', n);
     }
     if (kind === 'advance' && parseDuration(st.advance) === null) err('"advance" must look like "45m", "6h" or "2d"', n);
     if (kind === 'sleep' && st.sleep !== true) err('"sleep" must be true', n);

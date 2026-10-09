@@ -1,0 +1,25 @@
+{
+  "id": "llm-open-schema-new-relation",
+  "category": "open_schema",
+  "lang": "en",
+  "requires": "llm",
+  "description": "With an LLM, a fact no rule covers becomes a new relation (measured only with --llm).",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "I'm a gold member of your loyalty programme"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "mia",
+      "recall": "Which loyalty level am I?",
+      "expect": {
+        "remembers": [
+          "/gold/i"
+        ]
+      }
+    }
+  ]
+}

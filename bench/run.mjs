@@ -38,7 +38,10 @@ if (errors.length) {
   process.exit(1);
 }
 const filter = opt('filter');
-const scenarios = filter ? all.filter((s) => s.category === filter || s.id === filter) : all;
+const picked = filter ? all.filter((s) => s.category === filter || s.id === filter) : all;
+// Scenarios marked requires: "llm" need an LLM: skipped offline. With --url the
+// hub's own settings decide, so they run (and fail visibly if it has none).
+const scenarios = picked.filter((s) => s.requires !== 'llm' || flag('llm') || opt('url'));
 if (!scenarios.length) {
   console.error(`No scenario matches --filter ${filter}`);
   process.exit(1);

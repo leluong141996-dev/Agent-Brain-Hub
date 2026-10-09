@@ -263,3 +263,15 @@ test('bench: mark + asOf steps are validated and look back in time', async () =>
   const r = await runScenario(scenario, () => new InProcessTarget({ lang: 'en' }));
   assert.equal(r.status, 'passed', JSON.stringify(r.checks.filter((c) => !c.passed)));
 });
+
+test('bench: remember and promote steps validate; open_schema and arbitration are categories', () => {
+  const ok = { id: 'x', category: 'open_schema', lang: 'en', steps: [
+    { agent: 'kai', remember: { facts: [{ relation: 'loyalty_tier', value: 'gold' }] } },
+    { promote: { relation: 'loyalty_tier', scope: 'shared' } },
+    { agent: 'atlas', recall: 'tier?', expect: { remembers: ['gold'] } },
+  ] };
+  assert.deepEqual(validateScenario(ok, 'x.json', { agents: ['kai', 'atlas'] }), []);
+  const bad = { id: 'y', category: 'arbitration', lang: 'en', steps: [{ agent: 'kai', remember: { facts: [] } }, { promote: { scope: 'shared' } }] };
+  const errs = validateScenario(bad, 'y.json', { agents: ['kai'] });
+  assert.ok(errs.some((e) => /remember\.facts/.test(e)) && errs.some((e) => /promote\.relation/.test(e)), errs.join('\n'));
+});

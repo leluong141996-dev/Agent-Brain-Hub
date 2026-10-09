@@ -1,0 +1,31 @@
+{
+  "id": "arbitration-owner-income",
+  "category": "arbitration",
+  "lang": "en",
+  "description": "Policy \"owner\": income belongs to the finance domain, so another domain's different figure is outvoted.",
+  "steps": [
+    {
+      "agent": "penny",
+      "say": "My salary is 3000 USD a month"
+    },
+    {
+      "agent": "mia",
+      "say": "My income is 2000 dollars"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "penny",
+      "recall": "How much do I earn per month?",
+      "expect": {
+        "remembers": [
+          "3000 USD"
+        ],
+        "stale": [
+          "/income:? 2000 dollars/i"
+        ]
+      }
+    }
+  ]
+}

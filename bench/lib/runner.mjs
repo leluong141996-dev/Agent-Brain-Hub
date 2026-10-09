@@ -38,6 +38,12 @@ export async function runScenario(s, makeTarget, { llm = false } = {}) {
         res.timings.recall.push(performance.now() - t0);
         res.promptTokens.push(estimateTokens(obs.promptBlock));
         res.checks.push(...scoreRecall(st.expect, obs).map((c) => ({ ...explain(c, obs), step: n })));
+      } else if (st.remember !== undefined) {
+        await target.remember(st.agent, st.remember, st.customer);
+        await target.settle?.();
+      } else if (st.promote !== undefined) {
+        const { relation, ...body } = st.promote;
+        await target.promote(relation, { action: 'promote', ...body });
       } else if (st.advance !== undefined) {
         await target.advance(parseDuration(st.advance));
       } else if (st.mark !== undefined) {

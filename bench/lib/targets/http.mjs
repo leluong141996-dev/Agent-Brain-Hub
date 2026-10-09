@@ -58,6 +58,15 @@ export class HttpTarget {
     return { memories: r.memories, promptBlock: r.promptBlock };
   }
 
+  async remember(agent, payload, customer) {
+    const a = await this.agent(agent);
+    await this.call('POST', '/v1/remember', { customerId: this.customer(customer), facts: payload.facts, userText: payload.text, lang: this.lang }, a.key);
+  }
+
+  async promote(relation, body) {
+    await this.call('PUT', `/api/relations/${encodeURIComponent(relation)}`, body);
+  }
+
   async now() {
     return (await this.call('GET', '/api/state')).now;
   }

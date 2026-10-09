@@ -1,0 +1,29 @@
+{
+  "id": "arbitration-trust-tie-conflict",
+  "category": "arbitration",
+  "lang": "en",
+  "description": "Policy \"trust\": two agents nobody has rated yet disagree, so a human decides; the brain doesn't pick.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "I live in Hanoi"
+    },
+    {
+      "agent": "atlas",
+      "say": "I live in Da Nang"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "recall": "Ship the order to my home",
+      "expect": {
+        "conflict": [
+          "Hanoi",
+          "Da Nang"
+        ]
+      }
+    }
+  ]
+}

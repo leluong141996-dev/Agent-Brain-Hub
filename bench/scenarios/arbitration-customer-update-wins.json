@@ -1,0 +1,31 @@
+{
+  "id": "arbitration-customer-update-wins",
+  "category": "arbitration",
+  "lang": "en",
+  "description": "Whatever the policy, the customer saying something changed replaces the old value.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "I live in Hanoi"
+    },
+    {
+      "agent": "atlas",
+      "say": "I moved to Saigon last month"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "recall": "Ship the order to my home",
+      "expect": {
+        "remembers": [
+          "Saigon"
+        ],
+        "stale": [
+          "/lives in:? hanoi/i"
+        ]
+      }
+    }
+  ]
+}

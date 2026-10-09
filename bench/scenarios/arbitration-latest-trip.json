@@ -1,0 +1,34 @@
+{
+  "id": "arbitration-latest-trip",
+  "category": "arbitration",
+  "lang": "en",
+  "description": "Policy \"latest\": a newer trip destination from another agent replaces the old one instead of raising a conflict.",
+  "steps": [
+    {
+      "agent": "atlas",
+      "say": "I'm flying to Tokyo next week"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "mia",
+      "say": "I'm travelling to Seoul next week"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "atlas",
+      "recall": "Book my flight for next week's trip",
+      "expect": {
+        "remembers": [
+          "Seoul"
+        ],
+        "stale": [
+          "/trip to:? tokyo/i"
+        ]
+      }
+    }
+  ]
+}

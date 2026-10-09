@@ -50,7 +50,8 @@ Add one JSON file to `bench/scenarios/`. No code changes are needed.
 
 **Fields**
 - `id`: kebab-case and unique.
-- `category`: one of `cross_agent`, `stale`, `contradiction`, `leakage`, `multi_hop`, `long_conversation`, `exact_match`, `temporal`.
+- `category`: one of `cross_agent`, `stale`, `contradiction`, `leakage`, `multi_hop`, `long_conversation`, `exact_match`, `temporal`, `open_schema`, `arbitration`.
+- `requires: "llm"` (optional): the scenario needs a language model; it is skipped offline and runs with `--llm` (or `--url`, where the hub's settings decide).
 - `lang`: `en`, `vi` or `ja`.
 
 **Steps** (each step has exactly one of these):
@@ -62,8 +63,10 @@ Add one JSON file to `bench/scenarios/`. No code changes are needed.
 | `{ "advance": "45m" \| "6h" \| "2d" }` | moves the brain's simulated clock |
 | `{ "sleep": true }` | runs a sleep cycle manually |
 | `{ "mark": "before-move" }` | remembers the current (simulated) time under a name; a later `recall` can add `"asOf": "before-move"` to ask what the brain believed then |
+| `{ "agent": "kai", "remember": { "facts": [{ "relation": "loyalty_tier", "value": "gold" }] } }` | a connected agent hands the brain facts through `remember` (`/v1/remember` over HTTP); relations outside the built-in ones become provisional |
+| `{ "promote": { "relation": "loyalty_tier", "scope": "shared", "policy": "trust" } }` | an admin promotes a learned relation (`PUT /api/relations/:name`) |
 
-Categories also include `exact_match` (order numbers, model names) and `temporal` (looking back with `asOf`). Agents are `mia` (personal), `kai` (repair), `atlas` (travel), `sage` (health, private), `penny` (finance), `nova` (shopping). Add `"customer": "<id>"` to a step to use more than one customer; by default every scenario has its own customer.
+Categories also include `exact_match` (order numbers, model names), `temporal` (looking back with `asOf`), `open_schema` (relations outside the built-in ones, and that they stay private until promoted) and `arbitration` (what happens when two agents write different values: write policies, trust ties, customer updates). A `stale` check on a value that is still in the conversation history should match the fact line (`"/lives in:? hanoi/i"`), not the bare word. Agents are `mia` (personal), `kai` (repair), `atlas` (travel), `sage` (health, private), `penny` (finance), `nova` (shopping). Add `"customer": "<id>"` to a step to use more than one customer; by default every scenario has its own customer.
 
 Automatic sleep runs after every step, as it does in production (idle and pressure triggers; the nightly trigger is off because it depends on wall-clock time).
 
@@ -88,7 +91,7 @@ Run `npm test`: it validates every scenario file. `npm run bench` stops with a l
 
 ## How it works
 
-Each scenario runs against a **target** with a small interface (`say`, `recall`, `advance`, `sleep`). Scoring only uses what a public API exposes: the `recall` payload (`memories[]`, `promptBlock`) and replies. The same scenarios can therefore run over HTTP later ([#15](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/15)) and keep working when the memory core changes.
+Each scenario runs against a **target** with a small interface (`say`, `recall`, `remember`, `promote`, `advance`, `sleep`). Scoring only uses what a public API exposes: the `recall` payload (`memories[]`, `promptBlock`) and replies. The same scenarios can therefore run over HTTP later ([#15](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/15)) and keep working when the memory core changes.
 
 **Benchmarking a running hub** (`--url`, [lib/targets/http.mjs](lib/targets/http.mjs)) uses only its REST APIs, so it scores exactly what you deployed: a Docker container, a hub with its own LLM and embedding settings. Each scenario gets its own customer, and each scenario agent becomes a temporary connected agent with the same domain, deleted afterwards; built-in agents and their keys are never touched. `advance` moves the hub's simulated clock, which is global, so **point it at a test hub, not production**. Run against the same configuration, it gives the same numbers as the in-process target.
 

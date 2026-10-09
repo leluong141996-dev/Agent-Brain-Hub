@@ -30,6 +30,14 @@ export class InProcessTarget {
     return { memories: r.memories, promptBlock: r.promptBlock, diagnostics: r.diagnostics };
   }
 
+  async remember(agent, payload, customer = DEFAULT_CUSTOMER) {
+    await this.brain.remember({ agentId: agent, customerId: customer, facts: payload.facts, userText: payload.text, lang: this.lang });
+  }
+
+  async promote(relation, body) {
+    this.brain.updateRelation(relation, body);
+  }
+
   async now() {
     return this.brain.clock.now();
   }

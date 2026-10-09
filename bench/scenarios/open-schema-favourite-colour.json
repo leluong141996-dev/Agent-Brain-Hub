@@ -1,0 +1,24 @@
+{
+  "id": "open-schema-favourite-colour",
+  "category": "open_schema",
+  "lang": "en",
+  "description": "A relation outside the 19 built-in ones: the customer's favourite colour, remembered offline.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "My favourite colour is blue"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "mia",
+      "recall": "What colour should the gift wrap be?",
+      "expect": {
+        "remembers": [
+          "blue"
+        ]
+      }
+    }
+  ]
+}

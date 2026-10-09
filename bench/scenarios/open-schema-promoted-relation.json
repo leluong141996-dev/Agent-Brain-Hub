@@ -1,0 +1,35 @@
+{
+  "id": "open-schema-promoted-relation",
+  "category": "open_schema",
+  "lang": "en",
+  "description": "After an admin promotes the relation to shared, another domain sees the value already stored.",
+  "steps": [
+    {
+      "agent": "kai",
+      "remember": {
+        "facts": [
+          {
+            "relation": "loyalty_tier",
+            "value": "gold"
+          }
+        ]
+      }
+    },
+    {
+      "promote": {
+        "relation": "loyalty_tier",
+        "scope": "shared",
+        "policy": "trust"
+      }
+    },
+    {
+      "agent": "atlas",
+      "recall": "What loyalty tier is this customer?",
+      "expect": {
+        "remembers": [
+          "gold"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "vi-open-schema-mau-yeu-thich",
+  "category": "open_schema",
+  "lang": "vi",
+  "description": "Tiếng Việt: màu yêu thích, một quan hệ ngoài 19 loại có sẵn.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "Màu yêu thích của tôi là xanh lá"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "mia",
+      "recall": "Gói quà bằng giấy màu gì nhỉ?",
+      "expect": {
+        "remembers": [
+          "xanh lá"
+        ]
+      }
+    }
+  ]
+}

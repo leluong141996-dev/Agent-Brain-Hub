@@ -1,0 +1,37 @@
+{
+  "id": "open-schema-custom-relation-private",
+  "category": "open_schema",
+  "lang": "en",
+  "description": "A connected agent remembers a relation of its own; until an admin promotes it, other domains can't see it.",
+  "steps": [
+    {
+      "agent": "kai",
+      "remember": {
+        "facts": [
+          {
+            "relation": "loyalty_tier",
+            "value": "gold"
+          }
+        ]
+      }
+    },
+    {
+      "agent": "kai",
+      "recall": "What loyalty tier is this customer?",
+      "expect": {
+        "remembers": [
+          "gold"
+        ]
+      }
+    },
+    {
+      "agent": "atlas",
+      "recall": "What loyalty tier is this customer?",
+      "expect": {
+        "private": [
+          "gold"
+        ]
+      }
+    }
+  ]
+}

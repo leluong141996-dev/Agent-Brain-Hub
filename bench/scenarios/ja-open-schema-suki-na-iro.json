@@ -1,0 +1,24 @@
+{
+  "id": "ja-open-schema-suki-na-iro",
+  "category": "open_schema",
+  "lang": "ja",
+  "description": "日本語：好きな色（標準の19種類にない関係）。",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "私の好きな色は青です"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "mia",
+      "recall": "プレゼントの包装紙は何色がいい？",
+      "expect": {
+        "remembers": [
+          "青"
+        ]
+      }
+    }
+  ]
+}
