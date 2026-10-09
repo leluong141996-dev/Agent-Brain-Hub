@@ -402,3 +402,13 @@ test('anymore preference change supersedes the old like (#22)', async () => {
   assert.ok(likes.every((f) => f.status === 'superseded'));
   assert.ok(dislikes.some((f) => f.status === 'active' && f.value === 'spicy food'));
 });
+
+test('an update marker still counts before final punctuation (#22)', async () => {
+  for (const text of ['Tôi không thích ăn cay nữa.', "I don't like spicy food anymore!", 'I hate onions now.']) {
+    assert.ok(extractFactsRuleBased(text).every((f) => f.isUpdate), text);
+  }
+  const b = makeBrain();
+  await b.think({ agentId: 'mia', text: 'Tôi thích ăn cay', lang: 'vi' });
+  const r = await b.think({ agentId: 'mia', text: 'Tôi không thích ăn cay nữa.', lang: 'vi' });
+  assert.ok(r.learned.some((l) => l.action === 'superseded'), JSON.stringify(r.learned));
+});

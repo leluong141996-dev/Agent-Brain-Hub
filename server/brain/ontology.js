@@ -178,7 +178,9 @@ export function extractFactsRuleBased(rawText) {
       facts.push({ entity: 'asset', relation: 'asset_unavailable', value: `${jaNoun(text)}が故障中`, evidence: 'broken' });
     }
   }
-  const isUpdate = UPDATE_MARKERS.some((k) => ` ${low} `.includes(k));
+  // Punctuation must not hide a marker at the end: "… nữa." / "… now!"
+  const padded = ` ${low.replace(/[.,!?;:…。、！？]+/g, ' ')} `;
+  const isUpdate = UPDATE_MARKERS.some((k) => padded.includes(k));
   return facts.map((f) => ({ ...f, isUpdate }));
 }
 
