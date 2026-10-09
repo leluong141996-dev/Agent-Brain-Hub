@@ -76,7 +76,10 @@ const rows = [];
 const started = performance.now();
 for (const [n, q] of questions.entries()) {
   const b = new Brain({ store: new Store(null), bus: new NeuralBus(), llm: new LLM({ offline: true }), deterministic: true, embedder });
-  const asked = parseDate(q.question_date);
+  // The haystack is history the user already told. LongMemEval-S dates ~6% of
+  // sessions after the question (70 of them hold evidence); a memory cannot
+  // hold the future, so the clock is set to the later of the two.
+  const asked = Math.max(parseDate(q.question_date), ...q.haystack_dates.map(parseDate));
   b.clock.offsetMs = asked - Date.now();
   const agent = b.state.agents.find((a) => a.id === 'mia');
   q.haystack_sessions.forEach((turns, i) => {

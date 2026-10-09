@@ -6,14 +6,15 @@ Most memory libraries are built for one agent. When several agents share one mem
 
 It's a plan, not a promise. Priorities change with feedback: comment on the milestone issues or open a [Discussion](https://github.com/leluong141996-dev/Agent-Brain-Hub/discussions).
 
-## Where we are (v0.4)
+## Where we are (v0.5)
 
 **Solid today**
 - Shared memory with governance: private / shared / global scopes, one writer domain per relation, per-agent permissions, append-only audit log.
 - Every request traced live through 13 brain regions; facts carry their source, age and expiry into the prompt.
 - Automatic sleep cycle (idle, pressure, nightly), TTL-based forgetting, contradiction flagging, skill promotion.
 - Runs offline with zero configuration, or with any LLM. REST, JS SDK and MCP. English, Vietnamese, Japanese.
-- Measured: a 25-scenario memory benchmark with a CI gate, plus LongMemEval-S retrieval. Hybrid semantic + lexical search with real embedding models; a per-customer index keeps retrieval under 2 ms at 100,000 episodes.
+- Correct over time: facts are invalidated rather than deleted, and `recall({ asOf })` shows what the brain believed at any moment.
+- Measured: a 29-scenario memory benchmark with a CI gate, plus LongMemEval-S retrieval. Hybrid semantic + lexical search with real embedding models; a per-customer index keeps retrieval under 2 ms at 100,000 episodes.
 
 **Still basic**
 
@@ -21,7 +22,6 @@ It's a plan, not a promise. Priorities change with feedback: comment on the mile
 |---|---|
 | Closed schema | 19 predefined relations and 35 regex rules. LLM extraction is limited to the same list, so anything outside it (say, a favourite colour) is not remembered. |
 | Retrieval quality on long histories | On LongMemEval-S, hashing finds the evidence session in the top 4 for about half the questions; preferences and multi-session questions are weakest. |
-| Coarse time | A fact has a TTL and is deleted when it expires. There's no way to ask what the brain believed at a given moment. |
 | No graph | Facts hang off a customer. No relations between entities, no entity resolution. |
 | Answers not measured | Benchmarks score what reaches the agent (25 own scenarios, LongMemEval retrieval), not the final answers. The value dashboard's "time saved" is an estimate (20 s per question). |
 | Single process | State lives in memory; SQLite is the persistence layer. |
@@ -63,19 +63,28 @@ These hold for every milestone:
 - Answer accuracy on LongMemEval with an LLM (needs a GPU run), and embedding-model numbers on it.
 - Retrieval quality on LongMemEval's weak spots: preferences (20% @4) and questions that need every evidence session (26% @4).
 
-### v0.5: A temporal knowledge graph
+### v0.5: Memory over time ✅ released
 
-*Goal: memory that is correct over time, and connected.*
+*Goal: memory that is correct over time.*
 
-- [ ] **Bi-temporal facts.** Each fact has *valid time* (when it is true in the world) and *record time* (when the brain learned it, and when it was invalidated). Facts are invalidated, not deleted. Retention policies still purge old data.
-- [ ] **Point-in-time recall:** `recall({ asOf })` answers "what did the brain believe then?". Use it to debug questions like "what did Atlas know when it booked the flight?"
-- [ ] **Entities as nodes, relations as edges**, with entity resolution ("John" = "Mr. Smith" = customer `kh-001`).
+- [x] **Bi-temporal facts.** Record time (`recordedAt`, `invalidatedAt`) and valid time (`validFrom`, `validUntil`). Facts are invalidated, not deleted; sleep purges them after a history period (90 days by default).
+- [x] **Point-in-time recall:** `recall({ asOf })` answers "what did the brain believe then?", read-only and within the same permissions.
+- [x] A "view memory as of" control in the UI, with each fact's replacement history.
+- [x] Fix [#22](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/22): a changed preference replaces the old one.
+
+**Result:** stale-use rate 25% → 0%; the new `temporal` benchmark category passes 100%; with `bge-m3` all 29 scenarios pass.
+
+### v0.6: An entity graph
+
+*Goal: memory that is connected.* Split from v0.5, which shipped the time model first.
+
+- [ ] **Entities as nodes, relations as edges**, with entity resolution ("John" = "Mr. Smith" = customer `kh-001`; "my car" = the Honda Civic).
 - [ ] Multi-hop retrieval over the graph (customer → car → repair shop), inside the same permission checks.
-- [ ] A time slider in the UI to replay memory state; graph view of a customer's entities.
+- [ ] A graph view of a customer's entities in the UI.
 
-**Done when** the stale-fact and multi-hop benchmark scores improve over v0.4, and `asOf` queries are covered by tests.
+**Done when** the multi-hop benchmark category passes with hashing (today 50%), and graph traversal never crosses a permission boundary (leak tests).
 
-### v0.6: Open schema and multi-agent consistency
+### v0.7: Open schema and multi-agent consistency
 
 *Goal: remember anything, and keep many writers consistent.*
 
@@ -88,7 +97,7 @@ These hold for every milestone:
 
 **Done when** the benchmark's contradiction and long-conversation scores improve, and "favourite colour" is remembered and recalled.
 
-### v0.7: Production governance and scale
+### v0.8: Production governance and scale
 
 *Goal: something a team can run for real.*
 

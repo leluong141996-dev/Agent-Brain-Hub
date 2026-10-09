@@ -4,7 +4,7 @@
 //   npm run bench -- --filter leakage --compare bench/results/0.2.0.json
 //   npm run bench -- --llm --save
 //   npm run bench -- --embed          (configured embedding model; Settings → Semantic search or BRAIN_EMBED_*)
-//   npm run bench -- --gate bench/results/0.4.0.json   (CI: exit 1 if a quality metric got worse)
+//   npm run bench -- --gate bench/results/0.5.0.json   (CI: exit 1 if a quality metric got worse)
 //   npm run bench -- --url http://localhost:4317 [--token …]  (a running hub, with its own LLM/embedding settings)
 import fs from 'node:fs';
 import path from 'node:path';

@@ -5,6 +5,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-09
+
+Memory that is **correct over time**: facts are invalidated instead of deleted, and you can ask what the brain believed at any moment.
+
+### Added
+
+- **`recall({ asOf })`** (REST: `asOf` on `/v1/recall`): what the brain believed at that time. It is read-only (no working-memory turn, no access counts), audited as `inspect`, and enforces the same permissions. Debug questions like "what did Atlas know when it booked the flight?".
+- **Facts are invalidated, not deleted.** New fields: `recordedAt`, `validFrom`, `invalidatedAt` / `invalidatedBy` / `invalidReason` (`superseded` or `resolved`), `conflictedAt` / `conflictResolvedAt`. A replaced fact keeps its chain: `GET /api/facts/:id/history` shows Hanoi → Saigon with dates. Older data is converted on load; no migration step.
+- **History retention:** sleep purges expired and replaced facts after **90 days** (Settings → Sleep cycle → *Keep fact history*, or `BRAIN_HISTORY_DAYS`; `0` restores immediate deletion).
+- **UI:** a *View memory as of* bar on the Semantic and Episodic tabs, a clear banner while viewing the past, per-fact history, and translated status badges.
+- **Benchmark:** a `mark` step and `asOf` on recall; new `temporal` category (4 scenarios). The suite now has 29 scenarios. With `bge-m3`, all 29 pass.
+
+### Fixed
+
+- **"I don't like X anymore" kept both "likes X" and "dislikes X anymore"** ([#22](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/22)). Trailing time words (anymore, now, last month, nữa, tháng trước…) are trimmed from values, so the update replaces the old preference. Stale-use rate: 25% → 0%.
+- An expired fact counted as live when a new fact arrived, so "in the shop for 5 days" after an expired "3 days" became a false conflict.
+- LongMemEval script: about 6% of LongMemEval-S sessions are dated after their question. The clock is now set past the last session, so those sessions stay "told" (the retrieval score is unchanged: 52.8% @4).
+
+### Changed
+
+- Expired facts are no longer deleted at the next sleep; retrieval still ignores them, and they are purged after the history period.
+
 ## [0.4.0] - 2026-10-09
 
 Retrieval that scales, keeps exact matches with embeddings on, and a first number on a public dataset.
@@ -108,7 +130,8 @@ First public release.
 - README in English (`README.md`) and Vietnamese (`README.vi.md`), `CONTRIBUTING.md`, issue and PR templates, and a CI workflow (tests on Node 18/20/22, Docker build, end-to-end run).
 - 32 unit tests (including the acceptance QA suite: amnesia, contradiction, staleness, skill promotion, 20k-episode load) and an 11-step end-to-end script (`npm run e2e -- --lang vi|en|ja`).
 
-[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.1.1...v0.2.0
