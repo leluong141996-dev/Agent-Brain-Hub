@@ -394,7 +394,7 @@ export class Brain {
     }
     const explicitFacts = (Array.isArray(facts) ? facts : [])
       .filter((f) => f && f.relation && f.value)
-      .map((f) => ({ relation: String(f.relation), value: String(f.value), isUpdate: !!f.isUpdate }));
+      .map((f) => ({ relation: String(f.relation), value: redact(String(f.value)).text, isUpdate: !!f.isUpdate }));
     const llmFactsPromise = text && this.llm.available && agent.permissions?.write !== false ? this.llm.extractFacts(text, this.llmRelations()) : null;
     const encoded = await this.encode(t, { agent, customerId, text, salience, llmFactsPromise, explicitFacts });
 
@@ -649,6 +649,7 @@ export class Brain {
   undoDecision(decisionId) {
     const r = undoDecision(this, decisionId);
     if (!r) throw err('decision not found or already undone', 404);
+    if (r.stale) throw err('the kept value has changed since this decision; it can no longer be undone', 409);
     audit(this, { op: 'arbitrate', customerId: r.decision.customerId, relation: r.decision.relation, itemId: r.fact.id, kind: 'undo' });
     this.store.save();
     return r.decision;

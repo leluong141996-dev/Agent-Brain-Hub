@@ -1,7 +1,7 @@
 // Neocortex — Persistent Memory Layer (episodic + semantic stores) with
 // hot/warm/cold tiering, multi-agent scoping and contradiction resolution.
 import { validateFact, factToText, factEmbedText, sameValue } from './ontology.js';
-import { ensureRelation } from './registry.js';
+import { ensureRelation, relationOf } from './registry.js';
 import { arbitrate } from './arbitration.js';
 import { reward, penalize } from './trust.js';
 import { audit } from './audit.js';
@@ -85,7 +85,9 @@ export function writeFact(B, input, { agent, customerId }) {
   if (err) return { action: 'rejected', reason: err, input };
   const now = B.clock.now();
   const ttlDays = input.ttlDays ?? rel.ttlDays;
-  const ownerDomain = rel.owner;
+  // A provisional relation is private to each domain that writes it: another
+  // domain's write is its own value, never mixed with (or outvoting) the first.
+  const ownerDomain = rel.status === 'provisional' ? agent.domain : rel.owner;
   const delegated = agent.domain !== ownerDomain && ownerDomain !== 'system';
   const make = (extra = {}) => {
     const f = {
@@ -117,7 +119,7 @@ export function writeFact(B, input, { agent, customerId }) {
   };
   const live = B.state.facts.filter(
     // Live = believed now; an expired fact is history, not a competitor.
-    (f) => f.customerId === customerId && f.entity === input.entity && visibleAt(f, now)
+    (f) => f.customerId === customerId && f.entity === input.entity && visibleAt(f, now) && (rel.status !== 'provisional' || f.relation !== input.relation || f.ownerDomain === ownerDomain)
   );
 
   // Two different values: the relation's policy decides (arbitration.js).
@@ -181,20 +183,29 @@ export function writeFact(B, input, { agent, customerId }) {
 export function resolveConflict(B, factId) {
   const keep = B.state.facts.find((f) => f.id === factId);
   if (!keep) return null;
-  const other = B.state.facts.find((f) => f.id === keep.conflictWith);
   const now = B.clock.now();
+  const partner = B.state.facts.find((f) => f.id === keep.conflictWith);
+  // Keeping one value of a single-valued relation settles every other live
+  // value of it (3+ clashing values are linked only in pairs).
+  const single = relationOf(B, keep.relation)?.card === 'one';
+  const losers = B.state.facts.filter(
+    (f) => f !== keep && visibleAt(f, now) && (f === partner || (single && f.customerId === keep.customerId && f.relation === keep.relation && f.ownerDomain === keep.ownerDomain))
+  );
   keep.status = 'active';
   keep.confidence = 0.95;
   keep.conflictResolvedAt = now;
   delete keep.conflictWith;
-  if (other) {
-    invalidate(other, { by: keep.id, reason: 'resolved', at: now });
-    delete other.conflictWith;
+  for (const o of losers) {
+    invalidate(o, { by: keep.id, reason: 'resolved', at: now });
+    delete o.conflictWith;
   }
-  if (other && keep.sourceAgentId !== other.sourceAgentId) {
-    reward(B, keep.sourceAgentId);
-    penalize(B, other.sourceAgentId);
+  const penalized = new Set();
+  for (const o of losers) {
+    if (o.sourceAgentId === keep.sourceAgentId || penalized.has(o.sourceAgentId)) continue;
+    penalized.add(o.sourceAgentId);
+    penalize(B, o.sourceAgentId);
   }
+  if (penalized.size) reward(B, keep.sourceAgentId);
   return keep;
 }
 
@@ -207,10 +218,13 @@ export function undoDecision(B, decisionId) {
   const loser = B.state.facts.find((f) => f.id === d.loserId);
   if (!winner || !loser) return null;
   const now = B.clock.now();
+  // The winner was replaced since (e.g. the customer updated it): bringing the
+  // old loser back would put two values side by side.
+  if (!visibleAt(winner, now)) return { stale: true, decision: d };
   const back = { ...loser, id: B.store.id('fact'), status: 'active', confidence: 0.95, createdAt: now, updatedAt: now, recordedAt: now, validFrom: now, invalidatedAt: null, invalidReason: null, invalidatedBy: null, supersededBy: null, conflictedAt: null, conflictResolvedAt: null };
   delete back.conflictWith;
   B.state.facts.push(back);
-  if (visibleAt(winner, now)) invalidate(winner, { by: back.id, reason: 'resolved', at: now });
+  invalidate(winner, { by: back.id, reason: 'resolved', at: now });
   d.undoneAt = now;
   penalize(B, winner.sourceAgentId);
   reward(B, loser.sourceAgentId);

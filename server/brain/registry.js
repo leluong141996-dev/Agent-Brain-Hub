@@ -3,14 +3,22 @@
 // ttlDays) and every relation learned at runtime. A new relation starts
 // provisional: private to the domain that wrote it, short TTL, "latest wins".
 // Admins promote, merge or delete it (Settings → Memory schema).
-import { RELATIONS, setRelationLabel, relationLabel, factToText, factEmbedText } from './ontology.js';
+import { RELATIONS, setRelationLabel, relationLabel, factToText, factEmbedText, sameValue } from './ontology.js';
 import { stripDiacritics, truncate } from '../text.js';
 import { embed } from '../embed.js';
 import { DOMAINS } from '../agents.js';
+import { redact } from './brainstem.js';
+import { markConflict, visibleAt } from './temporal.js';
+import { DAY } from '../clock.js';
 
 export const POLICIES = ['latest', 'owner', 'trust', 'human'];
 export const MAX_PROVISIONAL = 200;
-const SECRET = /(^|_)(password|passcode|passwd|pin|otp|cvv|api_?key|token|secret|seed_?phrase|private_?key)(_|$)/;
+// Names containing a secret are refused. Long markers match anywhere (also
+// "wifipassword", "card_number"); short ones only as a word ("bank_pin",
+// "otp_codes"), so "shopping" or "hotpot" are not caught.
+const SECRET_PARTS = /(password|passwd|passcode|pincode|apikey|accesstoken|authtoken|seedphrase|privatekey|cardnumber|creditcard)/;
+const SECRET_WORDS = new Set(['pin', 'pw', 'pwd', 'otp', 'cvv', 'cvc', 'token', 'secret', 'ssn']);
+const isSecret = (name) => SECRET_PARTS.test(name.replace(/_/g, '')) || name.split('_').some((w) => SECRET_WORDS.has(w) || SECRET_WORDS.has(w.replace(/s$/, '')));
 const ALIASES = {
   likes: 'prefers', like: 'prefers', home_city: 'lives_in', city: 'lives_in', hometown: 'lives_in',
   job: 'occupation', profession: 'occupation', allergy: 'allergic_to', allergies: 'allergic_to',
@@ -44,7 +52,7 @@ function touch(B, name, customerId, value) {
   r.uses += 1;
   r.lastSeen = B.clock.now();
   if (customerId && !r.customers.includes(customerId) && r.customers.length < 50) r.customers.push(customerId);
-  const ex = truncate(String(value || ''), 40);
+  const ex = truncate(redact(String(value || '')).text, 40);
   if (ex && r.examples.length < 3 && !r.examples.includes(ex)) r.examples.push(ex);
 }
 
@@ -52,7 +60,7 @@ function touch(B, name, customerId, value) {
 export function ensureRelation(B, raw, { agent, customerId, value, label = null }) {
   const name = normalizeName(raw);
   if (!name || name.length < 2) return { error: 'invalid', name };
-  if (SECRET.test(name)) return { error: 'secret', name };
+  if (isSecret(name)) return { error: 'secret', name };
   const known = relationOf(B, name);
   if (known) {
     if (known.status !== 'core') touch(B, name, customerId, value);
@@ -93,16 +101,38 @@ function checkTtl(t) {
 }
 
 // Re-derive what each stored fact of a relation inherits from its definition.
-function restamp(B, name, rel) {
+// ttlDays (when given) re-derives each fact's lifetime from when it became true.
+function restamp(B, name, rel, { ttlDays } = {}) {
   for (const f of B.state.facts) {
     if (f.relation !== name) continue;
     f.scope = rel.scope;
     f.ownerDomain = rel.owner;
     f.entity = rel.entity;
+    if (ttlDays !== undefined) f.validUntil = ttlDays ? (f.validFrom ?? f.createdAt) + ttlDays * DAY : null;
     f.text = factToText(f, 'vi');
     f.embedding = embed(factEmbedText(f));
   }
   B.embedQueue?.kick();
+}
+
+// After facts move into one single-valued relation (promote, merge), two
+// different live values of one customer must not both look true: flag them.
+function flagClashes(B, name) {
+  const rel = relationOf(B, name);
+  if (!rel || rel.card !== 'one') return;
+  const now = B.clock.now();
+  const by = new Map();
+  for (const f of B.state.facts) {
+    if (f.relation !== name || !visibleAt(f, now)) continue;
+    const key = `${f.customerId}|${f.ownerDomain}`;
+    if (!by.has(key)) by.set(key, []);
+    by.get(key).push(f);
+  }
+  for (const list of by.values()) {
+    list.sort((a, b) => a.createdAt - b.createdAt);
+    const newest = list[list.length - 1];
+    for (const f of list.slice(0, -1)) if (!sameValue(f.value, newest.value)) markConflict(f, newest, now);
+  }
 }
 
 export function updateRelation(B, name, body = {}) {
@@ -128,7 +158,8 @@ export function updateRelation(B, name, body = {}) {
       e.label = body.label;
       setRelationLabel(name, body.label);
     }
-    restamp(B, name, e);
+    restamp(B, name, e, { ttlDays: body.ttlDays });
+    flagClashes(B, name);
     return relationOf(B, name);
   }
   if (body.action === 'merge') {
@@ -136,6 +167,7 @@ export function updateRelation(B, name, body = {}) {
     if (!into || into.name === name) throw bad('merge needs an existing relation in "into"');
     for (const f of B.state.facts) if (f.relation === name) f.relation = into.name;
     restamp(B, into.name, into);
+    flagClashes(B, into.name);
     delete regs[name];
     setRelationLabel(name, null);
     return into;

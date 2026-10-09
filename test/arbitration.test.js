@@ -109,3 +109,29 @@ test('trust: resolving a conflict and confirming a value move trust', async () =
   await b2.think({ agentId: 'nova', text: 'I am vegetarian', lang: 'en' });
   assert.equal(b2.state.trust.mia.up, 1, 'confirmation counts once per agent');
 });
+
+// ---- Final review fixes (v0.7) ----
+
+test('review fix: undo is refused once the winner has itself been replaced', async () => {
+  const b = makeBrain();
+  await b.think({ agentId: 'atlas', text: "I'm flying to Tokyo next week", lang: 'en' });
+  await b.think({ agentId: 'mia', text: "I'm travelling to Seoul next week", lang: 'en' });
+  const d = b.state.decisions.at(-1);
+  await b.think({ agentId: 'atlas', text: "Actually I'm going to Bangkok now", lang: 'en' });
+  assert.throws(() => b.undoDecision(d.id), (e) => e.status === 409);
+  assert.equal(active(b, /Tokyo/).length, 0, 'the old value does not come back next to the newer one');
+  assert.equal(active(b, /Bangkok/).length, 1);
+});
+
+test('review fix: keeping one of 3+ clashing values settles all of them', async () => {
+  const b = makeBrain();
+  await b.think({ agentId: 'mia', text: 'I live in Hanoi', lang: 'en' });
+  await b.think({ agentId: 'mia', text: 'I live in Hue', lang: 'en' });
+  await b.think({ agentId: 'mia', text: 'I live in Da Lat', lang: 'en' });
+  const dalat = b.state.facts.find((f) => /Da Lat/.test(f.value));
+  b.resolveConflict(dalat.id);
+  const now = b.clock.now();
+  const states = b.state.facts.filter((f) => f.relation === 'lives_in').map((f) => [f.value, stateAt(f, now)]);
+  assert.deepEqual(states.filter(([, s]) => s === 'active' || s === 'conflicted'), [['Da Lat', 'active']], JSON.stringify(states));
+  assert.equal(b.review('en').conflicts.length, 0);
+});

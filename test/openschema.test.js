@@ -132,3 +132,54 @@ test('admin: the review queue lists conflicts, decisions and suggestions', async
   assert.equal(r.decisions[0].policy, 'latest');
   assert.ok(r.suggestions.some((s) => s.name === 'loyalty_tier'));
 });
+
+// ---- Final review fixes (v0.7) ----
+
+test('review fix: names that contain a secret are refused, in any spelling', async () => {
+  const b = makeBrain();
+  for (const relation of ['wifi_passwords', 'wifiPassword', 'wifi_pw', 'card_number', 'bank-pin', 'my_otp_codes']) {
+    const r = await b.remember({ agentId: 'mia', facts: [{ relation, value: 'hunter2' }], lang: 'en' });
+    assert.ok(r.learned.some((l) => l.action === 'rejected'), relation);
+  }
+  assert.ok(!JSON.stringify(b.state).includes('hunter2'));
+  const ok = await b.remember({ agentId: 'mia', facts: [{ relation: 'shopping_list', value: 'milk' }], lang: 'en' });
+  assert.ok(ok.learned.some((l) => l.action === 'created'), 'no false positive on "shopping" (contains "pin")');
+});
+
+test('review fix: remembered values and registry examples are PII-redacted', async () => {
+  const b = makeBrain();
+  await b.remember({ agentId: 'mia', facts: [{ relation: 'contact_note', value: 'call 0912 345 678 or minh@gmail.com' }], lang: 'en' });
+  const s = JSON.stringify({ facts: b.state.facts, relations: b.state.relations });
+  assert.ok(!s.includes('0912') && !s.includes('minh@gmail.com'), s.slice(0, 300));
+});
+
+test('review fix: another domain writing a provisional relation keeps its own private value', async () => {
+  const b = makeBrain();
+  await b.remember({ agentId: 'kai', facts: [{ relation: 'loyalty_tier', value: 'gold' }], lang: 'en' });
+  await b.remember({ agentId: 'atlas', facts: [{ relation: 'loyalty_tier', value: 'platinum' }], lang: 'en' });
+  const kai = await b.recall({ agentId: 'kai', text: 'What loyalty tier is this customer?', lang: 'en' });
+  const atlas = await b.recall({ agentId: 'atlas', text: 'What loyalty tier is this customer?', lang: 'en' });
+  assert.ok(kai.memories.some((m) => /gold/.test(m.text)) && !/platinum/.test(kai.promptBlock), 'repair keeps its value and never sees travel\'s');
+  assert.ok(atlas.memories.some((m) => /platinum/.test(m.text)) && !/gold/.test(atlas.promptBlock), 'travel sees its own value only');
+  assert.equal(b.state.facts.find((f) => f.value === 'platinum').ownerDomain, 'travel');
+});
+
+test('review fix: promoting with a new TTL re-derives the lifetime of stored facts', async () => {
+  const b = makeBrain();
+  await b.remember({ agentId: 'kai', facts: [{ relation: 'loyalty_tier', value: 'gold' }], lang: 'en' });
+  b.updateRelation('loyalty_tier', { action: 'promote', scope: 'shared', ttlDays: null });
+  assert.equal(b.state.facts.find((f) => f.value === 'gold').validUntil, null);
+  b.advanceClock(60);
+  const r = await b.recall({ agentId: 'atlas', text: 'What loyalty tier is this customer?', lang: 'en' });
+  assert.ok(r.memories.some((m) => /gold/.test(m.text)), 'still known after 60 days');
+});
+
+test('review fix: merging into a relation with a different live value flags a conflict', async () => {
+  const b = makeBrain();
+  await b.think({ agentId: 'mia', text: 'I live in Hanoi', lang: 'en' });
+  await b.remember({ agentId: 'mia', facts: [{ relation: 'residence_city', value: 'Tokyo' }], lang: 'en' });
+  b.updateRelation('residence_city', { action: 'merge', into: 'lives_in' });
+  const live = b.state.facts.filter((f) => f.relation === 'lives_in' && f.status !== 'superseded');
+  assert.equal(live.length, 2);
+  assert.ok(live.every((f) => f.status === 'conflicted'), JSON.stringify(live.map((f) => [f.value, f.status])));
+});
