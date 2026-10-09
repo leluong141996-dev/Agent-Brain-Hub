@@ -25,6 +25,8 @@ import { reflect } from './dmn.js';
 import { emptySleepState, recordSleep } from './sleepScheduler.js';
 import { EmbedQueue } from './embedQueue.js';
 import { MemoryIndex } from './memoryIndex.js';
+import { normalizeFact, stateAt, DEFAULT_HISTORY_DAYS } from './temporal.js';
+import { detectIntent } from './prefrontal.js';
 import { seedGlobal, resolveConflict } from './neocortex.js';
 import { extractFactsRuleBased, factToText, factValue, RELATIONS } from './ontology.js';
 import { templateReply, buildPrompt, contextBlock, memoryInstructions } from './respond.js';
@@ -38,6 +40,13 @@ const err = (message, status) => Object.assign(new Error(message), { status });
 const hashKey = (key) => crypto.createHash('sha256').update(key).digest('hex');
 const newKey = () => `abk_${crypto.randomBytes(18).toString('hex')}`;
 const dayOf = (ts) => new Date(ts).toISOString().slice(0, 10);
+
+// asOf as ms, ISO string or numeric string.
+function parseTime(v) {
+  const n = typeof v === 'number' ? v : /^\d+$/.test(String(v)) ? Number(v) : Date.parse(v);
+  if (!Number.isFinite(n)) throw err('asOf must be a timestamp (ms) or an ISO date', 400);
+  return n;
+}
 
 export class Brain {
   constructor({ store, bus, llm, deterministic = false, embedder = null }) {
@@ -53,6 +62,9 @@ export class Brain {
     this._sleepQueue = Promise.resolve();
     seedGlobal(this);
     seedSkills(this);
+    // Ended facts are kept this long as history (sleep settings can override).
+    this.historyDays = Number(process.env.BRAIN_HISTORY_DAYS ?? DEFAULT_HISTORY_DAYS);
+    for (const f of this.state.facts) normalizeFact(f); // facts stored before v0.5
     for (const a of this.state.agents) {
       a.permissions ||= { ...DEFAULT_PERMISSIONS };
       a.kind ||= 'native';
@@ -244,10 +256,11 @@ export class Brain {
   // ---------------- recall(): context package for a connected agent ----------------
   // diagnostics: in-process callers only (the benchmark). The /v1 route never
   // passes it, because excluded items include other agents' private memories.
-  async recall({ agentId, customerId = 'kh-001', text, lang, diagnostics = false }) {
+  async recall({ agentId, customerId = 'kh-001', text, lang, diagnostics = false, asOf = null }) {
     lang = normLang(lang);
     text = String(text || '').trim();
     if (!text) throw err('text is required', 400);
+    if (asOf !== null && asOf !== undefined) return this.recallAt({ agentId, customerId, text, lang, diagnostics, asOf: parseTime(asOf) });
     const qvec = await this.queryVector(text);
     const t = this.bus.trace('recall', { agentId, customerId, lang });
     const p = this.perceive(t, { agentId, customerId, text, lang, qvec });
@@ -286,6 +299,54 @@ export class Brain {
       ms: end.ms,
       ...(diagnostics ? { diagnostics: { excluded: retrieval.excluded } } : {}),
     };
+  }
+
+  // ---------------- recall({ asOf }): what the brain believed then ----------------
+  // Read-only: no working-memory turn, no access counts, no session change. It
+  // audits the look itself ("inspect") and enforces the same permissions.
+  async recallAt({ agentId, customerId, text, lang, diagnostics, asOf }) {
+    const agent = this.getAgent(agentId);
+    const clean = redact(text).text;
+    const qvec = await this.queryVector(text);
+    const t = this.bus.trace('recall', { agentId, customerId, lang, asOf });
+    t.step('thalamus', t.L(`Xem lại bộ nhớ tại ${new Date(asOf).toISOString()}`, `Looking back at ${new Date(asOf).toISOString()}`, `${new Date(asOf).toISOString()} 時点の記憶を参照`), { asOf: new Date(asOf).toISOString(), readOnly: true }, { from: 'input' });
+    const intent = detectIntent(clean, agent);
+    const retrieval = retrieve(this, t, { customerId, agent, query: clean, intent: intent.intent, qvec, asOf, readOnly: true });
+    const wm = this.state.working[customerId];
+    const hot = (wm?.turns || []).filter((x) => x.at <= asOf).slice(-6).map((x) => `${x.role === 'user' ? 'Customer' : this.agentName(x.agentId)}: ${x.text}`);
+    const ctx = { agent, lang, now: asOf, intent: intent.intent, salience: { priority: 'normal', sentiment: 'neutral', urgency: 'normal' }, selected: retrieval.selected, actions: [], skill: null, handoffPkg: null, hot };
+    const promptBlock = [`Reply in ${LANGUAGE_NAME[lang]}.`, ...memoryInstructions(), '', contextBlock(ctx)].join('\n');
+    audit(this, { op: 'inspect', agentId: agent.id, customerId, traceId: t.id });
+    const end = t.end({ intent: intent.intent, asOf });
+    return {
+      traceId: t.id,
+      lang,
+      asOf,
+      agent: { id: agent.id, name: agent.name },
+      redactedText: clean,
+      intent,
+      memories: retrieval.selected.map((s) => ({ kind: s.kind, text: s.text, relation: s.relation || null, scope: s.scope, from: s.source || null, updatedAt: s.at || null, validUntil: s.validUntil || null, tier: s.tier, score: s.score, conflicted: s.status === 'conflicted' })),
+      suggestedActions: [],
+      promptBlock,
+      steps: t.steps,
+      ms: end.ms,
+      ...(diagnostics ? { diagnostics: { excluded: retrieval.excluded } } : {}),
+    };
+  }
+
+  // The replacement chain a fact belongs to, oldest first: Hanoi → Da Nang → Saigon.
+  factHistory(factId) {
+    const facts = this.state.facts;
+    let f = facts.find((x) => x.id === factId);
+    if (!f) throw err('fact not found', 404);
+    while (true) {
+      const prev = facts.filter((x) => x.invalidatedBy === f.id).sort((a, b) => b.invalidatedAt - a.invalidatedAt)[0];
+      if (!prev) break;
+      f = prev;
+    }
+    const chain = [f];
+    for (let next; (next = f.invalidatedBy && facts.find((x) => x.id === f.invalidatedBy)); f = next) chain.push(next);
+    return chain;
   }
 
   // ---------------- remember(): a connected agent reports the turn ----------------

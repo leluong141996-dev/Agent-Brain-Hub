@@ -223,7 +223,7 @@ await step('9. Sleep loop — consolidate, forget, reflect', async () => {
   const consolidated = r.consolidated + auto;
   return [
     ['Sessions consolidated into episodes', consolidated >= 3, `${consolidated} episodes${auto ? ` (${auto} by automatic sleep)` : ''}`],
-    ['Forgetting really deletes the expired fact', !s.facts.some((f) => S.noCar.test(f.value)), r.forgotten.expiredFacts.join('; ')],
+    ['The expired fact is no longer active (kept only as history)', !s.facts.some((f) => S.noCar.test(f.value) && !f.stale && f.status !== 'superseded')],
     ['hippocampus → forgetting → dmn → cerebellum all ran', ['hippocampus', 'forgetting', 'dmn', 'cerebellum'].every((x) => r.steps.some((st) => st.region === x))],
     ['Shared insights hold no health data', !has(r.insights, S.allergyRe)],
     ['Shared insights hold no private income', !has(r.insights, S.incomeRe)],

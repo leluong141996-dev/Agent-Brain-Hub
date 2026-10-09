@@ -69,7 +69,7 @@ test('Negation is a contradiction (thích X vs không thích X)', async () => {
   assert.ok(r.learned.some((l) => l.action === 'conflict'));
 });
 
-test('Staleness test — expired facts stop being used and are forgotten', async () => {
+test('Staleness test — expired facts stop being used, are kept as history, then forgotten', async () => {
   const b = makeBrain();
   await b.think({ agentId: 'kai', text: 'Xe phải sửa 3 ngày' });
   b.advanceClock(5);
@@ -77,7 +77,12 @@ test('Staleness test — expired facts stop being used and are forgotten', async
   assert.ok(!r.retrieval.selected.some((s) => s.relation === 'asset_unavailable'));
   assert.ok(r.retrieval.excluded.some((s) => /stale/.test(s.reason)));
   await b.sleep();
-  assert.ok(!b.state.facts.some((f) => f.relation === 'asset_unavailable'), 'forgetting engine removed it for real');
+  // v0.5: kept as history for recall({ asOf }) until historyDays have passed.
+  const kept = b.state.facts.find((f) => f.relation === 'asset_unavailable');
+  assert.ok(kept, 'still stored as history');
+  b.advanceClock(91);
+  await b.sleep();
+  assert.ok(!b.state.facts.some((f) => f.relation === 'asset_unavailable'), 'forgetting engine removed it for real after 90 days');
 });
 
 test('Skill promotion test — 3 successes, 4th time uses the learned playbook', async () => {
@@ -356,6 +361,8 @@ test('#22: "I don\'t like X anymore" stores X and replaces "I like X"', async ()
   assert.deepEqual(value('tôi không thích ăn cay nữa'), ['dislikes=ăn cay']);
   assert.deepEqual(value('tôi không thích hành nữa rồi'), ['dislikes=hành']);
   assert.deepEqual(value('I really like hiking now'), ['prefers=hiking'], 'also on positive preferences');
+  assert.deepEqual(value('I moved to Saigon last month'), ['lives_in=Saigon'], 'and on other relations');
+  assert.deepEqual(value('tôi mới chuyển đến Đà Nẵng tháng trước'), ['lives_in=Đà Nẵng']);
 
   const b = makeBrain();
   await b.think({ agentId: 'mia', text: 'I love spicy food', lang: 'en' });

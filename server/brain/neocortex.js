@@ -1,6 +1,7 @@
 // Neocortex — Persistent Memory Layer (episodic + semantic stores) with
 // hot/warm/cold tiering, multi-agent scoping and contradiction resolution.
 import { RELATIONS, validateFact, factToText, factEmbedText, sameValue } from './ontology.js';
+import { visibleAt, invalidate, markConflict } from './temporal.js';
 import { similarity } from '../text.js';
 import { embed } from '../embed.js';
 import { DAY } from '../clock.js';
@@ -79,6 +80,8 @@ export function writeFact(B, input, { agent, customerId }) {
       pinned: false,
       createdAt: now,
       updatedAt: now,
+      recordedAt: now,
+      validFrom: now,
       validUntil: ttlDays ? now + ttlDays * DAY : null,
       evidence: input.evidence || null,
       ...extra,
@@ -90,7 +93,8 @@ export function writeFact(B, input, { agent, customerId }) {
     return f;
   };
   const live = B.state.facts.filter(
-    (f) => f.customerId === customerId && f.entity === input.entity && (f.status === 'active' || f.status === 'conflicted')
+    // Live = believed now; an expired fact is history, not a competitor.
+    (f) => f.customerId === customerId && f.entity === input.entity && visibleAt(f, now)
   );
 
   // Negation against the opposite relation ("thích X" vs "không thích X").
@@ -98,14 +102,12 @@ export function writeFact(B, input, { agent, customerId }) {
     const neg = live.find((f) => f.relation === rel.opposite && sameValue(f.value, input.value));
     if (neg) {
       if (input.isUpdate) {
-        neg.status = 'superseded';
         const f = make();
-        neg.supersededBy = f.id;
+        invalidate(neg, { by: f.id, reason: 'superseded', at: now });
         return { action: 'superseded', fact: f, against: neg, delegated };
       }
-      const f = make({ status: 'conflicted', conflictWith: neg.id });
-      neg.status = 'conflicted';
-      neg.conflictWith = f.id;
+      const f = make();
+      markConflict(f, neg, now);
       return { action: 'conflict', fact: f, against: neg, reason: 'negation', delegated };
     }
   }
@@ -122,16 +124,12 @@ export function writeFact(B, input, { agent, customerId }) {
     const old = same[same.length - 1];
     const close = similarity(old.value, input.value) >= 0.75;
     if (close || input.isUpdate) {
-      for (const o of same) {
-        o.status = 'superseded';
-      }
       const f = make();
-      for (const o of same) o.supersededBy = f.id;
+      for (const o of same) invalidate(o, { by: f.id, reason: 'superseded', at: now });
       return { action: 'superseded', fact: f, against: old, reason: close ? 'close_values' : 'customer_update', delegated };
     }
-    const f = make({ status: 'conflicted', conflictWith: old.id });
-    old.status = 'conflicted';
-    old.conflictWith = f.id;
+    const f = make();
+    markConflict(f, old, now);
     return { action: 'conflict', fact: f, against: old, reason: 'two_active', delegated };
   }
   return { action: 'created', fact: make(), delegated };
@@ -141,12 +139,13 @@ export function resolveConflict(B, factId) {
   const keep = B.state.facts.find((f) => f.id === factId);
   if (!keep) return null;
   const other = B.state.facts.find((f) => f.id === keep.conflictWith);
+  const now = B.clock.now();
   keep.status = 'active';
   keep.confidence = 0.95;
+  keep.conflictResolvedAt = now;
   delete keep.conflictWith;
   if (other) {
-    other.status = 'superseded';
-    other.supersededBy = keep.id;
+    invalidate(other, { by: keep.id, reason: 'resolved', at: now });
     delete other.conflictWith;
   }
   return keep;

@@ -127,7 +127,7 @@ function shadow(text) {
 // Time and update words that end a sentence but aren't part of the value:
 // "I don't like spicy food anymore" → "spicy food" (#22). Kept in the sentence,
 // so the message still counts as an update and replaces the old preference.
-const TRAILING = /(?:\s+(?:any ?more|now|nowadays|these days|lately|at all|either|nữa|rồi|bây giờ|giờ đây|luôn))+\s*$/iu;
+const TRAILING = /(?:\s+(?:any ?more|now|nowadays|these days|lately|recently|at all|either|yesterday|last (?:week|month|year)|this (?:week|month|year)|nữa|rồi|bây giờ|giờ đây|luôn|hôm qua|gần đây|(?:tuần|tháng) (?:trước|này)|năm (?:ngoái|nay)))+\s*$/iu;
 const trimTrailing = (v) => {
   let out = v;
   for (let prev; prev !== out; ) {

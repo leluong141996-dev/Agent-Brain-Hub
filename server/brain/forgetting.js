@@ -1,22 +1,25 @@
-// Synaptic pruning — Forgetting Engine. TTL expiry, removal of superseded
-// facts, importance decay and pruning of weak, never-used episodes.
+// Synaptic pruning — Forgetting Engine. Purges facts that ended (expired or
+// invalidated) more than historyDays ago, decays importance and prunes weak,
+// never-used episodes. Until purged, ended facts stay as history for
+// recall({ asOf }); retrieval already ignores them.
 import { DAY } from '../clock.js';
+import { endedAt, DEFAULT_HISTORY_DAYS, visibleAt } from './temporal.js';
+
+export const historyDaysOf = (B) => B.state.sleep?.config?.historyDays ?? B.historyDays ?? DEFAULT_HISTORY_DAYS;
 
 export function forget(B, t) {
   const now = B.clock.now();
-  const stats = { expiredFacts: [], prunedSuperseded: 0, expiredEpisodes: 0, prunedWeak: 0, decayed: 0, flaggedConflicts: 0 };
+  const keepMs = historyDaysOf(B) * DAY;
+  const stats = { expiredFacts: [], prunedSuperseded: 0, expiredEpisodes: 0, prunedWeak: 0, decayed: 0, flaggedConflicts: 0, historyDays: historyDaysOf(B) };
 
   B.state.facts = B.state.facts.filter((f) => {
-    if (f.pinned) return true;
-    if (f.validUntil && f.validUntil < now) {
-      stats.expiredFacts.push(f.text);
+    const ended = endedAt(f, now);
+    if (ended != null && now - ended >= keepMs) {
+      if (f.invalidatedAt != null) stats.prunedSuperseded += 1;
+      else stats.expiredFacts.push(f.text);
       return false;
     }
-    if (f.status === 'superseded' && now - f.updatedAt > 30 * DAY) {
-      stats.prunedSuperseded += 1;
-      return false;
-    }
-    if (f.status === 'conflicted') stats.flaggedConflicts += 1;
+    if (f.status === 'conflicted' && visibleAt(f, now)) stats.flaggedConflicts += 1;
     return true;
   });
 

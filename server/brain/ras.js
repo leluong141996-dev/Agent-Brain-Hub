@@ -4,6 +4,8 @@
 // token budget. Items hidden by scope are reported as `blocked` for the audit.
 import { embed, cosine } from '../embed.js';
 import { dot } from '../embeddings.js';
+import { DAY } from '../clock.js';
+import { stateAt } from './temporal.js';
 import { estimateTokens, truncate } from '../text.js';
 import { visible, hiddenReason, episodeTier } from './neocortex.js';
 import { factToText, factValue } from './ontology.js';
@@ -37,9 +39,11 @@ const TIER_LATENCY = { hot: '0ms', warm: '100–500ms', cold: '1–5s' };
 // qvec: the query embedded by the configured model ({ vec, model, status }), or
 // null. Items that have a vector from that model are compared with it; all
 // others fall back to the local hashing vectors.
-export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, budgetTokens = 700, maxEpisodes = 4, maxFacts = 10 }) {
+// asOf: retrieve what the brain believed at that time (v0.5). readOnly: don't
+// record access (used for asOf and benchmarks, so looking never changes memory).
+export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, asOf = null, readOnly = false, budgetTokens = 700, maxEpisodes = 4, maxFacts = 10 }) {
   const t0 = performance.now();
-  const now = B.clock.now();
+  const now = asOf ?? B.clock.now();
   const lang = t.lang;
   const q = embed(query);
   let byModel = 0;
@@ -84,13 +88,14 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
       blocked.push(item);
       continue;
     }
+    if (e.createdAt > now) continue; // not yet remembered at asOf
     if (e.expiresAt && e.expiresAt < now) {
       excluded.push({ kind: 'episodic', id: e.id, text: truncate(e.text, 70), reason: t.L('hết hạn TTL', 'TTL expired', 'TTL切れ') });
       continue;
     }
     const tier = episodeTier(B, e, recent);
     const sim = similarity(e);
-    const recency = Math.exp(-B.clock.daysSince(e.createdAt) / 30);
+    const recency = Math.exp(-(now - e.createdAt) / DAY / 30);
     const score = 0.6 * sim + 0.25 * recency + 0.15 * e.importance;
     if (tier === 'cold' && sim < 0.3) continue; // cold store only queried on strong match
     epCands.push({ kind: 'episodic', id: e.id, text: e.text, tier, scope: e.scope, owner: e.ownerDomain, source: e.agentId, episodeKind: e.kind, at: e.createdAt, validUntil: e.expiresAt || null, score, parts: { sim, recency, importance: e.importance } });
@@ -107,8 +112,10 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
   const fCands = [];
   for (const f of facts) {
     const text = factToText(f, lang);
-    if (f.status === 'superseded') {
-      excluded.push({ kind: 'semantic', id: f.id, text, reason: t.L('đã bị thay thế (cold)', 'superseded (cold)', '置き換え済み（cold）') });
+    const state = stateAt(f, now);
+    if (state === 'unknown') continue; // learned after asOf
+    if (state === 'superseded' || state === 'resolved') {
+      excluded.push({ kind: 'semantic', id: f.id, text, reason: state === 'resolved' ? t.L('thua khi giải mâu thuẫn', 'lost a resolved conflict', '矛盾の解決で不採用') : t.L('đã bị thay thế (cold)', 'superseded (cold)', '置き換え済み（cold）') });
       continue;
     }
     if (!visible(f, agent)) {
@@ -117,7 +124,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
       blocked.push(item);
       continue;
     }
-    if (f.validUntil && f.validUntil < now && !f.pinned) {
+    if (state === 'expired') {
       excluded.push({ kind: 'semantic', id: f.id, text, reason: t.L('hết hạn (stale)', 'expired (stale)', '期限切れ（stale）') });
       continue;
     }
@@ -126,7 +133,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     const profile = PROFILE.has(f.relation) ? (ESSENTIAL.has(f.relation) ? 0.35 : 0.15) : 0;
     const global = f.scope === 'global' ? 0.1 : 0;
     const score = 0.5 * sim + entityHit + profile + global + 0.1 * f.confidence;
-    fCands.push({ kind: 'semantic', id: f.id, text, relation: f.relation, value: factValue(f, lang), tier: 'warm', scope: f.scope, owner: f.ownerDomain, source: f.sourceAgentId, sourceName: f.sourceAgentId ? B.agentName(f.sourceAgentId) : null, at: f.updatedAt || f.createdAt, validUntil: f.validUntil || null, status: f.status, score, parts: { sim, entityHit, profile } });
+    fCands.push({ kind: 'semantic', id: f.id, text, relation: f.relation, value: factValue(f, lang), tier: 'warm', scope: f.scope, owner: f.ownerDomain, source: f.sourceAgentId, sourceName: f.sourceAgentId ? B.agentName(f.sourceAgentId) : null, at: f.updatedAt || f.createdAt, validUntil: f.validUntil || null, status: state, score, parts: { sim, entityHit, profile } });
   }
   t.step('neocortex', t.L(`Semantic: tra ${facts.length} fact theo entity/query`, `Semantic: looked up ${facts.length} facts by entity/query`, `意味記憶：${facts.length}件をエンティティ/クエリで検索`), {
     store: 'semantic (facts)',
@@ -157,7 +164,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
   for (const c of fCands.filter((x) => !relevant(x))) excluded.push({ kind: c.kind, id: c.id, text: c.text, reason: t.L('dưới ngưỡng liên quan', 'below relevance threshold', '関連度のしきい値未満') });
 
   const sel = new Set(selected.map((s) => s.id));
-  for (const e of mine) {
+  for (const e of readOnly ? [] : mine) {
     if (sel.has(e.id)) {
       e.accessCount += 1;
       e.lastAccess = now;
