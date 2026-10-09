@@ -1,0 +1,28 @@
+{
+  "id": "multi-hop-trip-budget",
+  "category": "multi_hop",
+  "lang": "en",
+  "description": "What to buy before a trip should use the budget told to the finance agent, though neither message mentions the other.",
+  "steps": [
+    {
+      "agent": "atlas",
+      "say": "I'm flying to Tokyo next week"
+    },
+    {
+      "agent": "penny",
+      "say": "My budget is 800 USD"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "nova",
+      "recall": "What should I buy before Tokyo?",
+      "expect": {
+        "remembers": [
+          "800"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "id": "multi-hop-civic-in-shop",
+  "category": "multi_hop",
+  "lang": "en",
+  "description": "\"My Civic\" is the car that is in the shop: the answer needs the model name linked to the car's availability.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "My car is a Honda Civic"
+    },
+    {
+      "agent": "kai",
+      "say": "The car broke down, it will be in the shop for 3 days"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "penny",
+      "recall": "Should I set money aside for my Civic this week?",
+      "expect": {
+        "remembers": [
+          "no car for 3 days"
+        ]
+      }
+    }
+  ]
+}
