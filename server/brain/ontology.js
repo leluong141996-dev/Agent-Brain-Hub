@@ -44,6 +44,28 @@ export function relationLabel(relation, lang) {
   return (l && tr(l, lang)) || String(relation).replace(/_/g, ' ');
 }
 
+// Words that name a relation in a question ("colour", "màu", "色" for
+// favourite_colour), without the generic "favourite" part every such label has.
+const LABEL_STOP = new Set(['favourite', 'favorite', 'yeu', 'thich', 'nhat', 'cua']);
+export function relationKeywords(relation) {
+  const words = new Set();
+  const l = RELATIONS[relation]?.label || CUSTOM_LABELS.get(relation) || {};
+  for (const s of [String(relation).replace(/_/g, ' '), l.en, l.vi].filter(Boolean)) {
+    for (const w of stripDiacritics(String(s).toLowerCase()).split(/[^a-z0-9]+/)) if (w.length >= 3 && !LABEL_STOP.has(w)) words.add(w);
+  }
+  const ja = l.ja && l.ja.replace(/好きな|お気に入りの/g, '');
+  if (ja) words.add(ja);
+  return words;
+}
+
+export function mentionsRelation(query, relation) {
+  const q = ` ${stripDiacritics(String(query).toLowerCase()).replace(/[^a-z0-9]+/g, ' ')} `;
+  for (const w of relationKeywords(relation)) {
+    if (/[\u3040-\u9fff]/.test(w) ? String(query).includes(w) : q.includes(` ${w} `)) return true;
+  }
+  return false;
+}
+
 // rel: the registry definition of f.relation (registry.relationOf).
 export function validateFact(f, rel) {
   if (!rel) return `relation "${f.relation}" not in ontology`;
@@ -152,6 +174,47 @@ const trimTrailing = (v) => {
   return out || v;
 };
 
+// Open schema offline (v0.7): "my favourite X is Y" in en / vi / ja becomes the
+// provisional relation favourite_<noun>. The noun map gives one name across
+// languages and labels in all three; other nouns use their ASCII form (en, vi).
+const FAV_NOUNS = [
+  ['colour', /^colou?rs?$/, /^mau( sac)?$/, /^色$/, { vi: 'màu yêu thích', en: 'favourite colour', ja: '好きな色' }],
+  ['food', /^(food|dish|meal)$/, /^(mon an|do an|mon)$/, /^(食べ物|料理)$/, { vi: 'món ăn yêu thích', en: 'favourite food', ja: '好きな食べ物' }],
+  ['drink', /^(drink|beverage)$/, /^(do uong|thuc uong|nuoc uong)$/, /^飲み物$/, { vi: 'đồ uống yêu thích', en: 'favourite drink', ja: '好きな飲み物' }],
+  ['movie', /^(movie|film)$/, /^(phim|bo phim)$/, /^映画$/, { vi: 'phim yêu thích', en: 'favourite movie', ja: '好きな映画' }],
+  ['sport', /^sports?$/, /^(mon the thao|the thao)$/, /^スポーツ$/, { vi: 'môn thể thao yêu thích', en: 'favourite sport', ja: '好きなスポーツ' }],
+  ['music', /^(music|song|band)$/, /^(nhac|bai hat|ban nhac)$/, /^(音楽|曲)$/, { vi: 'nhạc yêu thích', en: 'favourite music', ja: '好きな音楽' }],
+  ['book', /^(book|novel)$/, /^(sach|cuon sach)$/, /^本$/, { vi: 'sách yêu thích', en: 'favourite book', ja: '好きな本' }],
+  ['singer', /^(singer|artist)$/, /^ca si$/, /^歌手$/, { vi: 'ca sĩ yêu thích', en: 'favourite singer', ja: '好きな歌手' }],
+  ['season', /^season$/, /^mua$/, /^季節$/, { vi: 'mùa yêu thích', en: 'favourite season', ja: '好きな季節' }],
+  ['animal', /^(animal|pet)$/, /^(con vat|dong vat|thu cung)$/, /^(動物|ペット)$/, { vi: 'con vật yêu thích', en: 'favourite animal', ja: '好きな動物' }],
+];
+const FAV_EN = new RegExp(`\\bmy (?:favou?rite|fave) ([a-z ]{2,20}?) is ([^,.!?;]{1,40}?)${END}`, 'd');
+const FAV_VI = new RegExp(`(?:^|[,.!?;]\\s*|\\s)([a-z ]{2,20}?) (?:yeu thich|ua thich)(?: nhat)? cua ${ME} la ([^,.!?;]{1,40}?)${END}`, 'd');
+const FAV_JA = /(?:私|僕|俺|わたし)の(?:一番)?好きな([^\s、。はが]{1,10})は([^\s、。！？!?]{1,30}?)(?:です|だ)?(?=[\s、。！？!?]|$)/d;
+
+function favouriteNoun(noun, lang) {
+  const col = lang === 'en' ? 1 : lang === 'vi' ? 2 : 3;
+  const hit = FAV_NOUNS.find((n) => n[col].test(noun.trim()));
+  if (hit) return { name: hit[0], label: hit[4] };
+  const slug = stripDiacritics(noun).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return slug ? { name: slug, label: null } : null;
+}
+
+function extractFavourites(text, low) {
+  const out = [];
+  for (const [re, lang, src] of [[FAV_EN, 'en', low], [FAV_VI, 'vi', low], [FAV_JA, 'ja', text]]) {
+    const m = re.exec(src);
+    if (!m) continue;
+    const noun = favouriteNoun(m[1], lang);
+    if (!noun) continue;
+    const [s, e] = m.indices[2];
+    const value = trimTrailing(text.slice(s, e).trim());
+    if (value) out.push({ entity: 'customer', relation: `favourite_${noun.name}`, value, label: noun.label, evidence: text.slice(m.index, m.index + m[0].length) });
+  }
+  return out;
+}
+
 export function extractFactsRuleBased(rawText) {
   const text = rawText.normalize('NFC');
   const low = shadow(text);
@@ -187,6 +250,7 @@ export function extractFactsRuleBased(rawText) {
       facts.push({ entity: 'asset', relation: 'asset_unavailable', value: `${jaNoun(text)}が故障中`, evidence: 'broken' });
     }
   }
+  facts.push(...extractFavourites(text, low));
   // Punctuation must not hide a marker at the end: "… nữa." / "… now!"
   const padded = ` ${low.replace(/[.,!?;:…。、！？]+/g, ' ')} `;
   const isUpdate = UPDATE_MARKERS.some((k) => padded.includes(k));

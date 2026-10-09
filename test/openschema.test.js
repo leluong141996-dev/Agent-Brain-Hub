@@ -6,6 +6,7 @@ import { Store } from '../server/store.js';
 import { NeuralBus } from '../server/bus.js';
 import { LLM } from '../server/llm.js';
 import { relationOf } from '../server/brain/registry.js';
+import { extractFactsRuleBased, relationLabel } from '../server/brain/ontology.js';
 
 const makeBrain = (llm = new LLM({ offline: true })) => new Brain({ store: new Store(null), bus: new NeuralBus(), llm, deterministic: true });
 
@@ -57,4 +58,36 @@ test('open schema: the LLM may propose a new relation; known relations are liste
   await b.think({ agentId: 'mia', text: 'teal is the one for me', lang: 'en' });
   assert.ok(seen.some((r) => r.name === 'lives_in'), 'core relations are offered for reuse');
   assert.ok(b.state.facts.some((f) => f.relation === 'favourite_colour' && f.value === 'teal'));
+});
+
+const fav = (s) => extractFactsRuleBased(s).filter((f) => f.relation.startsWith('favourite_')).map((f) => `${f.relation}=${f.value}`);
+
+test('open schema offline: "my favourite X is Y" in en / vi / ja', () => {
+  assert.deepEqual(fav('My favourite colour is blue'), ['favourite_colour=blue']);
+  assert.deepEqual(fav('my favorite color is dark green, by the way'), ['favourite_colour=dark green']);
+  assert.deepEqual(fav('Màu yêu thích của tôi là xanh lá'), ['favourite_colour=xanh lá']);
+  assert.deepEqual(fav('Món ăn yêu thích của mình là phở bò'), ['favourite_food=phở bò']);
+  assert.deepEqual(fav('私の好きな色は青です'), ['favourite_colour=青']);
+  assert.deepEqual(fav('My favourite podcast is Hardcore History'), ['favourite_podcast=Hardcore History']);
+  assert.deepEqual(fav('My car is a Honda Civic'), [], 'no generic "my X is Y"');
+});
+
+test('open schema offline: favourite colour is remembered and recalled, with labels in each language', async () => {
+  const b = makeBrain();
+  await b.think({ agentId: 'mia', text: 'My favourite colour is blue', lang: 'en' });
+  b.advanceClock(2 / 24);
+  const r = await b.recall({ agentId: 'mia', text: 'What colour should the gift wrap be?', lang: 'en' });
+  assert.ok(r.memories.some((m) => /blue/.test(m.text)), r.promptBlock);
+  for (const [lang, say, ask, want] of [
+    ['vi', 'Màu yêu thích của tôi là xanh lá', 'Gói quà bằng giấy màu gì nhỉ?', /xanh lá/],
+    ['ja', '私の好きな色は青です', 'プレゼントの包装紙は何色がいい？', /青/],
+  ]) {
+    const bl = makeBrain();
+    await bl.think({ agentId: 'mia', text: say, lang });
+    bl.advanceClock(2 / 24);
+    const rl = await bl.recall({ agentId: 'mia', text: ask, lang });
+    assert.ok(rl.memories.some((m) => want.test(m.text)), `${lang}: ${rl.promptBlock}`);
+  }
+  assert.equal(relationLabel('favourite_colour', 'vi'), 'màu yêu thích');
+  assert.equal(relationLabel('favourite_colour', 'ja'), '好きな色');
 });

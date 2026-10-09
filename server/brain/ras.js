@@ -9,7 +9,8 @@ import { stateAt } from './temporal.js';
 import { link, entityOf, mentionedEntities } from './entities.js';
 import { estimateTokens, truncate } from '../text.js';
 import { visible, hiddenReason, episodeTier } from './neocortex.js';
-import { factToText, factValue } from './ontology.js';
+import { factToText, factValue, mentionsRelation } from './ontology.js';
+import { relationOf } from './registry.js';
 
 // Relations an intent cares about (entity-based semantic lookup).
 const INTENT_RELATIONS = {
@@ -145,6 +146,15 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     conflicted: fCands.filter((f) => f.status === 'conflicted').length,
     blocked: blocked.length,
   }, { from: 'ras', status: blocked.length ? 'warn' : 'ok' });
+
+  // --- Open schema (v0.7): a question that names a learned relation ---
+  // "What colour…?" names favourite_colour. Core relations are reached through
+  // intents; learned ones only have their name, so the name counts as a match.
+  for (const c of fCands) {
+    if (relationOf(B, c.relation)?.status === 'core' || !mentionsRelation(query, c.relation)) continue;
+    c.parts.relationMention = 1;
+    c.score = Math.max(c.score, 0.35);
+  }
 
   // --- Multi-hop (v0.6): spread relevance over the entity graph ---
   // Seeds are facts the question itself matched (wording or intent). Their
