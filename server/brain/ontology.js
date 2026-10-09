@@ -31,14 +31,23 @@ export const RELATIONS = {
   policy: { entity: 'organization', card: 'many', scope: 'global', writer: 'system', label: { vi: 'chính sách', en: 'policy', ja: 'ポリシー' } },
 };
 
-export function relationLabel(relation, lang) {
-  return tr(RELATIONS[relation]?.label, lang) || relation;
+// Labels of relations the brain learned at runtime (provisional or promoted),
+// registered by registry.js. Core labels stay in RELATIONS.
+const CUSTOM_LABELS = new Map();
+export function setRelationLabel(name, label) {
+  if (label) CUSTOM_LABELS.set(name, label);
+  else CUSTOM_LABELS.delete(name);
 }
 
-export function validateFact(f) {
-  const rel = RELATIONS[f.relation];
+export function relationLabel(relation, lang) {
+  const l = RELATIONS[relation]?.label || CUSTOM_LABELS.get(relation);
+  return (l && tr(l, lang)) || String(relation).replace(/_/g, ' ');
+}
+
+// rel: the registry definition of f.relation (registry.relationOf).
+export function validateFact(f, rel) {
   if (!rel) return `relation "${f.relation}" not in ontology`;
-  if (f.entity !== rel.entity) return `relation "${f.relation}" only applies to entity "${rel.entity}"`;
+  if (f.entity && f.entity !== rel.entity) return `relation "${f.relation}" only applies to entity "${rel.entity}"`;
   const v = String(f.value || '').trim();
   if (v.length < 1 || v.length > 160) return 'empty or too long value';
   return null;
@@ -193,11 +202,11 @@ export function factToText(f, lang = 'vi') {
   return `${relationLabel(f.relation, lang)}${lang === 'ja' ? '：' : ': '}${factValue(f, lang)}`;
 }
 
-// Text used for embeddings: both labels so queries in either language match.
+// Text used for embeddings: labels in every language so queries in any language match.
 export function factEmbedText(f) {
-  const rel = RELATIONS[f.relation];
   const extra = f.valueI18n ? Object.values(f.valueI18n).join(' ') : '';
-  return `${rel ? `${rel.label.vi} ${rel.label.en} ${rel.label.ja}` : f.relation}: ${f.value} ${extra}`.trim();
+  const labels = [...new Set(['vi', 'en', 'ja'].map((l) => relationLabel(f.relation, l)))].join(' ');
+  return `${labels}: ${f.value} ${extra}`.trim();
 }
 
 export function sameValue(a, b) {

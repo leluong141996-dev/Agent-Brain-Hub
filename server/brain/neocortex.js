@@ -57,7 +57,7 @@ export function addEpisode(B, ep) {
 // Write a fact through ontology validation, single-writer ownership and
 // contradiction resolution. Returns { action, fact, against? , reason? }.
 export function writeFact(B, input, { agent, customerId }) {
-  const err = validateFact(input);
+  const err = validateFact(input, RELATIONS[input.relation] && { entity: RELATIONS[input.relation].entity });
   if (err) return { action: 'rejected', reason: err, input };
   const rel = RELATIONS[input.relation];
   const now = B.clock.now();

@@ -35,6 +35,9 @@ export function emptyState() {
     audit: [], // memory backend only — SQLite keeps it in the `audit` table
     stats: { totals: {}, byAgent: {}, daily: {} }, // usage counters
     sleep: emptySleepState(), // automatic sleep: settings, nightly bookkeeping, recent runs
+    relations: {}, // registry: core overrides + relations learned at runtime (v0.7)
+    decisions: [], // arbitration decisions, newest last, capped (v0.7)
+    trust: {}, // agentId → { up, down } (v0.7)
     seq: 0,
   };
 }
@@ -201,6 +204,9 @@ export class Store {
     s.seq = Number(this.meta('seq') || 0);
     s.stats = JSON.parse(this.meta('stats') || '{"totals":{},"byAgent":{},"daily":{}}');
     s.sleep = { ...emptySleepState(), ...JSON.parse(this.meta('sleep') || '{}') };
+    s.relations = JSON.parse(this.meta('relations') || '{}');
+    s.decisions = JSON.parse(this.meta('decisions') || '[]');
+    s.trust = JSON.parse(this.meta('trust') || '{}');
     s.audit = [];
     this.state = s;
   }
@@ -273,6 +279,9 @@ export class Store {
       this.stmt.setMeta.run('seq', String(this.state.seq || 0));
       this.stmt.setMeta.run('stats', JSON.stringify(this.state.stats || {}));
       this.stmt.setMeta.run('sleep', JSON.stringify(this.state.sleep || emptySleepState()));
+      this.stmt.setMeta.run('relations', JSON.stringify(this.state.relations || {}));
+      this.stmt.setMeta.run('decisions', JSON.stringify(this.state.decisions || []));
+      this.stmt.setMeta.run('trust', JSON.stringify(this.state.trust || {}));
     })();
     this.lastFlush = { upserts, deletes, ms: +(performance.now() - t0).toFixed(1) };
     return this.lastFlush;

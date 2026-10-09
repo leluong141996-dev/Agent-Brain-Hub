@@ -25,6 +25,7 @@ import { reflect } from './dmn.js';
 import { emptySleepState, recordSleep } from './sleepScheduler.js';
 import { EmbedQueue } from './embedQueue.js';
 import { MemoryIndex } from './memoryIndex.js';
+import { loadRegistry } from './registry.js';
 import { normalizeFact, stateAt, visibleAt, DEFAULT_HISTORY_DAYS } from './temporal.js';
 import { entityOf, link, CONCRETE, W_ENTITY } from './entities.js';
 import { detectIntent } from './prefrontal.js';
@@ -60,6 +61,9 @@ export class Brain {
     this.deterministic = deterministic;
     this.clock = new Clock(store.state.clockOffsetMs || 0);
     store.state.sleep ||= emptySleepState(); // states imported from older versions
+    store.state.decisions ||= [];
+    store.state.trust ||= {};
+    loadRegistry(this);
     this._sleepQueue = Promise.resolve();
     this._forcedSleep = new Set();
     seedGlobal(this);
