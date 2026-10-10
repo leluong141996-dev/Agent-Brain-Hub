@@ -59,7 +59,7 @@ export const DOMAINS = {
     primaryLayers: ['semantic', 'episodic'],
     episodeScope: 'private', // money matters stay with the finance agent
     intents: {
-      budget_planning: ['ngân sách', 'chi tiêu', 'tiết kiệm', 'kế hoạch tài chính', 'budget', 'spending', 'save money', 'saving', '予算', '支出', '貯金', '節約'],
+      budget_planning: ['ngân sách', 'chi tiêu', 'tiết kiệm', 'kế hoạch tài chính', 'lương', 'thu nhập', 'kiếm được', 'budget', 'spending', 'save money', 'saving', 'income', 'salary', 'earn', 'earnings', 'paycheck', '予算', '支出', '貯金', '節約', '収入', '給料', '月収', '年収'],
       insurance: ['bảo hiểm', 'quyền lợi', 'bồi thường', 'insurance', 'claim', 'coverage', '保険', '補償', '請求'],
       payment: ['thanh toán', 'hoá đơn', 'hóa đơn', 'chuyển khoản', 'trả góp', 'payment', 'bill', 'invoice', 'transfer', '支払い', '請求書', '振込', '分割払い'],
     },

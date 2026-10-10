@@ -149,3 +149,20 @@ test('minor fix: undo brings back every value a decision outvoted', async () => 
   assert.deepEqual(live, ['Hanoi', 'Hue']);
   assert.equal(b.review('en').conflicts.length, 1, 'they come back as the conflict they were');
 });
+
+test('retrieval: a question about earnings reaches the income fact (vi / en / ja)', async () => {
+  // Found by the LLM benchmark: "How much do I earn per month?" was a general
+  // question, so the income fact stayed below the relevance threshold; the
+  // offline run only passed because the extractive session summary repeated it.
+  for (const [lang, say, ask, want] of [
+    ['en', 'My salary is 3000 USD a month', 'How much do I earn per month?', /3000 USD/],
+    ['vi', 'Lương tôi 30 triệu', 'Mỗi tháng tôi kiếm được bao nhiêu?', /30 triệu/],
+    ['ja', '私の給料は30万円です', '毎月の収入はいくら？', /30万円/],
+  ]) {
+    const b = makeBrain();
+    await b.think({ agentId: 'penny', text: say, lang });
+    b.advanceClock(2 / 24);
+    const r = await b.recall({ agentId: 'penny', text: ask, lang });
+    assert.ok(r.memories.some((m) => m.kind === 'semantic' && want.test(m.text)), `${lang}: ${r.memories.map((m) => m.text).join(' | ')}`);
+  }
+});
