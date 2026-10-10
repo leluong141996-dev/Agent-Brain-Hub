@@ -377,7 +377,10 @@ export class LLM {
     if (!this.client) return null;
     const system =
       `Summarize this customer-service session for long-term episodic memory in 1-2 sentences, in ${LANGUAGE_NAME[normLang(lang)]}. ` +
-      'Keep decisions, outcomes, emotions and facts that matter later. No PII.';
+      'Write about the customer and what they need, not about the session itself; never write about "this session". ' +
+      'Keep decisions, outcomes, emotions and facts that matter later. ' +
+      'Copy identifiers exactly as written: order numbers, product and model names, amounts, dates and places. ' +
+      'No PII (phone numbers, emails, card numbers).';
     try {
       const r = await this._call({ system, messages: [{ role: 'user', content: transcript }], utility: true });
       return r.text || null;

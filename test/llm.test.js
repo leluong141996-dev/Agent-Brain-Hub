@@ -132,3 +132,28 @@ test('a reasoning model that runs out of tokens while thinking is asked again wi
     server.close();
   }
 });
+
+test('session summaries keep identifiers verbatim and are about the customer', async () => {
+  // The LLM benchmark lost "ORD-48207" and "WH-1000XM5": summaries rewrote or
+  // dropped them, and talked about "this session" instead of the customer.
+  let system = '';
+  const server = http.createServer(async (req, res) => {
+    let raw = '';
+    for await (const c of req) raw += c;
+    system = JSON.parse(raw).messages[0].content;
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ choices: [{ message: { content: 'Customer reports order ORD-48207 (rain jacket) has not arrived.' } }] }));
+  });
+  await new Promise((r) => server.listen(0, r));
+  try {
+    const llm = new LLM({ config: { provider: 'ollama', baseUrl: `http://localhost:${server.address().port}/v1`, model: 'qwen3:4b' } });
+    llm.forcedOffline = false;
+    llm.configure(llm.cfg, { persist: false });
+    assert.match(await llm.summarize('Customer: My order ORD-48207 for a rain jacket hasn\'t arrived yet', 'en'), /ORD-48207/);
+    assert.match(system, /exactly as written/i, system);
+    assert.match(system, /order numbers/i);
+    assert.match(system, /never write about "this session"|not about the session/i);
+  } finally {
+    server.close();
+  }
+});
