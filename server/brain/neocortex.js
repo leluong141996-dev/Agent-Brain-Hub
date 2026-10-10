@@ -130,12 +130,12 @@ export function writeFact(B, input, { agent, customerId }) {
     const base = { customerId, relation: input.relation, policy: d.policy, agentId: agent.id };
     if (d.winner === 'new') {
       for (const o of olds) invalidate(o, { by: f.id, reason: 'outvoted', at: now });
-      const decision = recordDecision(B, { ...base, winnerId: f.id, loserId: old.id });
+      const decision = recordDecision(B, { ...base, winnerId: f.id, loserId: old.id, loserIds: olds.map((o) => o.id) });
       return { action: 'arbitrated', fact: f, against: old, reason: `policy_${d.policy}`, decision, delegated };
     }
     if (d.winner === 'old') {
       invalidate(f, { by: old.id, reason: 'outvoted', at: now });
-      const decision = recordDecision(B, { ...base, winnerId: old.id, loserId: f.id });
+      const decision = recordDecision(B, { ...base, winnerId: old.id, loserId: f.id, loserIds: [f.id] });
       return { action: 'outvoted', fact: f, against: old, reason: `policy_${d.policy}`, decision, delegated };
     }
     markConflict(f, old, now);
@@ -215,20 +215,27 @@ export function undoDecision(B, decisionId) {
   const d = (B.state.decisions || []).find((x) => x.id === decisionId);
   if (!d || d.undoneAt) return null;
   const winner = B.state.facts.find((f) => f.id === d.winnerId);
-  const loser = B.state.facts.find((f) => f.id === d.loserId);
-  if (!winner || !loser) return null;
+  const losers = (d.loserIds || [d.loserId]).map((id) => B.state.facts.find((f) => f.id === id)).filter(Boolean);
+  if (!winner || !losers.length) return null;
   const now = B.clock.now();
   // The winner was replaced since (e.g. the customer updated it): bringing the
-  // old loser back would put two values side by side.
+  // old losers back would put two values side by side.
   if (!visibleAt(winner, now)) return { stale: true, decision: d };
-  const back = { ...loser, id: B.store.id('fact'), status: 'active', confidence: 0.95, createdAt: now, updatedAt: now, recordedAt: now, validFrom: now, invalidatedAt: null, invalidReason: null, invalidatedBy: null, supersededBy: null, conflictedAt: null, conflictResolvedAt: null };
-  delete back.conflictWith;
-  B.state.facts.push(back);
-  invalidate(winner, { by: back.id, reason: 'resolved', at: now });
+  // Every outvoted value comes back as a new fact, so recall({ asOf }) still
+  // shows what the brain believed in between.
+  const back = losers.map((loser) => {
+    const f = { ...loser, id: B.store.id('fact'), status: 'active', confidence: 0.95, createdAt: now, updatedAt: now, recordedAt: now, validFrom: now, invalidatedAt: null, invalidReason: null, invalidatedBy: null, supersededBy: null, conflictedAt: null, conflictResolvedAt: null };
+    delete f.conflictWith;
+    B.state.facts.push(f);
+    return f;
+  });
+  // Several values were live together before (a conflict): they come back as one.
+  for (const f of back.slice(0, -1)) if (!sameValue(f.value, back[back.length - 1].value)) markConflict(f, back[back.length - 1], now);
+  invalidate(winner, { by: back[back.length - 1].id, reason: 'resolved', at: now });
   d.undoneAt = now;
   penalize(B, winner.sourceAgentId);
-  reward(B, loser.sourceAgentId);
-  return { decision: d, fact: back };
+  for (const id of new Set(losers.map((l) => l.sourceAgentId))) if (id !== winner.sourceAgentId) reward(B, id);
+  return { decision: d, fact: back[back.length - 1] };
 }
 
 export const GLOBAL_POLICIES = [

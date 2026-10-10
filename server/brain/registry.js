@@ -27,8 +27,12 @@ const ALIASES = {
 const DEFAULT_POLICY = { asset_unavailable: 'latest', budget: 'latest', trip_destination: 'latest', prefers_seat: 'latest', clothing_size: 'latest', income: 'owner', payment_method: 'owner' };
 
 export function normalizeName(raw) {
-  let n = stripDiacritics(String(raw || '')).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40).replace(/_+$/, '');
-  n = n.replace(/^favorite_/, 'favourite_').replace(/(^|_)color$/, '$1colour');
+  // camelCase → snake_case first ("favoriteColor" = "favorite_color").
+  const snake = stripDiacritics(String(raw || '')).replace(/([a-z0-9])([A-Z])/g, '$1_$2');
+  let n = snake.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40).replace(/_+$/, '');
+  n = n.replace(/^favorite_/, 'favourite_');
+  if (n.startsWith('favourite_') && /[^s]s$/.test(n)) n = n.slice(0, -1); // "favourite_colors" = one favourite colour
+  n = n.replace(/(^|_)color$/, '$1colour');
   return ALIASES[n] || n;
 }
 
@@ -47,8 +51,11 @@ export function relationOf(B, name) {
   return { ...base, policy: saved.policy ?? base.policy, ttlDays: saved.ttlDays !== undefined ? saved.ttlDays : base.ttlDays };
 }
 
-function touch(B, name, customerId, value) {
+function touch(B, name, customerId, value, domain) {
   const r = B.state.relations[name];
+  // Which domains write it: only they see its name in their LLM prompt.
+  r.domains ||= [r.owner];
+  if (domain && !r.domains.includes(domain)) r.domains.push(domain);
   r.uses += 1;
   r.lastSeen = B.clock.now();
   if (customerId && !r.customers.includes(customerId) && r.customers.length < 50) r.customers.push(customerId);
@@ -63,7 +70,7 @@ export function ensureRelation(B, raw, { agent, customerId, value, label = null 
   if (isSecret(name)) return { error: 'secret', name };
   const known = relationOf(B, name);
   if (known) {
-    if (known.status !== 'core') touch(B, name, customerId, value);
+    if (known.status !== 'core') touch(B, name, customerId, value, agent?.domain);
     return { rel: relationOf(B, name), name };
   }
   const regs = (B.state.relations ||= {});
@@ -71,7 +78,7 @@ export function ensureRelation(B, raw, { agent, customerId, value, label = null 
   const now = B.clock.now();
   regs[name] = { name, entity: 'customer', card: 'one', scope: 'private', owner: agent.domain, ttlDays: 30, label, opposite: null, status: 'provisional', policy: 'latest', uses: 0, customers: [], examples: [], firstSeen: now, lastSeen: now };
   if (label) setRelationLabel(name, label);
-  touch(B, name, customerId, value);
+  touch(B, name, customerId, value, agent.domain);
   return { rel: regs[name], name, created: true };
 }
 
@@ -111,6 +118,9 @@ function restamp(B, name, rel, { ttlDays } = {}) {
     if (ttlDays !== undefined) f.validUntil = ttlDays ? (f.validFrom ?? f.createdAt) + ttlDays * DAY : null;
     f.text = factToText(f, 'vi');
     f.embedding = embed(factEmbedText(f));
+    // The model vector embedded the old label: drop it so the queue re-embeds.
+    delete f.vec;
+    f.vecModel = null;
   }
   B.embedQueue?.kick();
 }
@@ -136,6 +146,7 @@ function flagClashes(B, name) {
 }
 
 export function updateRelation(B, name, body = {}) {
+  name = normalizeName(name);
   const r = relationOf(B, name);
   if (!r) throw bad(`relation "${name}" not found`, 404);
   const regs = (B.state.relations ||= {});
@@ -176,6 +187,7 @@ export function updateRelation(B, name, body = {}) {
 }
 
 export function deleteRelation(B, name) {
+  name = normalizeName(name);
   const r = relationOf(B, name);
   if (!r) throw bad(`relation "${name}" not found`, 404);
   if (r.status === 'core') throw bad('core relations cannot be deleted');

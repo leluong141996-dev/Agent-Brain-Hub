@@ -135,3 +135,17 @@ test('review fix: keeping one of 3+ clashing values settles all of them', async 
   assert.deepEqual(states.filter(([, s]) => s === 'active' || s === 'conflicted'), [['Da Lat', 'active']], JSON.stringify(states));
   assert.equal(b.review('en').conflicts.length, 0);
 });
+
+test('minor fix: undo brings back every value a decision outvoted', async () => {
+  const b = makeBrain();
+  await b.think({ agentId: 'mia', text: 'I live in Hanoi', lang: 'en' });
+  await b.think({ agentId: 'mia', text: 'I live in Hue', lang: 'en' }); // same agent: a conflict pair
+  b.updateRelation('lives_in', { action: 'edit', policy: 'latest' });
+  await b.think({ agentId: 'atlas', text: 'I live in Da Lat', lang: 'en' }); // outvotes both
+  const d = b.state.decisions.at(-1);
+  assert.equal(d.loserIds.length, 2);
+  b.undoDecision(d.id);
+  const live = b.state.facts.filter((f) => f.relation === 'lives_in' && ['active', 'conflicted'].includes(stateAt(f, b.clock.now()))).map((f) => f.value).sort();
+  assert.deepEqual(live, ['Hanoi', 'Hue']);
+  assert.equal(b.review('en').conflicts.length, 1, 'they come back as the conflict they were');
+});

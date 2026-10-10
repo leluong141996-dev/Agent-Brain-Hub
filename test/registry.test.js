@@ -86,3 +86,28 @@ test('registry: provisional relations and labels survive a restart', () => {
   assert.equal(relationLabel('loyalty_tier', 'vi'), 'hạng thành viên');
   s2.close();
 });
+
+// ---- Deferred minors from the v0.7 review ----
+
+test('registry: plural and camelCase spellings of a favourite land on one relation', () => {
+  assert.equal(normalizeName('Favorite Colors'), 'favourite_colour');
+  assert.equal(normalizeName('favoriteColor'), 'favourite_colour');
+  assert.equal(normalizeName('loyaltyTier'), 'loyalty_tier');
+  assert.equal(normalizeName('favourite_glass'), 'favourite_glass', 'a word ending in "ss" is not a plural');
+});
+
+test('registry: labels come back from storage after a restart (not from a process-wide cache)', async () => {
+  const { setRelationLabel } = await import('../server/brain/ontology.js');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'brain-registry-')), 'brain.db');
+  const s1 = new Store(file);
+  const b1 = makeBrain(s1);
+  ensureRelation(b1, 'member_rank', { agent: mia, customerId: 'kh-001', value: 'gold', label: { vi: 'hạng hội viên', en: 'member rank', ja: '会員ランク' } });
+  b1.store.save();
+  s1.close();
+  setRelationLabel('member_rank', null); // a fresh process has no labels in memory
+  assert.equal(relationLabel('member_rank', 'vi'), 'member rank');
+  const s2 = new Store(file);
+  makeBrain(s2);
+  assert.equal(relationLabel('member_rank', 'vi'), 'hạng hội viên');
+  s2.close();
+});

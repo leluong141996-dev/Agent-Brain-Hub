@@ -183,3 +183,39 @@ test('review fix: merging into a relation with a different live value flags a co
   assert.equal(live.length, 2);
   assert.ok(live.every((f) => f.status === 'conflicted'), JSON.stringify(live.map((f) => [f.value, f.status])));
 });
+
+// ---- Deferred minors from the v0.7 review ----
+
+test('minor fix: another domain\'s provisional relation names stay out of an agent\'s LLM prompt', async () => {
+  const b = makeBrain();
+  await b.remember({ agentId: 'sage', facts: [{ relation: 'insulin_schedule', value: 'twice a day' }], lang: 'en' });
+  const forAtlas = b.llmRelations(b.getAgent('atlas')).map((r) => r.name);
+  const forSage = b.llmRelations(b.getAgent('sage')).map((r) => r.name);
+  assert.ok(!forAtlas.includes('insulin_schedule'), 'travel does not learn that health has this relation');
+  assert.ok(forSage.includes('insulin_schedule') && forAtlas.includes('lives_in'));
+});
+
+test('minor fix: promote and merge drop stale model vectors so they are re-embedded', async () => {
+  const b = makeBrain();
+  await b.remember({ agentId: 'kai', facts: [{ relation: 'loyalty_tier', value: 'gold' }], lang: 'en' });
+  const f = b.state.facts.find((x) => x.value === 'gold');
+  Object.assign(f, { vec: [1, 0], vecModel: 'test-model' });
+  b.updateRelation('loyalty_tier', { action: 'promote', scope: 'shared' });
+  assert.ok(!f.vecModel && !f.vec);
+});
+
+test('minor fix: the relation name in the admin API is normalised like everywhere else', async () => {
+  const b = makeBrain();
+  await b.remember({ agentId: 'kai', facts: [{ relation: 'loyalty_tier', value: 'gold' }], lang: 'en' });
+  b.updateRelation('Loyalty Tier', { action: 'edit', policy: 'trust' });
+  assert.equal(relationOf(b, 'loyalty_tier').policy, 'trust');
+  assert.equal(b.deleteRelation('loyalty-tier').removedFacts, 1);
+});
+
+test('ruling fix: generic words (status, order, note, name) do not count as naming a learned relation', async () => {
+  const { mentionsRelation } = await import('../server/brain/ontology.js');
+  assert.equal(mentionsRelation('What is the status of my order?', 'order_status_note'), false);
+  assert.equal(mentionsRelation('What is my name?', 'pet_name'), false);
+  assert.equal(mentionsRelation("What is my pet's name?", 'pet_name'), true, 'the specific word still names it');
+  assert.equal(mentionsRelation('What colour should the wrap be?', 'favourite_colour'), true);
+});

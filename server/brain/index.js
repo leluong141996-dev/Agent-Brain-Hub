@@ -177,9 +177,13 @@ export class Brain {
     return encoded;
   }
 
-  // Relations offered to the LLM extractor for reuse (core + learned, no system ones).
-  llmRelations() {
-    return listRelations(this, 'en').filter((r) => r.owner !== 'system').map((r) => ({ name: r.name, labelText: r.labelText }));
+  // Relations offered to the LLM extractor for reuse: core and promoted ones,
+  // and provisional ones this agent's domain writes (another domain's private
+  // relation names stay out of the prompt). No system relations.
+  llmRelations(agent) {
+    return listRelations(this, 'en')
+      .filter((r) => r.owner !== 'system' && (r.status !== 'provisional' || (r.domains || [r.owner]).includes(agent?.domain)))
+      .map((r) => ({ name: r.name, labelText: r.labelText }));
   }
 
   learnedView(encoded, lang) {
@@ -200,7 +204,7 @@ export class Brain {
     const p = this.perceive(t, { agentId, customerId, text, lang, qvec });
     const { agent, guard, clean, salience, wm, intent, skill, retrieval, actions, ctx } = p;
     // Start LLM fact extraction now; Hippocampus awaits it after the reply.
-    const llmFactsPromise = this.llm.available && agent.permissions?.write !== false ? this.llm.extractFacts(clean, this.llmRelations()) : null;
+    const llmFactsPromise = this.llm.available && agent.permissions?.write !== false ? this.llm.extractFacts(clean, this.llmRelations(agent)) : null;
 
     let reply;
     let mode;
@@ -395,7 +399,7 @@ export class Brain {
     const explicitFacts = (Array.isArray(facts) ? facts : [])
       .filter((f) => f && f.relation && f.value)
       .map((f) => ({ relation: String(f.relation), value: redact(String(f.value)).text, isUpdate: !!f.isUpdate }));
-    const llmFactsPromise = text && this.llm.available && agent.permissions?.write !== false ? this.llm.extractFacts(text, this.llmRelations()) : null;
+    const llmFactsPromise = text && this.llm.available && agent.permissions?.write !== false ? this.llm.extractFacts(text, this.llmRelations(agent)) : null;
     const encoded = await this.encode(t, { agent, customerId, text, salience, llmFactsPromise, explicitFacts });
 
     let feedback = null;
