@@ -41,3 +41,22 @@ test('index: retrieval only looks at the customer\'s own memories', async () => 
   assert.ok(r.memories.some((m) => m.kind === 'episodic'));
   assert.ok(r.memories.every((m) => m.kind !== 'episodic' || /customer 7\b/.test(m.text)), 'no other customer\'s episodes');
 });
+
+test('identifiers: a question with an exact order number reaches that order among similar LLM summaries', async () => {
+  // Found by the LLM benchmark: LLM session summaries are longer and phrased
+  // differently each time, so "48207" was a small part of the lexical score and
+  // other order sessions (plus an insight) took the episode slots.
+  const b = new Brain({ store: new Store(null), bus: new NeuralBus(), llm: new LLM({ offline: true }), deterministic: true });
+  const items = ['a blue backpack', 'running shoes', 'a desk lamp', 'a phone case', 'a yoga mat', 'a coffee grinder', 'wireless earbuds', 'a rain jacket', 'a tent', 'a kettle', 'a bike helmet', 'a water bottle'];
+  const phrasing = [
+    (n, x) => `[Nova] The customer reports that their order ORD-${n} for ${x} has not arrived and wants the delivery status.`,
+    (n, x) => `[Nova] The customer is still waiting for ${x} (order ORD-${n}) and is worried about the shipping delay.`,
+    (n, x) => `[Nova] The customer needs an update on order ORD-${n}; ${x} has not been delivered yet.`,
+  ];
+  items.forEach((x, i) => addEpisode(b, { customerId: 'kh-001', agentId: 'nova', ownerDomain: 'shopping', scope: 'shared', kind: 'session', text: phrasing[i % 3](48200 + i, x) }));
+  addEpisode(b, { customerId: 'kh-001', agentId: 'system', ownerDomain: 'shopping', scope: 'shared', kind: 'insight', text: '[Insight] Customer may benefit from expedited shipping on delayed orders.' });
+  for (const q of ['what is going on with order 48207', 'Has ORD-48207 shipped yet?']) {
+    const r = await b.recall({ agentId: 'mia', text: q, lang: 'en' });
+    assert.ok(r.memories.some((m) => /ORD-48207/.test(m.text)), `${q}: ${r.memories.map((m) => m.text.slice(0, 60)).join(' | ')}`);
+  }
+});

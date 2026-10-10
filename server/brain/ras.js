@@ -43,6 +43,22 @@ const TIER_LATENCY = { hot: '0ms', warm: '100–500ms', cold: '1–5s' };
 // others fall back to the local hashing vectors.
 // asOf: retrieve what the brain believed at that time (v0.5). readOnly: don't
 // record access (used for asOf and benchmarks, so looking never changes memory).
+// Identifiers a question names exactly: codes that mix letters and digits
+// (ORD-48207, WH-1000XM5) and numbers of 5+ digits (48207; not years). An item
+// that contains one is what the question is about, however long or differently
+// worded it is (LLM summaries put an order number among many other words).
+export function identifiers(text) {
+  const out = new Set();
+  for (const m of String(text).matchAll(/[A-Za-z0-9][A-Za-z0-9-]*\d[A-Za-z0-9-]*/g)) {
+    const norm = m[0].replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const code = /[A-Z]/.test(norm) && norm.length >= 4;
+    if (code) out.add(norm);
+    for (const d of norm.match(/\d{5,}/g) || []) out.add(`#${d}`);
+  }
+  return out;
+}
+const ID_BOOST = 0.3;
+
 export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, asOf = null, readOnly = false, budgetTokens = 700, maxEpisodes = 4, maxFacts = 10 }) {
   const t0 = performance.now();
   const now = asOf ?? B.clock.now();
@@ -79,6 +95,9 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
       ? t.L(`private của ${item.ownerDomain}`, `private to ${item.ownerDomain}`, `${item.ownerDomain} の非公開データ`)
       : t.L('agent không có quyền đọc shared', 'agent has no shared-read permission', '共有メモリの閲覧権限なし');
 
+  const queryIds = identifiers(query);
+  const namesId = (text) => queryIds.size > 0 && [...identifiers(text)].some((id) => queryIds.has(id));
+
   // --- Episodic search ---
   const mine = B.memoryIndex.episodes(customerId);
   const recent = new Set([...mine].sort((a, b) => b.createdAt - a.createdAt).slice(0, 3).map((e) => e.id));
@@ -98,9 +117,10 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     const tier = episodeTier(B, e, recent);
     const sim = similarity(e);
     const recency = Math.exp(-(now - e.createdAt) / DAY / 30);
-    const score = 0.6 * sim + 0.25 * recency + 0.15 * e.importance;
-    if (tier === 'cold' && sim < 0.3) continue; // cold store only queried on strong match
-    epCands.push({ kind: 'episodic', id: e.id, text: e.text, tier, scope: e.scope, owner: e.ownerDomain, source: e.agentId, episodeKind: e.kind, at: e.createdAt, validUntil: e.expiresAt || null, score, parts: { sim, recency, importance: e.importance } });
+    const idMatch = namesId(e.text);
+    const score = 0.6 * sim + 0.25 * recency + 0.15 * e.importance + (idMatch ? ID_BOOST : 0);
+    if (tier === 'cold' && sim < 0.3 && !idMatch) continue; // cold store only queried on strong match
+    epCands.push({ kind: 'episodic', id: e.id, text: e.text, tier, scope: e.scope, owner: e.ownerDomain, source: e.agentId, episodeKind: e.kind, at: e.createdAt, validUntil: e.expiresAt || null, score, parts: { sim, recency, importance: e.importance, idMatch: idMatch ? 1 : 0 } });
   }
   t.step('neocortex', t.L(`Episodic: quét ${mine.length} episode`, `Episodic: scanned ${mine.length} episodes`, `エピソード記憶：${mine.length}件を走査`), {
     store: 'episodic (vector)',
@@ -140,9 +160,10 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     const entityHit = wanted.has(f.relation) ? 0.45 : 0;
     const profile = PROFILE.has(f.relation) ? (ESSENTIAL.has(f.relation) ? 0.35 : 0.15) : 0;
     const global = f.scope === 'global' ? 0.1 : 0;
-    const score = 0.5 * sim + entityHit + profile + global + 0.1 * f.confidence;
+    const idMatch = namesId(`${f.value} ${text}`);
+    const score = 0.5 * sim + entityHit + profile + global + 0.1 * f.confidence + (idMatch ? ID_BOOST : 0);
     factOf.set(f.id, f);
-    fCands.push({ kind: 'semantic', id: f.id, text, relation: f.relation, value: factValue(f, lang), tier: 'warm', scope: f.scope, owner: f.ownerDomain, source: f.sourceAgentId, sourceName: f.sourceAgentId ? B.agentName(f.sourceAgentId) : null, at: f.updatedAt || f.createdAt, validUntil: f.validUntil || null, status: state, score, parts: { sim, entityHit, profile } });
+    fCands.push({ kind: 'semantic', id: f.id, text, relation: f.relation, value: factValue(f, lang), tier: 'warm', scope: f.scope, owner: f.ownerDomain, source: f.sourceAgentId, sourceName: f.sourceAgentId ? B.agentName(f.sourceAgentId) : null, at: f.updatedAt || f.createdAt, validUntil: f.validUntil || null, status: state, score, parts: { sim, entityHit, profile, idMatch: idMatch ? 1 : 0 } });
   }
   t.step('neocortex', t.L(`Semantic: tra ${facts.length} fact theo entity/query`, `Semantic: looked up ${facts.length} facts by entity/query`, `意味記憶：${facts.length}件をエンティティ/クエリで検索`), {
     store: 'semantic (facts)',
