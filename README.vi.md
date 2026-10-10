@@ -109,7 +109,7 @@ Màn hình Agents có sẵn cấu hình `mcpServers` cho Claude Desktop/Cursor, 
 |---|---|---|---|
 | GET | `/v1/me` | | agent, domain, kind, permissions |
 | POST | `/v1/recall` | `{customerId, text, lang, asOf?}` | `traceId, intent, salience, handoff, playbook, memories[]` (mỗi mục có `from`, `updatedAt`, `validUntil`, và `via` khi được kéo vào qua đồ thị thực thể), `suggestedActions[], promptBlock, redactedText` |
-| POST | `/v1/remember` | `{traceId \| userText, reply, facts?: [{relation, value}], outcome?: {actionId, accepted}, lang}` | `learned[]`, feedback |
+| POST | `/v1/remember` | `{traceId \| userText, reply, facts?: [{relation, value}], outcome?: {actionId, accepted}, lang}` (tên quan hệ bất kỳ; quan hệ mới bắt đầu ở dạng tạm) | `learned[]`, feedback |
 | POST | `/v1/chat` | `{customerId, text, lang}` | bộ não tự trả lời (native qua API) |
 | POST | `/v1/feedback` | `{traceId, actionId, accepted}` | bandit + skill promotion |
 | GET | `/v1/profile` | `?customerId=&lang=` | các fact agent này được phép xem |
@@ -125,7 +125,7 @@ Màn hình Agents có sẵn cấu hình `mcpServers` cho Claude Desktop/Cursor, 
 - **Quyền từng agent** (bật/tắt ngay trên dòng của agent ở màn hình Agents):
   - `readShared`: có được đọc ký ức shared do agent khác ghi hay không;
   - `write`: có được ghi/học vào bộ não hay không. Agent đối tác có thể để chỉ-đọc.
-- **Single-writer-per-entity:** mỗi relation có đúng một lĩnh vực được ghi. Agent khác ghi thì Corpus callosum uỷ quyền cho owner.
+- **Quy tắc ghi theo từng quan hệ:** mỗi quan hệ có một miền sở hữu và một quy tắc (`latest`, `owner`, `trust` hoặc `human`) để quyết định khi hai agent ghi hai giá trị khác nhau. Giá trị thua được giữ làm lịch sử, mọi quyết định tự động đều có audit và hoàn tác được, còn mâu thuẫn chưa giải thì chờ ở trang **Duyệt** (xem [Schema mở và quy tắc ghi](#schema-mở-và-quy-tắc-ghi)).
 - **Audit log:** ghi lại mọi `read`, `write`, `blocked` (lượt đọc bị chặn vì private hoặc không có quyền), `recall`, `remember`, `handoff`, `feedback`, kèm agent ghi gốc. Đây cũng là nguồn số liệu cho dashboard giá trị.
 - **Brainstem:** che PII (SĐT VN/JP, email, thẻ, CCCD) trước khi bất cứ thứ gì được ghi nhớ. Có phản xạ khủng hoảng bằng cả 3 ngôn ngữ.
 - **API key:** lưu dạng SHA-256 và so sánh constant-time. Có thể xoay key; key cũ mất hiệu lực ngay.
@@ -315,6 +315,33 @@ Liên kết là cùng một thực thể (chiếc Civic và việc sửa xe) ho�
 
 Tab **Đồ thị** trong màn hình Bộ não hiển thị thực thể và liên kết của một khách, xem được cả ở thời điểm trong quá khứ; `GET /api/graph?customerId=&asOf=` trả về cùng dữ liệu. `npm run bench -- --no-graph` đo phần đồ thị mang lại (xem mục Benchmark).
 
+### Schema mở và quy tắc ghi
+
+Bộ não không còn bị giới hạn ở 19 loại quan hệ có sẵn. Thông tin lâu dài nào khách nói ra cũng có thể được ghi nhớ:
+
+```text
+"Màu yêu thích của tôi là xanh lá"            → màu yêu thích: xanh lá      (offline, vi / en / ja)
+"I'm a gold member of your loyalty programme" → loyalty tier: gold          (khi có LLM)
+remember({ facts: [{ relation: 'loyalty_tier', value: 'gold' }] })          (mọi agent kết nối)
+```
+
+Quan hệ bộ não chưa gặp bao giờ sẽ bắt đầu ở dạng **tạm**: chỉ miền đã ghi nó đọc được, giữ trong 30 ngày. Tên được chuẩn hoá ("Favorite Color" = `favourite_colour`), tên trông như bí mật (`password`, `pin`, `card_number`…) bị từ chối, và giá trị được che thông tin cá nhân. Trong **Cài đặt → Memory schema**, admin thấy mọi quan hệ kèm mức độ sử dụng, và có thể nâng cấp, gộp hoặc xoá các quan hệ mới. Một quan hệ mới chỉ hiện với miền khác khi admin nâng cấp nó, hoặc gộp nó vào một quan hệ gốc dạng shared.
+
+Khi hai agent ghi **hai giá trị khác nhau** cho cùng một quan hệ, quy tắc của quan hệ đó quyết định:
+
+| Quy tắc | Giá trị được giữ | Mặc định cho |
+|---|---|---|
+| `latest` | giá trị mới hơn | chuyến đi, ngân sách, tình trạng xe, ghế ngồi, size |
+| `owner` | giá trị do miền sở hữu quan hệ ghi | thu nhập, phương thức thanh toán |
+| `trust` | giá trị của agent đáng tin hơn (chênh rõ ràng, nếu không thì người quyết) | tên, nơi sống, nghề, chế độ ăn, sở thích |
+| `human` | người quyết trên trang Duyệt | (chọn cho từng quan hệ) |
+
+Giá trị còn lại được giữ làm lịch sử (`outvoted`, vẫn xem được bằng `asOf`). Quyết định được ghi audit, hiện trong trace trực tiếp và liệt kê ở trang **Duyệt**, nơi có thể hoàn tác. Hai quy tắc luôn đứng trước mọi policy: khách nói "đã đổi" thì luôn thắng, và nếu khách tự mâu thuẫn, bộ não hỏi lại khách chứ không tự chọn. **Độ tin cậy** của từng agent được học từ kết quả: người duyệt giữ giá trị nào, quyết định nào bị hoàn tác, và agent khác có xác nhận cùng giá trị không.
+
+![Trang Duyệt: một mâu thuẫn chờ người quyết, các quyết định tự động có thể hoàn tác, và quan hệ mới nên nâng cấp](docs/review-queue.png)
+
+API: `GET /api/relations`, `PUT /api/relations/:name` (`edit`, `promote`, `merge`), `DELETE /api/relations/:name`, `GET /api/review`, `POST /api/review/resolve`, `POST /api/review/undo`.
+
 ### Tìm kiếm theo ngữ nghĩa (embeddings)
 
 Mặc định, ký ức được so khớp bằng vector feature hashing chạy local: không cần mạng, không cần cài đặt, nhưng chỉ bắt được từ trùng nhau. Muốn tìm được cả câu diễn đạt khác ("Mai tôi tự lái ra sân bay được không?" → "không có xe 3 ngày"), hãy chọn model embedding trong **Cài đặt → Tìm kiếm theo ngữ nghĩa**: OpenAI, Gemini, Ollama, vLLM, LM Studio hoặc bất kỳ endpoint `/embeddings` tương thích OpenAI nào. Với tiếng Việt và tiếng Nhật, `bge-m3` chạy qua Ollama là lựa chọn local tốt.
@@ -326,28 +353,30 @@ Mặc định, ký ức được so khớp bằng vector feature hashing chạy 
 
 ## Benchmark
 
-`npm run bench` chấm bộ nhớ dùng chung trên 37 kịch bản nhiều agent: nhớ chéo giữa agent, fact hết hạn, mâu thuẫn, rò rỉ dữ liệu private, câu hỏi nhiều bước, hội thoại dài, khớp chính xác (mã đơn hàng, tên model) và xem lại quá khứ, bằng tiếng Anh kèm các ca tiếng Việt và tiếng Nhật. Chạy offline dưới một giây, và CI chặn mọi thay đổi làm tụt một chỉ số chất lượng ([bench/README.md](bench/README.md)).
+`npm run bench` chấm bộ nhớ dùng chung trên 46 kịch bản nhiều agent: nhớ chéo giữa agent, fact hết hạn, mâu thuẫn, rò rỉ dữ liệu private, câu hỏi nhiều bước, hội thoại dài, khớp chính xác (mã đơn hàng, tên model), xem lại quá khứ, quan hệ ngoài danh sách có sẵn, và cách xử lý khi hai agent bất đồng, bằng tiếng Anh kèm các ca tiếng Việt và tiếng Nhật. Chạy offline dưới một giây, và CI chặn mọi thay đổi làm tụt một chỉ số chất lượng ([bench/README.md](bench/README.md)).
 
-| v0.6.0 | Hashing (mặc định, offline) | Lai với `bge-m3` (Ollama, CPU) |
+| v0.7.0 | Hashing (mặc định, offline) | Lai với `bge-m3` (Ollama, CPU) |
 |---|---|---|
-| Scenario pass rate | 97,3% | **100%** |
-| Recall accuracy | 97,7% | **100%** |
+| Scenario pass rate | 97,8% | **100%** |
+| Recall accuracy | 98,0% | **100%** |
+| Schema mở / phân xử | **100%** / **100%** | **100%** / **100%** |
 | Câu hỏi nhiều bước | **100%** (40% khi tắt đồ thị) | **100%** |
 | Leak rate | **0%** | **0%** |
 | Stale-use rate | **0%** | **0%** |
-| Conflict handling | 100% | 100% |
-| Độ trễ recall (p50) | 0,4 ms | 96 ms |
-| Prompt tokens (trung bình) | 427 | 508 |
+| Độ trễ recall (p50) | 0,6 ms | 145 ms* |
+| Prompt tokens (trung bình) | 421 | 499 |
 
-Đây là kịch bản do dự án tự viết, nên dùng để so các phiên bản của chính dự án. Đồ thị thực thể nâng tỷ lệ đạt khi chạy offline từ 81,1% lên 97,3%, đổi lại mỗi prompt tốn thêm khoảng 6 token (`--no-graph` chạy cùng bộ kịch bản khi tắt đồ thị). Với `bge-m3`, các kịch bản nhiều bước vẫn đạt kể cả khi tắt đồ thị, vì model đã tự nối "con XPS" với "chiếc laptop"; khi đó đồ thị thêm phần giải thích `via`. Kịch bản duy nhất còn trượt khi chạy offline là một câu diễn đạt khác, không có từ nào trùng với ký ức.
+Đây là kịch bản do dự án tự viết, nên dùng để so các phiên bản của chính dự án. Đồ thị thực thể nâng tỷ lệ đạt khi chạy offline từ 84,8% lên 97,8% (`--no-graph` chạy cùng bộ kịch bản khi tắt đồ thị). Kịch bản duy nhất trượt khi chạy offline là một câu diễn đạt khác, không có từ nào trùng với ký ức. \* đo trong lúc máy đang chạy một benchmark khác (v0.6.0: 96 ms).
 
-**Trên bộ dữ liệu công khai.** `npm run bench:longmemeval` chấm khả năng truy xuất trên [LongMemEval-S](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned) (MIT, 470 câu hỏi, mỗi câu khoảng 50 phiên): phiên chứa câu trả lời có nằm gần đầu không? Với hashing local, nó nằm trong top 4 ở **52,8%** câu hỏi và trong top 10 ở **71,3%**. Điểm yếu là câu hỏi về sở thích (20% @4) và câu cần đủ mọi phiên bằng chứng. Độ chính xác của câu trả lời chưa được đo.
+**Với LLM thật.** Chạy toàn bộ kịch bản với một LLM trên máy (`qwen3:4b` qua Ollama, LLM trích fact và viết bản tóm tắt phiên) đã tìm ra bốn lỗi, đều được sửa trong v0.7: model suy luận trả lời rỗng, bản tóm tắt làm mất mã định danh, mã định danh chính xác bị xếp hạng thấp, và câu hỏi về thu nhập. Với LLM, các kịch bản khớp chính xác tăng từ 0% lên 100%, và `open_schema` đạt 100%, kể cả quan hệ chỉ LLM mới đề xuất được. Số liệu đầy đủ khi chạy với LLM sẽ được bổ sung sau.
+
+**Trên bộ dữ liệu công khai.** `npm run bench:longmemeval` chấm khả năng truy xuất trên [LongMemEval-S](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned) (MIT, 470 câu hỏi, mỗi câu khoảng 50 phiên): phiên chứa câu trả lời có nằm gần đầu không? Với hashing local, nó nằm trong top 4 ở **53,2%** câu hỏi và trong top 10 ở **71,5%**. Điểm yếu là câu hỏi về sở thích (20% @4) và câu cần đủ mọi phiên bằng chứng. Độ chính xác của câu trả lời chưa được đo.
 
 **Ở quy mô lớn.** Chỉ mục theo khách hàng giữ recall ở p50 0,6 ms / p95 1,9 ms với 100.000 episode (`npm run bench:scale`).
 
 ## Test
 
-- `npm test`: 96 unit test, gồm:
+- `npm test`: 136 unit test, gồm:
   - bộ QA nghiệm thu của tài liệu: amnesia, contradiction, staleness, skill promotion, load 20k episode;
   - phân quyền và rò rỉ prompt;
   - tiếng Anh, tiếng Nhật;
@@ -355,8 +384,9 @@ Mặc định, ký ức được so khớp bằng vector feature hashing chạy 
   - lớp LLM: danh mục nhà cung cấp, tự thích nghi với một server giả lập khó tính kiểu OpenAI, lưu/ẩn key, tải danh sách model;
   - lưu trữ SQLite: mở lại thì dữ liệu còn nguyên (kể cả embedding), chỉ ghi các dòng thay đổi, audit không bị cắt và số liệu SQL khớp với cách tính trong bộ nhớ, nhập từ JSON cũ, reset;
   - vòng ngủ tự động (im lặng, áp lực, ban đêm), nguồn gốc và tuổi của fact trong prompt, nhà cung cấp embedding (với server giả lập), và chính bộ benchmark;
-  - bộ nhớ theo thời gian (`asOf`, lịch sử) và đồ thị thực thể: gộp thực thể, truy xuất nhiều bước không bao giờ chạm tới fact private hay đã hết hạn, API đồ thị.
-- `npm run bench`: benchmark bộ nhớ. 37 kịch bản nhiều agent (nhớ chéo, fact hết hạn, mâu thuẫn, rò rỉ, nhiều bước, hội thoại dài, khớp chính xác, xem lại quá khứ), chấm offline dưới một giây. Ngoài ra có `npm run bench:longmemeval` (bộ dữ liệu công khai, truy xuất) và `npm run bench:scale` (độ trễ khi bộ nhớ lớn). Xem [bench/README.md](bench/README.md); thêm kịch bản chỉ cần một file JSON.
+  - bộ nhớ theo thời gian (`asOf`, lịch sử) và đồ thị thực thể: gộp thực thể, truy xuất nhiều bước không bao giờ chạm tới fact private hay đã hết hạn, API đồ thị;
+  - schema mở và quy tắc ghi: registry quan hệ (tên, bí mật, giới hạn, lưu qua restart), quan hệ tạm giữ riêng tư theo từng miền, nâng cấp / gộp / xoá, từng policy, hoàn tác, độ tin cậy, hàng chờ duyệt.
+- `npm run bench`: benchmark bộ nhớ. 46 kịch bản nhiều agent (nhớ chéo, fact hết hạn, mâu thuẫn, rò rỉ, nhiều bước, hội thoại dài, khớp chính xác, xem lại quá khứ, schema mở, phân xử), chấm offline dưới một giây. Ngoài ra có `npm run bench:longmemeval` (bộ dữ liệu công khai, truy xuất) và `npm run bench:scale` (độ trễ khi bộ nhớ lớn). Xem [bench/README.md](bench/README.md); thêm kịch bản chỉ cần một file JSON.
 - `npm run e2e -- --lang vi|en|ja`: 11 bước chạy trên server đang chạy, với bất kỳ cấu hình LLM nào (offline, Claude, GPT, model local…). Bao gồm cả agent connected qua SDK và MCP server qua stdio. Bài test dùng một khách hàng mới nên không đụng dữ liệu đang có, nhưng tua đồng hồ mô phỏng thêm 7 ngày.
 
 ## Cấu trúc
@@ -398,7 +428,7 @@ Mục tiêu: **lớp bộ nhớ cho hệ nhiều agent — đúng theo thời gi
 | ✅ **v0.4** | Tìm kiếm lai, chỉ mục theo khách hàng, LongMemEval, benchmark một hub đang chạy |
 | ✅ **v0.5** | Bộ nhớ theo thời gian: fact bị vô hiệu thay vì xoá, `recall({ asOf })`, lịch sử fact |
 | ✅ **v0.6** | Đồ thị thực thể: thực thể theo từng khách, truy xuất nhiều bước kèm `via`, giao diện đồ thị |
-| **v0.7** | Trích xuất schema mở, chính sách giải quyết khi ghi trùng, điểm tin cậy cho agent |
+| ✅ **v0.7** | Schema mở (registry quan hệ, quan hệ tạm), quy tắc ghi theo từng quan hệ, độ tin cậy của agent, trang Duyệt |
 | **v0.8** | Quản trị bằng chính sách khai báo, PostgreSQL + pgvector, OpenTelemetry, multi-tenant |
 
 Chi tiết, nguyên tắc và những gì không nằm trong kế hoạch: [ROADMAP.md](ROADMAP.md) (tiếng Anh).

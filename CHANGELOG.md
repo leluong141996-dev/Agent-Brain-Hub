@@ -5,6 +5,48 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-10
+
+Memory that **remembers anything**, and stays **consistent when several agents write**.
+
+### Added
+
+- **Open schema.** The 19 built-in relations become a registry (Settings → *Memory schema*, `GET/PUT/DELETE /api/relations`). A relation the brain has not seen before is no longer dropped: it starts **provisional**, private to the domain that wrote it, with a 30-day TTL. New relations come from three places:
+  - an LLM may propose one ("I'm a gold member" → `loyalty_tier`);
+  - offline, "my favourite X is Y" in English, Vietnamese and Japanese becomes `favourite_<noun>`, with one name across languages;
+  - a connected agent may send any relation through `/v1/remember`.
+
+  An admin promotes a provisional relation (scope, owner, policy, labels; facts already stored follow), merges it into another one, or deletes it. Nothing is widened automatically. Names that contain a secret (`password`, `pin`, `card_number`…) are refused, and values are PII-redacted.
+- **Write policies per relation.** When two agents write different values, the relation's policy decides:
+  - `latest`: the newer value wins (trip, budget, car availability…);
+  - `owner`: the owner domain wins (income, payment method);
+  - `trust`: the more trusted agent wins (profile facts);
+  - `human`: a person decides.
+
+  The loser is kept as history (`outvoted`, visible with `asOf`). Every automatic decision is audited, shown in the trace, and can be **undone**. A customer saying something changed always wins. If the customer contradicts themselves (the same agent writes both values), the brain asks them instead of picking.
+- **Agent trust scores**, learned from outcomes: which value a human keeps, undone decisions, and other agents confirming a value. They are shown on the Agents screen.
+- **Review page.** It lists conflicts waiting for a person (side by side, with source, trust and evidence), automatic decisions of the last 30 days with *Undo*, and new relations worth promoting. The sidebar shows how many conflicts are waiting.
+- **Benchmark:** `open_schema` and `arbitration` categories (46 scenarios in total), `remember` and `promote` steps, and scenarios that need an LLM (`requires: "llm"`, skipped offline).
+
+  | 0.7.0 | Hashing (offline) | Hybrid with `bge-m3` |
+  |---|---|---|
+  | Scenario pass rate (46) | 97.8% | 100% |
+  | open_schema / arbitration | 100% / 100% | 100% / 100% |
+  | Leak rate | 0% | 0% |
+
+  With a local LLM (`qwen3:4b` on Ollama), exact-match scenarios went from 0% to 100% and `open_schema` passed 100%; a full LLM run will follow.
+
+  LongMemEval-S retrieval: 52.8% → 53.2% @4.
+
+### Fixed
+
+- **Local reasoning models answered nothing.** Qwen3 builds on Ollama (the default Ollama model) always think. With the local token cap they used the whole budget thinking and returned an empty answer, so fact extraction silently found nothing. An empty answer is now retried once with room for the reply.
+- **LLM session summaries lost order numbers and model names** ("ORD-48207", "WH-1000XM5"), and described "this session" instead of the customer. Summaries now copy identifiers exactly.
+- **A question naming an exact identifier** ("order 48207", "WH-1000XM5") reaches the memory that contains it, even among many similar conversations. With an LLM, exact-match questions went from 0% to 100%.
+- **"How much do I earn?"** now reaches the income fact (income words in vi / en / ja).
+- **Retrieval excluded only some kinds of replaced facts.** A value that lost an automatic decision would have reached the prompt. Every invalidated fact is now excluded.
+- **Resolving one of three or more clashing values** settles all of them.
+
 ## [0.6.2] - 2026-10-09
 
 ### Fixed
@@ -173,7 +215,8 @@ First public release.
 - README in English (`README.md`) and Vietnamese (`README.vi.md`), `CONTRIBUTING.md`, issue and PR templates, and a CI workflow (tests on Node 18/20/22, Docker build, end-to-end run).
 - 32 unit tests (including the acceptance QA suite: amnesia, contradiction, staleness, skill promotion, 20k-episode load) and an 11-step end-to-end script (`npm run e2e -- --lang vi|en|ja`).
 
-[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.5.0...v0.6.0

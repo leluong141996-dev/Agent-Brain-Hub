@@ -6,25 +6,27 @@ Most memory libraries are built for one agent. When several agents share one mem
 
 It's a plan, not a promise. Priorities change with feedback: comment on the milestone issues or open a [Discussion](https://github.com/leluong141996-dev/Agent-Brain-Hub/discussions).
 
-## Where we are (v0.6)
+## Where we are (v0.7)
 
 **Solid today**
-- Shared memory with governance: private / shared / global scopes, one writer domain per relation, per-agent permissions, append-only audit log.
+- Shared memory with governance: private / shared / global scopes, an owner domain and a write policy per relation, per-agent permissions, append-only audit log.
 - Every request traced live through 13 brain regions; facts carry their source, age and expiry into the prompt.
 - Automatic sleep cycle (idle, pressure, nightly), TTL-based forgetting, contradiction flagging, skill promotion.
 - Runs offline with zero configuration, or with any LLM. REST, JS SDK and MCP. English, Vietnamese, Japanese.
 - Correct over time: facts are invalidated rather than deleted, and `recall({ asOf })` shows what the brain believed at any moment.
 - Connected: facts are grouped into entities per customer, and retrieval follows links between them (multi-hop), explaining each added fact with `via`, inside the same permission checks.
-- Measured: a 37-scenario memory benchmark with a CI gate, plus LongMemEval-S retrieval. Hybrid semantic + lexical search with real embedding models; a per-customer index keeps retrieval under 2 ms at 100,000 episodes.
+- Open schema: relations outside the built-in 19 are remembered as provisional, private to the domain that wrote them, until an admin promotes them. When agents disagree, a per-relation policy decides, the decision can be undone, and agent trust is learned from outcomes.
+- Measured: a 46-scenario memory benchmark with a CI gate, also run end to end with a local LLM, plus LongMemEval-S retrieval. Hybrid semantic + lexical search with real embedding models; a per-customer index keeps retrieval under 2 ms at 100,000 episodes.
 
 **Still basic**
 
 | Limitation | Today |
 |---|---|
-| Closed schema | 19 predefined relations and 35 regex rules. LLM extraction is limited to the same list, so anything outside it (say, a favourite colour) is not remembered. |
+| Learned relations are curated by hand | New relations start private and stay provisional until an admin promotes them; nothing suggests a scope, owner or policy yet. Offline, only the "favourite X" family is recognised without an LLM. |
+| Conflicts are decided by rules | Policies pick a value, or a person does. No LLM proposes a resolution with evidence yet. |
 | Retrieval quality on long histories | On LongMemEval-S, hashing finds the evidence session in the top 4 for about half the questions; preferences and multi-session questions are weakest. |
 | A narrow graph | Entities are assets, trips and profile groups, found with a lexicon; one node per asset type per customer, so two cars are one node. No people or organisations yet. The affinity table is hand-written. |
-| Answers not measured | Benchmarks score what reaches the agent (37 own scenarios, LongMemEval retrieval), not the final answers. The value dashboard's "time saved" is an estimate (20 s per question). |
+| Answers not measured | Benchmarks score what reaches the agent (46 own scenarios, LongMemEval retrieval), not the final answers. The value dashboard's "time saved" is an estimate (20 s per question). |
 | Single process | State lives in memory; SQLite is the persistence layer. |
 
 ## Principles
@@ -86,21 +88,28 @@ These hold for every milestone:
 
 **Result:** with hashing, multi-hop passes 100% (40% without the graph, measured with `--no-graph`), overall 81.1% → 97.3%; leak rate 0%. With `bge-m3` the multi-hop scenarios pass even without the graph, so they are not yet hard enough to show its value there.
 
-**Not done:** people and organisations as entities ("John" = "Mr. Smith"), and more than one asset of a type per customer. Both need LLM extraction, planned with the open schema in v0.7.
+**Not done:** people and organisations as entities ("John" = "Mr. Smith"), and more than one asset of a type per customer. Both need LLM extraction; not part of v0.7, they are listed under Next.
 
-### v0.7: Open schema and multi-agent consistency
+### v0.7: Open schema and multi-agent consistency ✅ released
 
 *Goal: remember anything, and keep many writers consistent.*
 
-- [ ] **Open-schema extraction.** The LLM may extract any relation. The ontology becomes a **policy registry**: known relations keep their scope, TTL and owner. New relations start as *provisional* with a safe default (private, short TTL) and are promoted as they're used.
-- [ ] **Write-arbitration policies per relation:** owner wins, latest wins, confidence-weighted, or human required.
-- [ ] **Agent trust scores**, learned from how often an agent's facts are corrected or superseded.
-- [ ] **Conflict resolution during sleep:** an LLM proposes a resolution with evidence, and a review queue in the UI lets a human accept it.
-- [ ] Memory tools for agents over MCP and REST: `brain_correct`, `brain_forget`.
-- [ ] LLM consolidation in the sleep cycle: distil episodes into facts, merge duplicate entities.
-- [ ] Richer graph entities from LLM extraction: people and organisations, and several assets of one type per customer.
+- [x] **Open schema.** The ontology became a registry: built-in relations keep their scope, TTL and owner; a new relation (from the LLM, the offline "favourite X" patterns, or `/v1/remember`) starts *provisional*, private to the domain that wrote it, with a 30-day TTL. An admin promotes, merges or deletes it in Settings → Memory schema.
+- [x] **Write policies per relation:** `latest`, `owner`, `trust` or `human`. The losing value is kept as history and every automatic decision can be undone.
+- [x] **Agent trust scores**, learned from human resolutions, undone decisions and confirmations by other agents.
+- [x] A **Review page** for conflicts waiting for a person and recent automatic decisions.
 
-**Done when** the benchmark's contradiction and long-conversation scores improve, and "favourite colour" is remembered and recalled.
+**Result:** "favourite colour" is remembered and recalled in English, Vietnamese and Japanese; the new `open_schema` and `arbitration` categories pass 100% offline; contradiction handling stays at 100% and the leak rate at 0%. Running the whole suite with a local LLM for the first time found four bugs that were fixed in this release (an empty answer from reasoning models, identifiers lost in summaries, exact identifiers outranked, income questions).
+
+**Moved to later** (see Next): an LLM proposing conflict resolutions, `brain_correct` / `brain_forget` for agents, LLM consolidation of episodes into facts, and people and organisations in the graph.
+
+### Next: memory that maintains itself
+
+- **Conflict resolution during sleep:** an LLM proposes a resolution with evidence; the Review page lets a person accept it.
+- **Suggestions for learned relations:** a proposed scope, owner and policy when a provisional relation is worth promoting.
+- Memory tools for agents over MCP and REST: `brain_correct`, `brain_forget`.
+- LLM consolidation in the sleep cycle: distil episodes into facts, merge duplicate entities.
+- Richer graph entities from LLM extraction: people and organisations, and several assets of one type per customer.
 
 ### v0.8: Production governance and scale
 

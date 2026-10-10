@@ -8,7 +8,7 @@ npm run bench -- --filter leakage                     # one category, or one sce
 npm run bench -- --compare bench/results/0.2.0.json   # adds a delta column
 npm run bench -- --llm                                # with the configured LLM (UI settings or BRAIN_LLM_* env)
 npm run bench -- --save                               # writes bench/results/<version>.json
-npm run bench -- --gate bench/results/0.6.0.json      # what CI runs: exit 1 if a quality metric got worse
+npm run bench -- --gate bench/results/0.7.0.json      # what CI runs: exit 1 if a quality metric got worse
 npm run bench -- --url http://localhost:4317          # a running hub, as it is configured (add --token if it has one)
 npm run bench -- --no-graph                           # ablation: the same run without the v0.6 entity graph
 npm run bench:scale                                   # retrieval latency with 20,000 episodes (--episodes, --customers)

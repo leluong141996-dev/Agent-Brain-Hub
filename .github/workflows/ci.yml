@@ -33,7 +33,7 @@ jobs:
       - name: Memory benchmark (fails if a quality metric gets worse)
         run: |
           set -o pipefail
-          npm run bench --silent -- --gate bench/results/0.6.0.json | tee -a "$GITHUB_STEP_SUMMARY"
+          npm run bench --silent -- --gate bench/results/0.7.0.json | tee -a "$GITHUB_STEP_SUMMARY"
 
   docker:
     runs-on: ubuntu-latest
