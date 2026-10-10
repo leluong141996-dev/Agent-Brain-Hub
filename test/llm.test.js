@@ -100,3 +100,35 @@ test('offline provider and forced offline never call out', async () => {
   assert.equal(off.label, 'Offline');
   assert.equal((await off.test()).ok, false);
 });
+
+test('a reasoning model that runs out of tokens while thinking is asked again with more room', async () => {
+  // Qwen3 "thinking" builds on Ollama always think, and ignore every switch to
+  // turn it off; with the local 700-token cap they used to answer "".
+  const budgets = [];
+  const server = http.createServer(async (req, res) => {
+    let raw = '';
+    for await (const c of req) raw += c;
+    const body = JSON.parse(raw);
+    const budget = body.max_tokens ?? body.max_completion_tokens;
+    budgets.push(budget);
+    res.writeHead(200, { 'content-type': 'application/json' });
+    const enough = budget > 700;
+    res.end(JSON.stringify({
+      model: body.model,
+      choices: [{ finish_reason: enough ? 'stop' : 'length', message: { content: enough ? '{"facts":[{"relation":"loyalty_tier","value":"gold"}]}' : '', reasoning: 'Okay, the user says they are a gold member…' } }],
+      usage: { prompt_tokens: 10, completion_tokens: enough ? 900 : budget },
+    }));
+  });
+  await new Promise((r) => server.listen(0, r));
+  try {
+    const llm = new LLM({ config: { provider: 'ollama', baseUrl: `http://localhost:${server.address().port}/v1`, model: 'qwen3:4b' } });
+    llm.forcedOffline = false;
+    llm.configure(llm.cfg, { persist: false });
+    const facts = await llm.extractFacts("I'm a gold member of your loyalty programme");
+    assert.deepEqual(facts, [{ relation: 'loyalty_tier', value: 'gold', isUpdate: false }]);
+    assert.equal(budgets.length, 2);
+    assert.ok(budgets[1] >= 4 * budgets[0], `retried with more room: ${budgets}`);
+  } finally {
+    server.close();
+  }
+});

@@ -239,10 +239,10 @@ export class LLM {
     return h;
   }
 
-  _body({ system, messages, maxTokens, json, model }) {
+  _body({ system, messages, maxTokens, json, model, budget }) {
     const q = this.quirks;
     const body = { model, messages: [{ role: 'system', content: system }, ...messages] };
-    body[q.maxTokensParam] = Math.min(maxTokens || this.cfg.maxTokens, this.cfg.maxTokens);
+    body[q.maxTokensParam] = budget ?? Math.min(maxTokens || this.cfg.maxTokens, this.cfg.maxTokens);
     // Not 0 for JSON: vLLM 0.10.2 crashes when a greedy structured-output
     // request is batched with a sampled one.
     if (q.temperature) body.temperature = json ? 0.1 : this.cfg.temperature;
@@ -282,6 +282,11 @@ export class LLM {
       const content = Array.isArray(choice.content) ? choice.content.map((c) => c.text || '').join('') : choice.content || '';
       const text = String(content).replace(/<think>[\s\S]*?<\/think>/g, '').trim();
       const usage = data.usage ? { input_tokens: data.usage.prompt_tokens, output_tokens: data.usage.completion_tokens } : null;
+      // A reasoning model (e.g. Qwen3 thinking builds on Ollama, which ignore
+      // every switch to turn thinking off) can spend the whole budget thinking
+      // and answer "". Ask once more with room for the answer.
+      const thoughtOut = !text && !opts.budget && (choice.reasoning || choice.reasoning_content || data.choices?.[0]?.finish_reason === 'length');
+      if (thoughtOut) return this._callOpenAI({ ...opts, budget: Math.min(4096, Math.max(2048, 4 * this.cfg.maxTokens)) });
       return { text, usage, model: data.model || opts.model };
     }
     throw new Error('provider kept rejecting the request parameters');
