@@ -367,20 +367,20 @@ By default, memories are matched with local feature-hashing vectors: no network,
 
 `npm run bench` scores the shared memory on 46 multi-agent scenarios: cross-agent recall, stale facts, contradictions, private-data leakage, multi-hop questions, long conversations, exact matches (order numbers, model names), looking back in time, relations outside the built-in ones, and what happens when two agents disagree, in English with Vietnamese and Japanese cases. It runs offline in under a second, and CI fails any change that makes a quality metric worse ([bench/README.md](bench/README.md)).
 
-| v0.7.0 | Hashing (default, offline) | Hybrid with `bge-m3` (Ollama, CPU) |
-|---|---|---|
-| Scenario pass rate | 97.8% | **100%** |
-| Recall accuracy | 98.0% | **100%** |
-| Open schema / arbitration | **100%** / **100%** | **100%** / **100%** |
-| Multi-hop questions | **100%** (40% without the graph) | **100%** |
-| Leak rate | **0%** | **0%** |
-| Stale-use rate | **0%** | **0%** |
-| recall latency (p50) | 0.6 ms | 145 ms* |
-| Prompt tokens (mean) | 421 | 499 |
+| v0.7.0 | Hashing (default, offline) | Hybrid with `bge-m3` (Ollama, CPU) | With an LLM (`qwen3:4b`, local) |
+|---|---|---|---|
+| Scenario pass rate | 97.8% | **100%** | 97.9% |
+| Recall accuracy | 98.0% | **100%** | 98.1% |
+| Open schema / arbitration | **100%** / **100%** | **100%** / **100%** | **100%** / **100%** |
+| Multi-hop questions | **100%** (40% without the graph) | **100%** | **100%** |
+| Leak rate | **0%** | **0%** | **0%** |
+| Stale-use rate | **0%** | **0%** | **0%** |
+| recall latency (p50) | 0.6 ms | 145 ms* | 0.7 ms |
+| Prompt tokens (mean) | 421 | 499 | 450 |
 
 These are our own scenarios, so they compare versions of this project. The entity graph lifts the offline pass rate from 84.8% to 97.8% (`--no-graph` runs the same set without it). The one scenario that fails offline is a paraphrase that shares no words with the memory. \* measured while another benchmark ran on the same machine (v0.6.0: 96 ms).
 
-**With a real LLM.** Running the suite end to end with a local LLM (`qwen3:4b` on Ollama, which extracts facts and writes the session summaries) found four bugs that are fixed in v0.7: empty answers from reasoning models, identifiers lost in summaries, exact identifiers outranked, and income questions. With the LLM, the exact-match scenarios went from 0% to 100%, and `open_schema` passed 100%, including a relation only an LLM can propose. A full LLM run with final numbers will be added here.
+**With a real LLM.** Running the suite end to end with a local LLM (`qwen3:4b` on Ollama, which extracts facts and writes the session summaries) found four bugs that are fixed in v0.7: empty answers from reasoning models, identifiers lost in summaries, exact identifiers outranked, and income questions. In the LLM column (47 scenarios, including one only an LLM can pass: a relation it has to invent), every category passes 100% except the same paraphrase, with no leaks. It runs on one consumer GPU (RTX 3060) with no cloud key, but slowly: about 42 s per message, 2 h 11 min for the suite.
 
 **On a public dataset.** `npm run bench:longmemeval` scores retrieval on [LongMemEval-S](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned) (MIT, 470 questions, ~50 sessions each): is the session that holds the answer near the top? With local hashing it is in the top 4 for **53.2%** of questions and in the top 10 for **71.5%**. Preferences (20% @4) and questions that need every evidence session are the weak spots. Answer accuracy isn't measured yet.
 

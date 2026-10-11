@@ -355,20 +355,20 @@ Mặc định, ký ức được so khớp bằng vector feature hashing chạy 
 
 `npm run bench` chấm bộ nhớ dùng chung trên 46 kịch bản nhiều agent: nhớ chéo giữa agent, fact hết hạn, mâu thuẫn, rò rỉ dữ liệu private, câu hỏi nhiều bước, hội thoại dài, khớp chính xác (mã đơn hàng, tên model), xem lại quá khứ, quan hệ ngoài danh sách có sẵn, và cách xử lý khi hai agent bất đồng, bằng tiếng Anh kèm các ca tiếng Việt và tiếng Nhật. Chạy offline dưới một giây, và CI chặn mọi thay đổi làm tụt một chỉ số chất lượng ([bench/README.md](bench/README.md)).
 
-| v0.7.0 | Hashing (mặc định, offline) | Lai với `bge-m3` (Ollama, CPU) |
-|---|---|---|
-| Scenario pass rate | 97,8% | **100%** |
-| Recall accuracy | 98,0% | **100%** |
-| Schema mở / phân xử | **100%** / **100%** | **100%** / **100%** |
-| Câu hỏi nhiều bước | **100%** (40% khi tắt đồ thị) | **100%** |
-| Leak rate | **0%** | **0%** |
-| Stale-use rate | **0%** | **0%** |
-| Độ trễ recall (p50) | 0,6 ms | 145 ms* |
-| Prompt tokens (trung bình) | 421 | 499 |
+| v0.7.0 | Hashing (mặc định, offline) | Lai với `bge-m3` (Ollama, CPU) | Có LLM (`qwen3:4b`, chạy trên máy) |
+|---|---|---|---|
+| Scenario pass rate | 97,8% | **100%** | 97,9% |
+| Recall accuracy | 98,0% | **100%** | 98,1% |
+| Schema mở / phân xử | **100%** / **100%** | **100%** / **100%** | **100%** / **100%** |
+| Câu hỏi nhiều bước | **100%** (40% khi tắt đồ thị) | **100%** | **100%** |
+| Leak rate | **0%** | **0%** | **0%** |
+| Stale-use rate | **0%** | **0%** | **0%** |
+| Độ trễ recall (p50) | 0,6 ms | 145 ms* | 0,7 ms |
+| Prompt tokens (trung bình) | 421 | 499 | 450 |
 
 Đây là kịch bản do dự án tự viết, nên dùng để so các phiên bản của chính dự án. Đồ thị thực thể nâng tỷ lệ đạt khi chạy offline từ 84,8% lên 97,8% (`--no-graph` chạy cùng bộ kịch bản khi tắt đồ thị). Kịch bản duy nhất trượt khi chạy offline là một câu diễn đạt khác, không có từ nào trùng với ký ức. \* đo trong lúc máy đang chạy một benchmark khác (v0.6.0: 96 ms).
 
-**Với LLM thật.** Chạy toàn bộ kịch bản với một LLM trên máy (`qwen3:4b` qua Ollama, LLM trích fact và viết bản tóm tắt phiên) đã tìm ra bốn lỗi, đều được sửa trong v0.7: model suy luận trả lời rỗng, bản tóm tắt làm mất mã định danh, mã định danh chính xác bị xếp hạng thấp, và câu hỏi về thu nhập. Với LLM, các kịch bản khớp chính xác tăng từ 0% lên 100%, và `open_schema` đạt 100%, kể cả quan hệ chỉ LLM mới đề xuất được. Số liệu đầy đủ khi chạy với LLM sẽ được bổ sung sau.
+**Với LLM thật.** Chạy toàn bộ kịch bản với một LLM trên máy (`qwen3:4b` qua Ollama, LLM trích fact và viết bản tóm tắt phiên) đã tìm ra bốn lỗi, đều được sửa trong v0.7: model suy luận trả lời rỗng, bản tóm tắt làm mất mã định danh, mã định danh chính xác bị xếp hạng thấp, và câu hỏi về thu nhập. Ở cột LLM (47 kịch bản, gồm một kịch bản chỉ LLM mới đạt được vì phải tự đặt ra quan hệ mới), mọi nhóm đều đạt 100%, trừ đúng câu diễn đạt khác kia, và không rò rỉ dữ liệu nào. Cột này chạy trên một GPU phổ thông (RTX 3060), không cần key cloud, nhưng chậm: khoảng 42 giây mỗi tin nhắn, 2 giờ 11 phút cho cả bộ kịch bản.
 
 **Trên bộ dữ liệu công khai.** `npm run bench:longmemeval` chấm khả năng truy xuất trên [LongMemEval-S](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned) (MIT, 470 câu hỏi, mỗi câu khoảng 50 phiên): phiên chứa câu trả lời có nằm gần đầu không? Với hashing local, nó nằm trong top 4 ở **53,2%** câu hỏi và trong top 10 ở **71,5%**. Điểm yếu là câu hỏi về sở thích (20% @4) và câu cần đủ mọi phiên bằng chứng. Độ chính xác của câu trả lời chưa được đo.
 
