@@ -196,9 +196,11 @@ export function resolveConflict(B, factId) {
   keep.confidence = 0.95;
   keep.conflictResolvedAt = now;
   delete keep.conflictWith;
+  delete keep.proposal;
   for (const o of losers) {
     invalidate(o, { by: keep.id, reason: 'resolved', at: now });
     delete o.conflictWith;
+    delete o.proposal;
   }
   const penalized = new Set();
   for (const o of losers) {

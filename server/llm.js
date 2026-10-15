@@ -390,6 +390,28 @@ export class LLM {
     }
   }
 
+  // v0.8: suggest how to settle a conflict between two values of one relation.
+  // input: { relation, a: {value, agent, evidence, at}, b: {…}, episodes: [text] }.
+  // Returns { keep: 'a' | 'b' | 'unsure', reason } or null. Advisory only.
+  async proposeResolution(input, lang = 'vi') {
+    if (!this.client) return null;
+    const side = (k, s) => `${k}) "${s.value}", recorded by ${s.agent} at ${s.at}; the customer said: "${s.evidence || 'n/a'}"`;
+    const system =
+      'Two AI agents recorded different values for the same fact about one customer. Decide which value is more likely true now, using only the evidence given. ' +
+      'Prefer explicit statements of change ("moved", "now", "no longer") and more recent, more direct evidence. If the evidence does not support one value, answer "unsure". ' +
+      `Return ONLY a JSON object {"keep":"a"|"b"|"unsure","reason":"one short sentence in ${LANGUAGE_NAME[normLang(lang)]}"}.`;
+    const user = [`Fact: ${input.relation}`, side('a', input.a), side('b', input.b), input.episodes?.length ? `Recent conversations:\n${input.episodes.map((e) => `- ${e}`).join('\n')}` : ''].filter(Boolean).join('\n');
+    try {
+      const { text } = await this._call({ system, messages: [{ role: 'user', content: user }], maxTokens: 400, json: true, utility: true });
+      const p = parseJson(text);
+      if (!p || !['a', 'b', 'unsure'].includes(p.keep)) return null;
+      return { keep: p.keep, reason: String(p.reason || '').slice(0, 300) };
+    } catch (e) {
+      this.lastError = e.message;
+      return null;
+    }
+  }
+
   async reflect(material, lang = 'vi') {
     if (!this.client) return null;
     const system =

@@ -22,6 +22,7 @@ import { handoff } from './corpusCallosum.js';
 import { encodeOnline, encodeOutcome, consolidate, describeReason } from './hippocampus.js';
 import { forget } from './forgetting.js';
 import { factsFromSessions } from './consolidation.js';
+import { proposeResolutions, proposalOf, olderFirst } from './proposals.js';
 import { reflect } from './dmn.js';
 import { emptySleepState, recordSleep } from './sleepScheduler.js';
 import { EmbedQueue } from './embedQueue.js';
@@ -483,6 +484,7 @@ export class Brain {
     const sessions = [];
     const episodes = await consolidate(this, t, { customerId, sessions });
     const consolidated = await factsFromSessions(this, t, { customerId, sessions });
+    await proposeResolutions(this, t, { customerId });
     const forgotten = forget(this, t);
     const reflection = await reflect(this, t, { customerId });
     this.count(null, 'sleeps');
@@ -641,8 +643,9 @@ export class Brain {
       const o = this.state.facts.find((x) => x.id === f.conflictWith);
       if (!o) continue;
       seen.add(f.id).add(o.id);
-      const [older, newer] = (o.createdAt ?? 0) <= (f.createdAt ?? 0) ? [o, f] : [f, o];
-      conflicts.push({ customerId: f.customerId, customerName: this.state.customers[f.customerId]?.name || f.customerId, relation: f.relation, label: relationLabel(f.relation, lang), a: side(older), b: side(newer) });
+      const [older, newer] = olderFirst(this, o, f);
+      const p = proposalOf(older, newer);
+      conflicts.push({ customerId: f.customerId, customerName: this.state.customers[f.customerId]?.name || f.customerId, relation: f.relation, label: relationLabel(f.relation, lang), a: side(older), b: side(newer), proposal: p ? { keepId: p.keepId, reason: p.reason, model: p.model, at: p.at } : null });
     }
     const facts = new Map(this.state.facts.map((f) => [f.id, f]));
     const decisions = (this.state.decisions || [])
@@ -687,9 +690,11 @@ export class Brain {
     return r.decision;
   }
 
-  resolveConflict(factId) {
+  // via: 'human' (default) or 'proposal' when a person accepts an LLM proposal.
+  resolveConflict(factId, { via = 'human' } = {}) {
     const f = resolveConflict(this, factId);
     if (!f) throw err('fact not found', 404);
+    audit(this, { op: 'resolve', customerId: f.customerId, relation: f.relation, itemId: f.id, kind: via === 'proposal' ? 'proposal' : 'human' });
     this.store.save();
     return f;
   }

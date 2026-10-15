@@ -75,7 +75,10 @@ const admin = {
   'GET /api/graph': (req, url) => brain.graph(q(url, 'customerId') || 'kh-001', q(url, 'lang'), q(url, 'asOf')),
   'GET /api/relations': (req, url) => ({ relations: brain.relations(q(url, 'lang')) }),
   'GET /api/review': (req, url) => brain.review(q(url, 'lang')),
-  'POST /api/review/resolve': async (req) => brain.resolveConflict((await readBody(req)).factId),
+  'POST /api/review/resolve': async (req) => {
+    const b = await readBody(req);
+    return brain.resolveConflict(b.factId, { via: b.via === 'proposal' ? 'proposal' : 'human' });
+  },
   'POST /api/review/undo': async (req) => brain.undoDecision((await readBody(req)).decisionId),
   'GET /api/value': (req, url) => brain.valueReport(q(url, 'lang')),
   'GET /api/audit': (req, url) => brain.auditLog(Math.min(5000, Number(q(url, 'limit') || 100))),

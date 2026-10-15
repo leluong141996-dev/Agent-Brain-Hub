@@ -211,3 +211,61 @@ test('consolidation: a private session stays private; at most 10 facts per sessi
   await off.sleep({ customerId: 'kh-001', lang: 'en' });
   assert.equal(off.state.facts.filter((f) => f.origin === 'consolidation').length, 0);
 });
+
+// ---- proposals: the LLM suggests how to settle a conflict; a person decides ----
+
+test('proposals: sleep asks the LLM once per conflict, stores the proposal, never applies it', async () => {
+  const asked = [];
+  const llm = stubLLM(() => []);
+  llm.proposeResolution = async (input) => {
+    asked.push(input);
+    return { keep: 'b', reason: 'Atlas heard it more recently and the customer mentioned a move.' };
+  };
+  const b = makeBrain(llm);
+  await b.think({ agentId: 'mia', text: 'I live in Hanoi', lang: 'en' });
+  await b.think({ agentId: 'atlas', text: 'I live in Da Nang', lang: 'en' });
+  await b.sleep({ customerId: 'kh-001', lang: 'en' });
+  assert.equal(asked.length, 1);
+  assert.deepEqual([asked[0].a.value, asked[0].b.value], ['Hanoi', 'Da Nang'], 'older value is "a"');
+  assert.ok(asked[0].a.evidence && asked[0].b.agent, 'the LLM sees evidence and who wrote each value');
+  const c = b.review('en').conflicts[0];
+  assert.equal(c.proposal.keepId, c.b.id);
+  assert.match(c.proposal.reason, /more recently/);
+  assert.equal(live(b, 'lives_in').filter((f) => f.status === 'conflicted').length, 2, 'nothing applied');
+  await b.sleep({ customerId: 'kh-001', lang: 'en' });
+  assert.equal(asked.length, 1, 'not asked again for the same pair');
+});
+
+test('proposals: accepting one settles the conflict like a person would, and says so in the audit', async () => {
+  const llm = stubLLM(() => []);
+  llm.proposeResolution = async () => ({ keep: 'a', reason: 'The finance agent verified it.' });
+  const b = makeBrain(llm);
+  await b.think({ agentId: 'mia', text: 'I live in Hanoi', lang: 'en' });
+  await b.think({ agentId: 'atlas', text: 'I live in Da Nang', lang: 'en' });
+  await b.sleep({ customerId: 'kh-001', lang: 'en' });
+  const c = b.review('en').conflicts[0];
+  b.resolveConflict(c.proposal.keepId, { via: 'proposal' });
+  assert.deepEqual(live(b, 'lives_in').map((f) => f.value), ['Hanoi']);
+  assert.ok(trustOf(b, 'mia') > 0.5 && trustOf(b, 'atlas') < 0.5);
+  assert.ok(b.auditLog(20).some((e) => e.op === 'resolve' && e.kind === 'proposal'));
+  assert.equal(b.review('en').conflicts.length, 0);
+});
+
+test('proposals: "unsure" is stored and not asked again; offline nothing is proposed', async () => {
+  let n = 0;
+  const llm = stubLLM(() => []);
+  llm.proposeResolution = async () => (n++, { keep: 'unsure', reason: 'Both sound plausible.' });
+  const b = makeBrain(llm);
+  await b.think({ agentId: 'mia', text: 'I live in Hanoi', lang: 'en' });
+  await b.think({ agentId: 'atlas', text: 'I live in Da Nang', lang: 'en' });
+  await b.sleep({ customerId: 'kh-001', lang: 'en' });
+  await b.sleep({ customerId: 'kh-001', lang: 'en' });
+  assert.equal(n, 1);
+  assert.equal(b.review('en').conflicts[0].proposal.keepId, null);
+
+  const off = makeBrain();
+  await off.think({ agentId: 'mia', text: 'I live in Hanoi', lang: 'en' });
+  await off.think({ agentId: 'atlas', text: 'I live in Da Nang', lang: 'en' });
+  await off.sleep({ customerId: 'kh-001', lang: 'en' });
+  assert.equal(off.review('en').conflicts[0].proposal, null);
+});
