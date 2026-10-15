@@ -279,7 +279,7 @@ await step('11. MCP server — tools/list and brain_recall over stdio', async ()
   const recallText = byId[3]?.result?.content?.[0]?.text || '';
   return [
     ['initialize handshake', byId[1]?.result?.serverInfo?.name === 'agent-brain-hub'],
-    ['4 brain tools exposed', byId[2]?.result?.tools?.length === 4, byId[2]?.result?.tools?.map((x) => x.name).join(', ')],
+    ['brain tools exposed (recall, remember, correct, forget, profile, feedback)', ['brain_recall', 'brain_remember', 'brain_correct', 'brain_forget', 'brain_profile', 'brain_feedback'].every((n) => byId[2]?.result?.tools?.some((x) => x.name === n)), byId[2]?.result?.tools?.map((x) => x.name).join(', ')],
     ['brain_recall returns traceId + memory context', /traceId: recall-/.test(recallText) && /Semantic memory/.test(recallText)],
   ];
 });
