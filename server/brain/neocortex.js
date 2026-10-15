@@ -268,49 +268,87 @@ export function seedGlobal(B) {
   }
 }
 
+// When a fact leaves a conflict (corrected, forgotten), its partner is no longer
+// in conflict with anything: it becomes the value again, and any proposal for
+// the pair is dropped.
+function releasePartners(B, gone, now) {
+  const ids = new Set(gone.map((f) => f.id));
+  for (const f of B.state.facts) {
+    if (!f.conflictWith || !ids.has(f.conflictWith) || ids.has(f.id)) continue;
+    delete f.conflictWith;
+    delete f.proposal;
+    f.conflictResolvedAt = now;
+    if (f.status === 'conflicted') f.status = 'active';
+  }
+  for (const f of gone) delete f.proposal;
+}
+
+const isGlobal = (f) => f.customerId === '*' || f.scope === 'global';
+
 // v0.8: an agent corrects a fact it can see. The wrong value is invalidated
 // (kept as history, reason "corrected"); an optional new value is written in
 // its place. Returns { corrected: [facts], fact }, or throws 404 when nothing
 // visible matches (the same answer whether a private fact exists or not).
+// Company-wide policies are not reachable (see Brain.correct).
 export function correctFact(B, { agent, customerId, relation, wrongValue, value, reason }) {
   const name = normalizeName(relation);
   const now = B.clock.now();
+  const newValue = value === undefined || value === null ? '' : String(value).trim();
+  if (newValue.length > 160) throw Object.assign(new Error('value is too long (160 characters at most)'), { status: 400 });
   const targets = B.state.facts.filter(
-    (f) => f.customerId === customerId && f.relation === name && visibleAt(f, now) && visible(f, agent) && (wrongValue === undefined || wrongValue === null || wrongValue === '' || sameValue(f.value, wrongValue))
+    (f) => f.customerId === customerId && !isGlobal(f) && f.relation === name && visibleAt(f, now) && visible(f, agent) && (wrongValue === undefined || wrongValue === null || wrongValue === '' || sameValue(f.value, wrongValue))
   );
   if (!targets.length) throw Object.assign(new Error(`no fact "${name}" this agent can see for this customer`), { status: 404 });
   for (const f of targets) {
     invalidate(f, { by: null, reason: 'corrected', at: now });
     f.correctedBy = agent.id;
     f.correctionReason = reason ? String(reason).slice(0, 200) : null;
-    delete f.conflictWith;
-    if (f.sourceAgentId && f.sourceAgentId !== agent.id) penalize(B, f.sourceAgentId);
   }
+  releasePartners(B, targets, now);
+  for (const f of targets) delete f.conflictWith;
+  // One penalty per writer, however many of its values were wrong.
+  for (const id of new Set(targets.map((f) => f.sourceAgentId))) if (id && id !== agent.id) penalize(B, id);
   let written = null;
-  if (value !== undefined && value !== null && String(value).trim()) {
-    const r = writeFact(B, { relation: name, value: String(value), isUpdate: true, evidence: reason ? `correction: ${reason}` : 'correction' }, { agent, customerId });
+  if (newValue) {
+    // Not an "update": only the corrected values are replaced; values this
+    // agent cannot see still go through arbitration as usual.
+    const r = writeFact(B, { relation: name, value: newValue, evidence: reason ? `correction: ${reason}` : 'correction' }, { agent, customerId });
     written = r.fact || null;
     if (written) for (const f of targets) f.invalidatedBy = f.supersededBy = written.id;
   }
   return { corrected: targets, fact: written };
 }
 
+// Words of a forgotten value as they may appear in text: the value itself and,
+// for a Latin word ending in "s", its singular with any ending ("peanuts" →
+// "peanut snacks"). Matched as whole words (never inside "$5000" for "$500");
+// CJK has no word boundaries and is matched as is. Best effort: an LLM-written
+// summary may paraphrase a value in words that are not there to match.
+function scrubPatterns(values) {
+  const esc = (v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return values.map((v) => {
+    if (/[぀-鿿]/.test(v)) return new RegExp(esc(v), 'gu');
+    const stem = /^[\p{L} ]+s$/iu.test(v) && v.length > 3 ? `${esc(v.slice(0, -1))}\\p{L}*` : esc(v);
+    return new RegExp(`(?<![\\p{L}\\p{N}])${stem}(?![\\p{L}\\p{N}])`, 'giu');
+  });
+}
+
 // v0.8: forget on the customer's request. Facts of the relation the agent can
 // see are deleted in every version (no history, no vectors), and their values
 // are scrubbed from what the agent can see of this customer: episodes,
-// working-memory turns, traces, insights and registry examples. Facts the agent
-// cannot see are left alone, and the answer looks the same as "nothing found".
+// working-memory turns, traces, insights, registry examples and the event log.
+// Facts the agent cannot see are left alone, and the answer looks the same as
+// "nothing found". Company-wide policies are not reachable (see Brain.forget).
 export function forgetFacts(B, { agent, customerId, relation, value, turnVisible }) {
   const name = normalizeName(relation);
-  const hit = (f) => f.customerId === customerId && f.relation === name && visible(f, agent) && (value === undefined || value === null || value === '' || sameValue(f.value, value));
-  const gone = B.state.facts.filter(hit);
+  const now = B.clock.now();
+  const matches = (f) => value === undefined || value === null || value === '' || sameValue(f.value, value) || Object.values(f.valueI18n || {}).some((v) => sameValue(v, value));
+  const gone = B.state.facts.filter((f) => f.customerId === customerId && !isGlobal(f) && f.relation === name && visible(f, agent) && matches(f));
   if (!gone.length) return { removedFacts: 0, scrubbed: 0 };
+  releasePartners(B, gone, now);
   B.state.facts = B.state.facts.filter((f) => !gone.includes(f));
-  const values = [...new Set(gone.flatMap((f) => [f.value, ...Object.values(f.valueI18n || {})]).map((v) => String(v).trim()).filter((v) => v.length >= 3))];
-  const patterns = values.map((v) => {
-    const esc = v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return /^[\p{L}\p{N}]/u.test(v) && !/[぀-鿿]/.test(v) ? new RegExp(`(?<![\\p{L}\\p{N}])${esc}(?![\\p{L}\\p{N}])`, 'giu') : new RegExp(esc, 'gi');
-  });
+  const values = [...new Set(gone.flatMap((f) => [f.value, ...Object.values(f.valueI18n || {})]).map((v) => String(v).trim()).filter(Boolean))];
+  const patterns = scrubPatterns(values);
   const scrub = (text) => {
     let out = String(text ?? '');
     for (const re of patterns) out = out.replace(re, '[forgotten]');
@@ -326,6 +364,12 @@ export function forgetFacts(B, { agent, customerId, relation, value, turnVisible
     scrubbed += 1;
     return true;
   };
+  // A turn or trace of another agent counts as seen only if this agent may
+  // read that agent's domain (private domains) and the shared pool.
+  const sees = (agentId) => {
+    if (!turnVisible(B, { agentId }, agent)) return false;
+    return agentId === agent.id || B.agentDomain(agentId) === agent.domain || agent.permissions?.readShared !== false;
+  };
   for (const e of B.state.episodes) {
     if (e.customerId !== customerId || !visible(e, agent)) continue;
     if (fix(e, 'text')) {
@@ -334,15 +378,32 @@ export function forgetFacts(B, { agent, customerId, relation, value, turnVisible
       e.vecModel = null;
     }
   }
+  // A trace keeps the whole context of a request (user text, reply, recent
+  // turns, facts), so it is scrubbed as a whole.
+  const scrubJson = (obj) => {
+    const json = JSON.stringify(obj);
+    const clean = scrub(json);
+    if (clean === json) return obj;
+    scrubbed += 1;
+    try {
+      return JSON.parse(clean);
+    } catch {
+      return { forgotten: true };
+    }
+  };
   const wm = B.state.working[customerId];
-  for (const turn of wm?.turns || []) if (turnVisible(B, turn, agent)) fix(turn, 'text');
-  for (const rec of Object.values(B.state.traces || {})) {
-    if (rec.customerId !== customerId) continue;
-    if (!turnVisible(B, { agentId: rec.agentId }, agent)) continue;
-    fix(rec, 'userText');
-    fix(rec, 'reply');
+  if (wm) {
+    for (const turn of wm.turns || []) if (sees(turn.agentId)) fix(turn, 'text');
+    // The rest of working memory (handoff context: recent turns, facts) is
+    // derived from what was shared, so the value goes there too.
+    for (const key of Object.keys(wm)) if (key !== 'turns' && wm[key] && typeof wm[key] === 'object') wm[key] = scrubJson(wm[key]);
+  }
+  for (const [id, rec] of Object.entries(B.state.traces || {})) {
+    if (rec.customerId !== customerId || !sees(rec.agentId)) continue;
+    B.state.traces[id] = scrubJson(rec);
   }
   for (const i of B.state.insights || []) if (i.customerId === customerId) fix(i, 'text');
+  for (const ev of B.bus?.log || []) ev.payload = scrubJson(ev.payload);
   const reg = B.state.relations?.[name];
   if (reg?.examples) reg.examples = reg.examples.map(scrub).filter((x) => x !== '[forgotten]');
   B.embedQueue?.kick();

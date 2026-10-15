@@ -48,7 +48,7 @@ const TOOLS = [
   {
     name: 'brain_forget',
     description:
-      'Forget something because the customer asked you to: deletes the facts of that relation you are allowed to see (or only value), including their history, and removes the value from the conversations you can see. Use it only on an explicit request. It cannot erase other domains\' private data; a full erase of a customer is an admin action.',
+      'Forget something because the customer asked you to: deletes the facts of that relation you are allowed to see (or only value), including their history, and removes the value from the conversations you can see. Use it only on an explicit request. Mentions of the value are removed word for word; a summary an LLM wrote in other words may still describe it. It cannot erase other domains\' private data or company-wide policies; a full erase of a customer is an admin action.',
     inputSchema: { type: 'object', properties: { customerId: { type: 'string' }, relation: { type: 'string' }, value: { type: 'string', description: 'Only this value (omit to forget every value of the relation)' } }, required: ['customerId', 'relation'] },
   },
   {

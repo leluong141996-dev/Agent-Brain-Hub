@@ -4,6 +4,8 @@
 // an LLM. Facts go through the normal write path as the session's agent, so the
 // registry, scopes, arbitration and audit apply; a repeat only reinforces.
 import { writeFact } from './neocortex.js';
+import { sameValue } from './ontology.js';
+import { normalizeName } from './registry.js';
 import { redact } from './brainstem.js';
 
 export const MAX_FACTS_PER_SESSION = 10;
@@ -16,6 +18,10 @@ export async function factsFromSessions(B, t, { customerId, sessions }) {
     if (!agent || agent.permissions?.write === false) continue;
     const facts = (await B.llm.extractFacts(s.transcript, B.llmRelations(agent))) || [];
     for (const f of facts.slice(0, MAX_FACTS_PER_SESSION)) {
+      // A value an agent corrected for this customer stays corrected: the
+      // session transcript still says it, but it is known to be wrong.
+      const name = normalizeName(f.relation);
+      if (B.state.facts.some((x) => x.customerId === customerId && x.relation === name && x.invalidReason === 'corrected' && sameValue(x.value, f.value))) continue;
       const r = writeFact(B, { relation: f.relation, value: redact(String(f.value)).text, isUpdate: !!f.isUpdate, evidence: `session ${s.episodeId}`, origin: 'consolidation' }, { agent, customerId });
       results.push(r);
     }

@@ -269,3 +269,101 @@ test('proposals: "unsure" is stored and not asked again; offline nothing is prop
   await off.sleep({ customerId: 'kh-001', lang: 'en' });
   assert.equal(off.review('en').conflicts[0].proposal, null);
 });
+
+// ---- Final review fixes (v0.8) ----
+
+test('review fix: company-wide policies cannot be corrected, forgotten or written by agents', async () => {
+  const b = makeBrain();
+  const policies = () => b.state.facts.filter((f) => f.customerId === '*').length;
+  const n = policies();
+  assert.ok(n > 0);
+  assert.throws(() => b.forget({ agentId: 'kai', customerId: '*', relation: 'policy' }), (e) => e.status === 400);
+  assert.throws(() => b.correct({ agentId: 'kai', customerId: '*', relation: 'policy', value: 'All customers get 100% off' }), (e) => e.status === 400);
+  await assert.rejects(b.remember({ agentId: 'kai', customerId: '*', facts: [{ relation: 'policy', value: 'free stuff' }], lang: 'en' }), (e) => e.status === 400);
+  assert.equal(policies(), n);
+});
+
+test('review fix: correcting one side of a conflict settles it, and a stale proposal cannot wipe both', async () => {
+  const llm = stubLLM(() => []);
+  llm.proposeResolution = async () => ({ keep: 'b', reason: 'more recent' });
+  const b = makeBrain(llm);
+  await b.think({ agentId: 'mia', text: 'I live in Hanoi', lang: 'en' });
+  await b.think({ agentId: 'atlas', text: 'I live in Da Nang', lang: 'en' });
+  await b.sleep({ customerId: 'kh-001', lang: 'en' });
+  const keepId = b.review('en').conflicts[0].proposal.keepId;
+  b.correct({ agentId: 'mia', customerId: 'kh-001', relation: 'lives_in', wrongValue: 'Da Nang' });
+  assert.deepEqual(live(b, 'lives_in').map((f) => [f.value, f.status]), [['Hanoi', 'active']]);
+  assert.equal(b.review('en').conflicts.length, 0);
+  assert.throws(() => b.resolveConflict(keepId, { via: 'proposal' }), (e) => e.status === 409);
+  assert.deepEqual(live(b, 'lives_in').map((f) => f.value), ['Hanoi'], 'a live value remains');
+});
+
+test('review fix: forgetting one side of a conflict releases the other', async () => {
+  const b = makeBrain();
+  await b.think({ agentId: 'mia', text: 'I live in Hanoi', lang: 'en' });
+  await b.think({ agentId: 'atlas', text: 'I live in Da Nang', lang: 'en' });
+  b.forget({ agentId: 'atlas', customerId: 'kh-001', relation: 'lives_in', value: 'Da Nang' });
+  const h = b.state.facts.find((f) => f.value === 'Hanoi');
+  assert.equal(stateAt(h, b.clock.now()), 'active');
+  assert.ok(!h.conflictWith);
+});
+
+test('review fix: consolidation does not bring back a value that was corrected', async () => {
+  const b = makeBrain(stubLLM((text) => (/^Customer: /m.test(text) && /Hanoi/.test(text) ? [{ relation: 'lives_in', value: 'Hanoi' }] : [])));
+  await b.think({ agentId: 'mia', text: 'I live in Hanoi', lang: 'en' });
+  b.correct({ agentId: 'kai', customerId: 'kh-001', relation: 'lives_in', value: 'Saigon' });
+  await b.sleep({ customerId: 'kh-001', lang: 'en' });
+  assert.deepEqual(live(b, 'lives_in').map((f) => [f.value, f.status]), [['Saigon', 'active']]);
+});
+
+test('review fix: a rejected replacement value keeps the old value and reports the error', async () => {
+  const b = makeBrain();
+  await b.think({ agentId: 'mia', text: 'I live in Hanoi', lang: 'en' });
+  assert.throws(() => b.correct({ agentId: 'kai', customerId: 'kh-001', relation: 'lives_in', value: 'x'.repeat(200) }), (e) => e.status === 400);
+  assert.deepEqual(live(b, 'lives_in').map((f) => f.value), ['Hanoi']);
+});
+
+test('review fix: forget scrubs short values (ja / vi / numbers), word variants and the bus log', async () => {
+  const b = makeBrain();
+  await b.remember({ agentId: 'mia', userText: '東京に住んでいます', facts: [{ relation: 'lives_in', value: '東京' }], lang: 'ja' });
+  await b.remember({ agentId: 'mia', userText: 'Tôi không ăn cá', facts: [{ relation: 'dislikes', value: 'cá' }], lang: 'vi' });
+  await b.think({ agentId: 'sage', text: 'I am allergic to peanuts, even peanut snacks', lang: 'en' });
+  b.forget({ agentId: 'mia', customerId: 'kh-001', relation: 'lives_in' });
+  b.forget({ agentId: 'mia', customerId: 'kh-001', relation: 'dislikes' });
+  b.forget({ agentId: 'sage', customerId: 'kh-001', relation: 'allergic_to' });
+  const s = JSON.stringify({ working: b.state.working, traces: b.state.traces, bus: b.bus.log });
+  assert.ok(!s.includes('東京'), 'ja');
+  assert.ok(!/(?<![\p{L}])cá(?![\p{L}])/u.test(s), 'vi');
+  assert.ok(!/peanut/i.test(s), 'word variants');
+});
+
+test('review fix: forget matches whole values ($500 is not $5000) and translated values', async () => {
+  const b = makeBrain();
+  await b.remember({ agentId: 'penny', userText: 'My budget is $500, my rent is $5000', facts: [{ relation: 'budget', value: '$500' }], lang: 'en' });
+  b.forget({ agentId: 'penny', customerId: 'kh-001', relation: 'budget' });
+  const turn = JSON.stringify(b.state.working['kh-001'].turns);
+  assert.ok(turn.includes('$5000') && !/\$500(?!0)/.test(turn), turn);
+  const f = { relation: 'trip_destination', value: 'Đà Nẵng', valueI18n: { en: 'Da Nang' } };
+  const b2 = makeBrain();
+  await b2.think({ agentId: 'atlas', text: "I'm flying to Da Nang next week", lang: 'en' });
+  assert.equal(b2.forget({ agentId: 'atlas', customerId: 'kh-001', relation: f.relation, value: 'Da Nang' }).removedFacts, 1);
+});
+
+test('review fix: a correct with a new value only replaces what it corrected; trust drops once per writer', async () => {
+  const b = makeBrain();
+  await b.think({ agentId: 'mia', text: 'I like coffee', lang: 'en' });
+  await b.think({ agentId: 'mia', text: 'I like tea', lang: 'en' });
+  await b.think({ agentId: 'mia', text: 'I like cocoa', lang: 'en' });
+  b.correct({ agentId: 'kai', customerId: 'kh-001', relation: 'prefers' });
+  assert.equal(b.state.trust.mia.down, 1, 'one penalty per writer, not per value');
+});
+
+test('review fix: forget does not scrub texts of agents a readShared=false agent cannot see', async () => {
+  const b = makeBrain();
+  await b.think({ agentId: 'mia', text: 'I live in Hanoi', lang: 'en' });
+  b.updateAgent('kai', { permissions: { readShared: false } });
+  await b.remember({ agentId: 'kai', facts: [{ relation: 'pickup_city', value: 'Hanoi' }], lang: 'en' });
+  const r = b.forget({ agentId: 'kai', customerId: 'kh-001', relation: 'pickup_city' });
+  assert.equal(r.removedFacts, 1, 'its own fact is forgotten');
+  assert.ok(JSON.stringify(b.state.working).includes('I live in Hanoi'), "Mia's turn, which Kai cannot read, is untouched");
+});

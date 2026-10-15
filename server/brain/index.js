@@ -376,6 +376,7 @@ export class Brain {
     if (traceId && !record) throw err('trace not found (it may have expired); send userText instead', 404);
     if (record && record.agentId !== agentId) throw err('trace belongs to another agent', 403);
     if (!record && !userText && !facts.length) throw err('provide traceId, userText or facts', 400);
+    if (customerId === '*') throw err('"*" holds company-wide policies; agents cannot write to it', 400);
     const t = this.bus.trace('remember', { agentId, customerId, lang });
     const agent = this.getAgent(agentId);
     customerId = record?.customerId || customerId;
@@ -661,6 +662,7 @@ export class Brain {
     const agent = this.getAgent(agentId);
     if (agent.permissions?.write === false) throw err('this agent is read-only', 403);
     if (!relation) throw err('relation is required', 400);
+    if (customerId === '*') throw err('company-wide policies are managed by an admin, not by agents', 400);
     const cleanValue = value === undefined || value === null ? value : redact(String(value)).text;
     const r = correctFact(this, { agent, customerId, relation, wrongValue, value: cleanValue, reason });
     audit(this, { op: 'correct', agentId: agent.id, customerId, relation: r.corrected[0].relation, itemId: r.fact?.id || null, kind: r.fact ? 'replaced' : 'dropped' });
@@ -675,6 +677,7 @@ export class Brain {
     const agent = this.getAgent(agentId);
     if (agent.permissions?.write === false) throw err('this agent is read-only', 403);
     if (!relation) throw err('relation is required', 400);
+    if (customerId === '*') throw err('company-wide policies are managed by an admin, not by agents', 400);
     const r = forgetFacts(this, { agent, customerId, relation, value, turnVisible });
     audit(this, { op: 'forget', agentId: agent.id, customerId, relation: normalizeName(relation), kind: `${r.removedFacts} facts, ${r.scrubbed} texts` });
     this.store.save();
@@ -692,6 +695,8 @@ export class Brain {
 
   // via: 'human' (default) or 'proposal' when a person accepts an LLM proposal.
   resolveConflict(factId, { via = 'human' } = {}) {
+    const target = this.state.facts.find((x) => x.id === factId);
+    if (target && !visibleAt(target, this.clock.now())) throw err('this value is no longer current (it was corrected, replaced or resolved)', 409);
     const f = resolveConflict(this, factId);
     if (!f) throw err('fact not found', 404);
     audit(this, { op: 'resolve', customerId: f.customerId, relation: f.relation, itemId: f.id, kind: via === 'proposal' ? 'proposal' : 'human' });

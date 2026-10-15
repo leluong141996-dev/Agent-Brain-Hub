@@ -79,7 +79,8 @@ export class BrainClient {
   /**
    * Forget on the customer's request: deletes the relation's facts this agent
    * can see (or only `value`), with their history, and scrubs the value from
-   * what this agent can see. Returns { removedFacts, scrubbed }.
+   * what this agent can see (word for word: an LLM-written summary that
+   * paraphrases it is not caught). Returns { removedFacts, scrubbed }.
    */
   forget({ customerId, relation, value }) {
     return this.#call('POST', '/v1/forget', { customerId, relation, value });
