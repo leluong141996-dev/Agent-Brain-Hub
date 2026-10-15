@@ -41,6 +41,12 @@ export async function runScenario(s, makeTarget, { llm = false } = {}) {
       } else if (st.remember !== undefined) {
         await target.remember(st.agent, st.remember, st.customer);
         await target.settle?.();
+      } else if (st.correct !== undefined) {
+        await target.correct(st.agent, st.correct, st.customer);
+        await target.settle?.();
+      } else if (st.forget !== undefined) {
+        await target.forget(st.agent, st.forget, st.customer);
+        await target.settle?.();
       } else if (st.promote !== undefined) {
         const { relation, ...body } = st.promote;
         await target.promote(relation, { action: 'promote', ...body });

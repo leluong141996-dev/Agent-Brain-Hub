@@ -1,0 +1,29 @@
+{
+  "id": "llm-maintenance-consolidation",
+  "category": "maintenance",
+  "lang": "en",
+  "requires": "llm",
+  "description": "With an LLM, sleep learns a fact spread over two messages (measured only with --llm).",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "I have kids, by the way"
+    },
+    {
+      "agent": "mia",
+      "say": "Two of them, both in primary school"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "mia",
+      "recall": "Plan a family weekend for us",
+      "expect": {
+        "remembers": [
+          "/(child|kid)[^:\\n]*:\\s*(2|two)/i"
+        ]
+      }
+    }
+  ]
+}

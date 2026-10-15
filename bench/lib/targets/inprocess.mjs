@@ -34,6 +34,14 @@ export class InProcessTarget {
     await this.brain.remember({ agentId: agent, customerId: customer, facts: payload.facts, userText: payload.text, lang: this.lang });
   }
 
+  async correct(agent, body, customer = DEFAULT_CUSTOMER) {
+    this.brain.correct({ agentId: agent, customerId: customer, ...body, lang: this.lang });
+  }
+
+  async forget(agent, body, customer = DEFAULT_CUSTOMER) {
+    this.brain.forget({ agentId: agent, customerId: customer, ...body });
+  }
+
   async promote(relation, body) {
     this.brain.updateRelation(relation, body);
   }

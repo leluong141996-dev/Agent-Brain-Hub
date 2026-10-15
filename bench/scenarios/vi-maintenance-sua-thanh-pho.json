@@ -1,0 +1,37 @@
+{
+  "id": "vi-maintenance-sua-thanh-pho",
+  "category": "maintenance",
+  "lang": "vi",
+  "description": "Tiếng Việt: agent sửa thành phố khách đang sống.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "Tôi sống ở Hà Nội"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "kai",
+      "correct": {
+        "relation": "lives_in",
+        "value": "Đà Nẵng"
+      }
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "atlas",
+      "recall": "Đặt taxi từ nhà tôi ra sân bay",
+      "expect": {
+        "remembers": [
+          "Đà Nẵng"
+        ],
+        "stale": [
+          "/sống ở: hà nội/i"
+        ]
+      }
+    }
+  ]
+}

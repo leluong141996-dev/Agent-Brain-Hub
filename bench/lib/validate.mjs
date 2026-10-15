@@ -2,9 +2,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const CATEGORIES = ['cross_agent', 'stale', 'contradiction', 'leakage', 'multi_hop', 'long_conversation', 'exact_match', 'temporal', 'open_schema', 'arbitration'];
+export const CATEGORIES = ['cross_agent', 'stale', 'contradiction', 'leakage', 'multi_hop', 'long_conversation', 'exact_match', 'temporal', 'open_schema', 'arbitration', 'maintenance'];
 const LANGS = ['vi', 'en', 'ja'];
-const KINDS = ['say', 'recall', 'remember', 'advance', 'sleep', 'mark', 'promote'];
+const KINDS = ['say', 'recall', 'remember', 'correct', 'forget', 'advance', 'sleep', 'mark', 'promote'];
 const RECALL_CHECKS = ['remembers', 'private', 'stale', 'conflict'];
 const UNITS = { m: 60_000, h: 3_600_000, d: 86_400_000 };
 
@@ -52,6 +52,10 @@ export function validateScenario(s, file, { agents }) {
       if (!agents.includes(st.agent)) err(`unknown agent "${st.agent}" (known: ${agents.join(', ')})`, n);
       const facts = st.remember?.facts;
       if (!Array.isArray(facts) || !facts.length || facts.some((f) => !f || typeof f.relation !== 'string' || !f.relation || f.value === undefined)) err('remember.facts must be a non-empty list of {relation, value}', n);
+    }
+    if (kind === 'correct' || kind === 'forget') {
+      if (!agents.includes(st.agent)) err(`unknown agent "${st.agent}" (known: ${agents.join(', ')})`, n);
+      if (typeof st[kind]?.relation !== 'string' || !st[kind].relation) err(`${kind}.relation must be a relation name`, n);
     }
     if (kind === 'promote') {
       if (typeof st.promote?.relation !== 'string' || !st.promote.relation) err('promote.relation must be a relation name', n);

@@ -1,0 +1,39 @@
+{
+  "id": "maintenance-forget-cannot-reach-private",
+  "category": "maintenance",
+  "lang": "en",
+  "description": "An agent from another domain cannot forget (or see) a private fact.",
+  "steps": [
+    {
+      "agent": "sage",
+      "say": "I am allergic to peanuts"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "atlas",
+      "forget": {
+        "relation": "allergic_to"
+      }
+    },
+    {
+      "agent": "sage",
+      "recall": "Do I have any food allergies?",
+      "expect": {
+        "remembers": [
+          "peanuts"
+        ]
+      }
+    },
+    {
+      "agent": "atlas",
+      "recall": "Do I have any food allergies?",
+      "expect": {
+        "private": [
+          "peanut"
+        ]
+      }
+    }
+  ]
+}

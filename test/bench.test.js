@@ -275,3 +275,14 @@ test('bench: remember and promote steps validate; open_schema and arbitration ar
   const errs = validateScenario(bad, 'y.json', { agents: ['kai'] });
   assert.ok(errs.some((e) => /remember\.facts/.test(e)) && errs.some((e) => /promote\.relation/.test(e)), errs.join('\n'));
 });
+
+test('bench: correct and forget steps validate; maintenance is a category', () => {
+  const ok = { id: 'm', category: 'maintenance', lang: 'en', steps: [
+    { agent: 'kai', correct: { relation: 'lives_in', value: 'Saigon' } },
+    { agent: 'sage', forget: { relation: 'allergic_to', value: 'peanuts' } },
+  ] };
+  assert.deepEqual(validateScenario(ok, 'm.json', { agents: ['kai', 'sage'] }), []);
+  const bad = { id: 'n', category: 'maintenance', lang: 'en', steps: [{ agent: 'kai', correct: {} }, { agent: 'kai', forget: { value: 'x' } }] };
+  const errs = validateScenario(bad, 'n.json', { agents: ['kai'] });
+  assert.ok(errs.some((e) => /correct\.relation/.test(e)) && errs.some((e) => /forget\.relation/.test(e)), errs.join('\n'));
+});

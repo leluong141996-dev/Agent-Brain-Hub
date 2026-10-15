@@ -63,6 +63,16 @@ export class HttpTarget {
     await this.call('POST', '/v1/remember', { customerId: this.customer(customer), facts: payload.facts, userText: payload.text, lang: this.lang }, a.key);
   }
 
+  async correct(agent, body, customer) {
+    const a = await this.agent(agent);
+    await this.call('POST', '/v1/correct', { customerId: this.customer(customer), ...body, lang: this.lang }, a.key);
+  }
+
+  async forget(agent, body, customer) {
+    const a = await this.agent(agent);
+    await this.call('POST', '/v1/forget', { customerId: this.customer(customer), ...body }, a.key);
+  }
+
   async promote(relation, body) {
     await this.call('PUT', `/api/relations/${encodeURIComponent(relation)}`, body);
   }

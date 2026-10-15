@@ -1,0 +1,38 @@
+{
+  "id": "maintenance-correct-home",
+  "category": "maintenance",
+  "lang": "en",
+  "description": "An agent corrects a wrong home city: the new value is used, the old one is history.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "I live in Hanoi"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "kai",
+      "correct": {
+        "relation": "lives_in",
+        "value": "Saigon",
+        "reason": "the customer says Hanoi was a mistake"
+      }
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "atlas",
+      "recall": "Book a taxi from my home",
+      "expect": {
+        "remembers": [
+          "Saigon"
+        ],
+        "stale": [
+          "/lives in:? hanoi/i"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "id": "maintenance-forget-allergy",
+  "category": "maintenance",
+  "lang": "en",
+  "description": "The customer asks the health agent to forget an allergy: it is gone now and when looking back.",
+  "steps": [
+    {
+      "agent": "sage",
+      "say": "I am allergic to peanuts"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "mark": "before-forget"
+    },
+    {
+      "agent": "sage",
+      "forget": {
+        "relation": "allergic_to"
+      }
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "sage",
+      "recall": "Do I have any food allergies?",
+      "expect": {
+        "stale": [
+          "peanut"
+        ]
+      }
+    },
+    {
+      "agent": "sage",
+      "recall": "Do I have any food allergies?",
+      "asOf": "before-forget",
+      "expect": {
+        "stale": [
+          "peanut"
+        ]
+      }
+    }
+  ]
+}
