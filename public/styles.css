@@ -844,3 +844,9 @@ button.popover-row:hover, label.popover-row:hover { background: var(--hover); }
 .sc-form label { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--text-2); }
 .sc-form input { width: 150px; }
 .input.sm { height: 30px; padding: 4px 8px; font-size: 13px; width: auto; max-width: 100%; }
+
+/* v0.8: LLM proposals on the Review page */
+.rv-proposal { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: var(--violet-soft); display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
+.rv-proposal-text { display: flex; gap: 8px; align-items: flex-start; color: var(--violet); min-width: 0; }
+.rv-proposal-text b { color: var(--text); }
+.rv-proposal-text span { overflow-wrap: anywhere; }

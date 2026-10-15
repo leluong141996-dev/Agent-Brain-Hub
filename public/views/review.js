@@ -15,9 +15,18 @@ export async function render(root, ctx) {
       ${button}
     </div>`;
   const keep = (s) => `<button class="btn sm" data-keep="${s.id}">${icon('check', 13)}<span>${t('rv_keep')}</span></button>`;
+  // v0.8: what the LLM suggests during sleep (advice; a person decides).
+  const proposal = (c) => {
+    const p = c.proposal;
+    if (!p) return '';
+    const kept = p.keepId === c.a.id ? c.a : p.keepId === c.b.id ? c.b : null;
+    const head = kept ? t('rv_proposal_keep', { value: kept.value }) : t('rv_proposal_unsure');
+    const button = kept ? `<button class="btn sm primary" data-accept="${kept.id}">${icon('check', 13)}<span>${t('rv_accept_proposal')}</span></button>` : '';
+    return `<div class="rv-proposal"><div class="rv-proposal-text">${icon('sparkles', 14)}<span><b>${esc(head)}</b>${p.reason ? ` <span class="muted">${esc(p.reason)}</span>` : ''}</span></div>${button}</div>`;
+  };
   const conflicts = r.conflicts
     .map((c) => `<div class="card rv-card"><div class="rv-head"><b>${esc(c.label)}</b> <span class="muted small">· ${esc(c.customerName)}</span></div>
-      <div class="rv-pair">${side(c.a, keep(c.a))}${side(c.b, keep(c.b))}</div></div>`)
+      <div class="rv-pair">${side(c.a, keep(c.a))}${side(c.b, keep(c.b))}</div>${proposal(c)}</div>`)
     .join('');
   const decisions = r.decisions
     .map((d) => `<tr>
@@ -55,5 +64,6 @@ export async function render(root, ctx) {
     await ctx.refresh();
   };
   $$('[data-keep]', root).forEach((b) => (b.onclick = act('/api/review/resolve', { factId: b.dataset.keep })));
+  $$('[data-accept]', root).forEach((b) => (b.onclick = act('/api/review/resolve', { factId: b.dataset.accept, via: 'proposal' })));
   $$('[data-undo]', root).forEach((b) => (b.onclick = act('/api/review/undo', { decisionId: b.dataset.undo })));
 }

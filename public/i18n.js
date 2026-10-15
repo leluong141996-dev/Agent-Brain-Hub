@@ -7,6 +7,9 @@ export const LANGS = [
 
 const D = {
   vi: {
+    rv_proposal_keep: "Đề xuất của LLM: giữ \"{value}\".",
+    rv_proposal_unsure: "LLM chưa chắc nên giữ giá trị nào.",
+    rv_accept_proposal: "Chấp nhận đề xuất",
     nav_review: "Duyệt",
     rv_sub: "Mâu thuẫn cần người quyết, quyết định tự động có thể hoàn tác, và quan hệ mới nên xem xét.",
     rv_conflicts: "Mâu thuẫn chờ duyệt ({n})",
@@ -167,6 +170,9 @@ const D = {
     adapted: 'Đã tự điều chỉnh cho nhà cung cấp: {list}', source_settings: 'Lưu trong cài đặt', source_env: 'Từ biến môi trường', show: 'Hiện', hide: 'Ẩn', active: 'Đang dùng',
   },
   en: {
+    rv_proposal_keep: "LLM suggests keeping \"{value}\".",
+    rv_proposal_unsure: "The LLM is not sure which value to keep.",
+    rv_accept_proposal: "Accept proposal",
     nav_review: "Review",
     rv_sub: "Conflicts for a human to decide, automatic decisions you can undo, and new relations worth a look.",
     rv_conflicts: "Conflicts waiting ({n})",
@@ -323,6 +329,9 @@ const D = {
     adapted: 'Auto-adjusted for this provider: {list}', source_settings: 'Saved in settings', source_env: 'From environment variables', show: 'Show', hide: 'Hide', active: 'Active',
   },
   ja: {
+    rv_proposal_keep: "LLMの提案：「{value}」を採用。",
+    rv_proposal_unsure: "LLMはどちらを採用すべきか判断できませんでした。",
+    rv_accept_proposal: "提案を採用",
     nav_review: "レビュー",
     rv_sub: "人が判断すべき矛盾、取り消せる自動判断、確認すべき新しい関係。",
     rv_conflicts: "判断待ちの矛盾（{n}）",
