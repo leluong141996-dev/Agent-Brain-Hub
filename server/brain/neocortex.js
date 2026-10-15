@@ -109,6 +109,7 @@ export function writeFact(B, input, { agent, customerId }) {
       validFrom: now,
       validUntil: ttlDays ? now + ttlDays * DAY : null,
       evidence: input.evidence || null,
+      origin: input.origin || null,
       ...extra,
     };
     f.text = factToText(f, 'vi');

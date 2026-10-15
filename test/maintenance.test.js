@@ -152,3 +152,62 @@ test('correct and forget over REST (SDK) and MCP', async () => {
     hub.kill();
   }
 });
+
+// ---- consolidation: facts from whole sessions during sleep ----
+
+const stubLLM = (extract) => ({
+  available: true,
+  model: 'stub',
+  lastError: null,
+  async generate() {
+    return { text: 'Noted.', model: 'stub', usage: { input_tokens: 1, output_tokens: 1 } };
+  },
+  async extractFacts(text, relations) {
+    return extract(text, relations);
+  },
+  async summarize() {
+    return null;
+  },
+  async reflect() {
+    return [];
+  },
+});
+
+test('consolidation: a fact spread over two turns is extracted from the whole session during sleep', async () => {
+  const seen = [];
+  const llm = stubLLM((text) => {
+    seen.push(text);
+    // Online, each message alone says nothing durable; the session does.
+    return /I have kids/.test(text) && /Two of them/.test(text) ? [{ relation: 'has_children', value: '2', isUpdate: false }] : [];
+  });
+  const b = makeBrain(llm);
+  await b.think({ agentId: 'mia', text: 'I have kids, by the way', lang: 'en' });
+  await b.think({ agentId: 'mia', text: 'Two of them, both in primary school', lang: 'en' });
+  assert.equal(live(b, 'has_children').length, 0, 'nothing from single messages');
+  await b.sleep({ customerId: 'kh-001', lang: 'en' });
+  const f = live(b, 'has_children');
+  assert.deepEqual(f.map((x) => x.value), ['2']);
+  assert.equal(f[0].origin, 'consolidation');
+  assert.equal(f[0].sourceAgentId, 'mia', 'written as the session agent');
+  assert.match(f[0].evidence, /^session /);
+  assert.ok(seen.some((t) => /I have kids[\s\S]*Two of them/.test(t)), 'the extractor saw the whole session');
+});
+
+test('consolidation: a private session stays private; at most 10 facts per session; nothing offline', async () => {
+  // Only the session transcript ("Customer: …") yields facts, as in the first test.
+  const llm = stubLLM((text) => (/^Customer: /m.test(text) ? [{ relation: 'health_condition', value: 'asthma' }, ...Array.from({ length: 14 }, (_, i) => ({ relation: `note_${i}`, value: `v${i}` }))] : []));
+  const b = makeBrain(llm);
+  await b.think({ agentId: 'sage', text: 'I sometimes struggle to breathe at night', lang: 'en' });
+  await b.sleep({ customerId: 'kh-001', lang: 'en' });
+  const asthma = b.state.facts.find((f) => f.value === 'asthma');
+  assert.equal(asthma.scope, 'private');
+  assert.equal(asthma.ownerDomain, 'health');
+  assert.equal(b.state.facts.filter((f) => f.origin === 'consolidation').length, 10);
+  const atlas = await b.recall({ agentId: 'atlas', text: 'any health condition?', lang: 'en' });
+  assert.ok(!/asthma/.test(atlas.promptBlock));
+
+  const off = makeBrain();
+  await off.think({ agentId: 'mia', text: 'I have kids, by the way', lang: 'en' });
+  await off.sleep({ customerId: 'kh-001', lang: 'en' });
+  assert.equal(off.state.facts.filter((f) => f.origin === 'consolidation').length, 0);
+});

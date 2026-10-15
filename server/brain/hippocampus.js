@@ -126,7 +126,9 @@ export function encodeOutcome(B, t, { record, actionId, accepted }) {
 }
 
 // Sleep: turn un-consolidated working-memory turns into session episodes.
-export async function consolidate(B, t, { customerId }) {
+// sessions (optional): filled with { agentId, episodeId, transcript } for each
+// session stored, so the sleep cycle can extract facts from it (consolidation.js).
+export async function consolidate(B, t, { customerId, sessions = [] }) {
   const wm = B.state.working[customerId];
   const pending = (wm?.turns || []).filter((x) => !x.consolidated);
   const groups = new Map();
@@ -163,6 +165,7 @@ export async function consolidate(B, t, { customerId }) {
       expiresAt: days ? now + days * DAY : null,
     });
     created.push(ep);
+    sessions.push({ agentId, episodeId: ep.id, transcript });
     for (const x of turns) x.consolidated = true;
   }
   // Working memory keeps the latest few turns after consolidation, plus every

@@ -21,6 +21,7 @@ import { selectActions, learn } from './basalGanglia.js';
 import { handoff } from './corpusCallosum.js';
 import { encodeOnline, encodeOutcome, consolidate, describeReason } from './hippocampus.js';
 import { forget } from './forgetting.js';
+import { factsFromSessions } from './consolidation.js';
 import { reflect } from './dmn.js';
 import { emptySleepState, recordSleep } from './sleepScheduler.js';
 import { EmbedQueue } from './embedQueue.js';
@@ -479,7 +480,9 @@ export class Brain {
     lang = normLang(lang);
     const started = performance.now();
     const t = this.bus.trace('sleep', { customerId, lang, trigger });
-    const episodes = await consolidate(this, t, { customerId });
+    const sessions = [];
+    const episodes = await consolidate(this, t, { customerId, sessions });
+    const consolidated = await factsFromSessions(this, t, { customerId, sessions });
     const forgotten = forget(this, t);
     const reflection = await reflect(this, t, { customerId });
     this.count(null, 'sleeps');
