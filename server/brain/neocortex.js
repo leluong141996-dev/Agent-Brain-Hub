@@ -1,7 +1,7 @@
 // Neocortex — Persistent Memory Layer (episodic + semantic stores) with
 // hot/warm/cold tiering, multi-agent scoping and contradiction resolution.
 import { validateFact, factToText, factEmbedText, sameValue } from './ontology.js';
-import { ensureRelation, relationOf } from './registry.js';
+import { ensureRelation, relationOf, normalizeName } from './registry.js';
 import { arbitrate } from './arbitration.js';
 import { reward, penalize } from './trust.js';
 import { audit } from './audit.js';
@@ -263,4 +263,85 @@ export function seedGlobal(B) {
     const r = writeFact(B, { entity: 'organization', relation: 'policy', value: p.vi, valueI18n: p }, { agent: sys, customerId: '*' });
     if (r.fact) r.fact.pinned = true;
   }
+}
+
+// v0.8: an agent corrects a fact it can see. The wrong value is invalidated
+// (kept as history, reason "corrected"); an optional new value is written in
+// its place. Returns { corrected: [facts], fact }, or throws 404 when nothing
+// visible matches (the same answer whether a private fact exists or not).
+export function correctFact(B, { agent, customerId, relation, wrongValue, value, reason }) {
+  const name = normalizeName(relation);
+  const now = B.clock.now();
+  const targets = B.state.facts.filter(
+    (f) => f.customerId === customerId && f.relation === name && visibleAt(f, now) && visible(f, agent) && (wrongValue === undefined || wrongValue === null || wrongValue === '' || sameValue(f.value, wrongValue))
+  );
+  if (!targets.length) throw Object.assign(new Error(`no fact "${name}" this agent can see for this customer`), { status: 404 });
+  for (const f of targets) {
+    invalidate(f, { by: null, reason: 'corrected', at: now });
+    f.correctedBy = agent.id;
+    f.correctionReason = reason ? String(reason).slice(0, 200) : null;
+    delete f.conflictWith;
+    if (f.sourceAgentId && f.sourceAgentId !== agent.id) penalize(B, f.sourceAgentId);
+  }
+  let written = null;
+  if (value !== undefined && value !== null && String(value).trim()) {
+    const r = writeFact(B, { relation: name, value: String(value), isUpdate: true, evidence: reason ? `correction: ${reason}` : 'correction' }, { agent, customerId });
+    written = r.fact || null;
+    if (written) for (const f of targets) f.invalidatedBy = f.supersededBy = written.id;
+  }
+  return { corrected: targets, fact: written };
+}
+
+// v0.8: forget on the customer's request. Facts of the relation the agent can
+// see are deleted in every version (no history, no vectors), and their values
+// are scrubbed from what the agent can see of this customer: episodes,
+// working-memory turns, traces, insights and registry examples. Facts the agent
+// cannot see are left alone, and the answer looks the same as "nothing found".
+export function forgetFacts(B, { agent, customerId, relation, value, turnVisible }) {
+  const name = normalizeName(relation);
+  const hit = (f) => f.customerId === customerId && f.relation === name && visible(f, agent) && (value === undefined || value === null || value === '' || sameValue(f.value, value));
+  const gone = B.state.facts.filter(hit);
+  if (!gone.length) return { removedFacts: 0, scrubbed: 0 };
+  B.state.facts = B.state.facts.filter((f) => !gone.includes(f));
+  const values = [...new Set(gone.flatMap((f) => [f.value, ...Object.values(f.valueI18n || {})]).map((v) => String(v).trim()).filter((v) => v.length >= 3))];
+  const patterns = values.map((v) => {
+    const esc = v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return /^[\p{L}\p{N}]/u.test(v) && !/[぀-鿿]/.test(v) ? new RegExp(`(?<![\\p{L}\\p{N}])${esc}(?![\\p{L}\\p{N}])`, 'giu') : new RegExp(esc, 'gi');
+  });
+  const scrub = (text) => {
+    let out = String(text ?? '');
+    for (const re of patterns) out = out.replace(re, '[forgotten]');
+    return out;
+  };
+  let scrubbed = 0;
+  const fix = (obj, key) => {
+    const before = obj[key];
+    if (typeof before !== 'string') return false;
+    const after = scrub(before);
+    if (after === before) return false;
+    obj[key] = after;
+    scrubbed += 1;
+    return true;
+  };
+  for (const e of B.state.episodes) {
+    if (e.customerId !== customerId || !visible(e, agent)) continue;
+    if (fix(e, 'text')) {
+      e.embedding = embed(e.text);
+      delete e.vec;
+      e.vecModel = null;
+    }
+  }
+  const wm = B.state.working[customerId];
+  for (const turn of wm?.turns || []) if (turnVisible(B, turn, agent)) fix(turn, 'text');
+  for (const rec of Object.values(B.state.traces || {})) {
+    if (rec.customerId !== customerId) continue;
+    if (!turnVisible(B, { agentId: rec.agentId }, agent)) continue;
+    fix(rec, 'userText');
+    fix(rec, 'reply');
+  }
+  for (const i of B.state.insights || []) if (i.customerId === customerId) fix(i, 'text');
+  const reg = B.state.relations?.[name];
+  if (reg?.examples) reg.examples = reg.examples.map(scrub).filter((x) => x !== '[forgotten]');
+  B.embedQueue?.kick();
+  return { removedFacts: gone.length, scrubbed };
 }

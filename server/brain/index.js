@@ -14,7 +14,7 @@ import crypto from 'node:crypto';
 import { thalamus } from './thalamus.js';
 import { brainstemIn, brainstemOut, crisisReply, redact } from './brainstem.js';
 import { amygdala } from './amygdala.js';
-import { updateWorkingMemory, recordReply, hotTurns, ensureWorking, taskName, pendingTurns, MAX_TURNS } from './prefrontal.js';
+import { updateWorkingMemory, recordReply, hotTurns, ensureWorking, taskName, pendingTurns, MAX_TURNS, turnVisible } from './prefrontal.js';
 import { matchSkill, recordOutcome, seedSkills, rollbackSkill, labelOf, skillName } from './cerebellum.js';
 import { retrieve } from './ras.js';
 import { selectActions, learn } from './basalGanglia.js';
@@ -25,12 +25,12 @@ import { reflect } from './dmn.js';
 import { emptySleepState, recordSleep } from './sleepScheduler.js';
 import { EmbedQueue } from './embedQueue.js';
 import { MemoryIndex } from './memoryIndex.js';
-import { loadRegistry, listRelations, updateRelation as updateRel, deleteRelation as deleteRel } from './registry.js';
+import { loadRegistry, listRelations, updateRelation as updateRel, deleteRelation as deleteRel, normalizeName } from './registry.js';
 import { trustView } from './trust.js';
 import { normalizeFact, stateAt, visibleAt, DEFAULT_HISTORY_DAYS } from './temporal.js';
 import { entityOf, link, CONCRETE, W_ENTITY } from './entities.js';
 import { detectIntent } from './prefrontal.js';
-import { seedGlobal, resolveConflict, undoDecision } from './neocortex.js';
+import { seedGlobal, resolveConflict, undoDecision, correctFact, forgetFacts } from './neocortex.js';
 import { extractFactsRuleBased, factToText, factValue, relationLabel } from './ontology.js';
 import { templateReply, buildPrompt, contextBlock, memoryInstructions } from './respond.js';
 import { audit, auditRetrieval } from './audit.js';
@@ -648,6 +648,31 @@ export class Brain {
       .reverse();
     const suggestions = listRelations(this, lang).filter((r) => r.worthReview);
     return { conflicts, decisions, suggestions };
+  }
+
+  // v0.8: a connected agent corrects a fact it can see (brain_correct).
+  correct({ agentId, customerId = 'kh-001', relation, wrongValue, value, reason, lang }) {
+    const agent = this.getAgent(agentId);
+    if (agent.permissions?.write === false) throw err('this agent is read-only', 403);
+    if (!relation) throw err('relation is required', 400);
+    const cleanValue = value === undefined || value === null ? value : redact(String(value)).text;
+    const r = correctFact(this, { agent, customerId, relation, wrongValue, value: cleanValue, reason });
+    audit(this, { op: 'correct', agentId: agent.id, customerId, relation: r.corrected[0].relation, itemId: r.fact?.id || null, kind: r.fact ? 'replaced' : 'dropped' });
+    this.store.save();
+    lang = normLang(lang);
+    return { corrected: r.corrected.map((f) => factToText(f, lang)), fact: r.fact ? factToText(r.fact, lang) : null };
+  }
+
+  // v0.8: forget on the customer's request (brain_forget). Only what this agent
+  // can see; the audit records the relation and counts, never the value.
+  forget({ agentId, customerId = 'kh-001', relation, value }) {
+    const agent = this.getAgent(agentId);
+    if (agent.permissions?.write === false) throw err('this agent is read-only', 403);
+    if (!relation) throw err('relation is required', 400);
+    const r = forgetFacts(this, { agent, customerId, relation, value, turnVisible });
+    audit(this, { op: 'forget', agentId: agent.id, customerId, relation: normalizeName(relation), kind: `${r.removedFacts} facts, ${r.scrubbed} texts` });
+    this.store.save();
+    return r;
   }
 
   undoDecision(decisionId) {

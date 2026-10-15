@@ -167,6 +167,15 @@ const v1 = {
     const r = await brain.think({ agentId: agent.id, customerId: b.customerId, text: b.text, lang: b.lang, via: 'api' });
     return { traceId: r.traceId, reply: r.reply, mode: r.mode, intent: r.intent.intent, suggestedActions: r.actions.map((a) => ({ id: a.id, label: a.label })), learned: r.learned };
   },
+  // v0.8: memory tools for agents.
+  'POST /v1/correct': async (agent, req) => {
+    const b = await readBody(req);
+    return brain.correct({ agentId: agent.id, customerId: b.customerId, relation: b.relation, wrongValue: b.wrongValue, value: b.value, reason: b.reason, lang: b.lang });
+  },
+  'POST /v1/forget': async (agent, req) => {
+    const b = await readBody(req);
+    return brain.forget({ agentId: agent.id, customerId: b.customerId, relation: b.relation, value: b.value });
+  },
   'POST /v1/feedback': async (agent, req) => {
     const b = await readBody(req);
     const r = brain.feedback({ traceId: b.traceId, actionId: b.actionId, accepted: b.accepted, lang: b.lang, agentId: agent.id });

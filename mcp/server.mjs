@@ -6,10 +6,12 @@
 //
 //   BRAIN_URL=http://localhost:4317 BRAIN_API_KEY=abk_... node mcp/server.mjs
 import readline from 'node:readline';
+import fs from 'node:fs';
 import { BrainClient } from '../sdk/brain-client.js';
 
 const brain = new BrainClient({ url: process.env.BRAIN_URL || 'http://localhost:4317', apiKey: process.env.BRAIN_API_KEY || 'missing' });
 const DEFAULT_LANG = process.env.BRAIN_LANG || 'en';
+const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 const log = (...a) => process.stderr.write(`[agent-brain-mcp] ${a.join(' ')}\n`);
 
 const lang = { type: 'string', enum: ['vi', 'en', 'ja'], description: 'Reply / label language' };
@@ -23,7 +25,7 @@ const TOOLS = [
   {
     name: 'brain_remember',
     description:
-      'Store the turn in the shared brain after you answered, so every other agent benefits. Pass the traceId from brain_recall and your reply. Optionally add explicit facts [{relation, value}] (relations: name, lives_in, occupation, has_children, prefers, dislikes, diet, clothing_size, owns_asset, asset_issue, asset_unavailable, trip_destination, prefers_seat, allergic_to, health_condition, budget, income, payment_method) and the outcome of a suggested action.',
+      'Store the turn in the shared brain after you answered, so every other agent benefits. Pass the traceId from brain_recall and your reply. Optionally add explicit facts [{relation, value}]: use a built-in relation when one fits (name, lives_in, occupation, has_children, prefers, dislikes, diet, owns_asset, trip_destination, allergic_to, budget, income…) or a short snake_case name for anything else (e.g. loyalty_tier); new relations stay private to your domain until an admin promotes them. Never store secrets. Optionally add the outcome of a suggested action.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -36,6 +38,18 @@ const TOOLS = [
         lang,
       },
     },
+  },
+  {
+    name: 'brain_correct',
+    description:
+      'Correct a fact in the shared brain that is wrong (the customer says so, or you verified it). The wrong value is kept as history and, if you pass value, replaced by it. Use wrongValue to pick one value of a multi-valued relation (e.g. one of several likes). You can only correct facts you are allowed to see.',
+    inputSchema: { type: 'object', properties: { customerId: { type: 'string' }, relation: { type: 'string', description: 'e.g. lives_in' }, wrongValue: { type: 'string' }, value: { type: 'string', description: 'The correct value (omit to just drop the wrong one)' }, reason: { type: 'string' }, lang }, required: ['customerId', 'relation'] },
+  },
+  {
+    name: 'brain_forget',
+    description:
+      'Forget something because the customer asked you to: deletes the facts of that relation you are allowed to see (or only value), including their history, and removes the value from the conversations you can see. Use it only on an explicit request. It cannot erase other domains\' private data; a full erase of a customer is an admin action.',
+    inputSchema: { type: 'object', properties: { customerId: { type: 'string' }, relation: { type: 'string' }, value: { type: 'string', description: 'Only this value (omit to forget every value of the relation)' } }, required: ['customerId', 'relation'] },
   },
   {
     name: 'brain_profile',
@@ -60,6 +74,14 @@ async function callTool(name, args = {}) {
     case 'brain_remember': {
       const r = await brain.remember({ ...args, lang: l });
       return `stored. learned: ${r.learned.map((x) => `${x.text} (${x.action})`).join('; ') || 'nothing new'}${r.feedback?.promoted ? `\nnew skill learned: ${r.feedback.promoted.name}` : ''}`;
+    }
+    case 'brain_correct': {
+      const r = await brain.correct({ customerId: args.customerId, relation: args.relation, wrongValue: args.wrongValue, value: args.value, reason: args.reason, lang: l });
+      return `corrected: ${r.corrected.join('; ')}${r.fact ? `\nnow: ${r.fact}` : ''}`;
+    }
+    case 'brain_forget': {
+      const r = await brain.forget({ customerId: args.customerId, relation: args.relation, value: args.value });
+      return r.removedFacts ? `forgotten: ${r.removedFacts} fact(s), value removed from ${r.scrubbed} text(s)` : 'nothing you can see matched';
     }
     case 'brain_profile': {
       const r = await brain.profile({ customerId: args.customerId, lang: l });
@@ -90,7 +112,7 @@ async function handle(msg) {
         return reply(id, {
           protocolVersion: params.protocolVersion || '2025-06-18',
           capabilities: { tools: {} },
-          serverInfo: { name: 'agent-brain-hub', version: '0.3.0' },
+          serverInfo: { name: 'agent-brain-hub', version: VERSION },
           instructions: 'Shared company brain. Call brain_recall before answering a customer and brain_remember after answering.',
         });
       case 'ping':

@@ -67,6 +67,24 @@ export class BrainClient {
     return this.#call('POST', '/v1/feedback', { traceId, actionId, accepted, lang });
   }
 
+  /**
+   * Correct a fact this agent can see: the wrong value is kept as history and,
+   * if `value` is given, replaced. `wrongValue` picks one value of a
+   * multi-valued relation. Throws 404 when there is nothing visible to correct.
+   */
+  correct({ customerId, relation, wrongValue, value, reason, lang = 'vi' }) {
+    return this.#call('POST', '/v1/correct', { customerId, relation, wrongValue, value, reason, lang });
+  }
+
+  /**
+   * Forget on the customer's request: deletes the relation's facts this agent
+   * can see (or only `value`), with their history, and scrubs the value from
+   * what this agent can see. Returns { removedFacts, scrubbed }.
+   */
+  forget({ customerId, relation, value }) {
+    return this.#call('POST', '/v1/forget', { customerId, relation, value });
+  }
+
   /** Facts about a customer that this agent is allowed to see. */
   profile({ customerId, lang = 'vi' }) {
     return this.#call('GET', `/v1/profile?customerId=${encodeURIComponent(customerId)}&lang=${lang}`);
