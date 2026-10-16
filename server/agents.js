@@ -48,7 +48,7 @@ export const DOMAINS = {
     episodeScope: 'private', // sensitive data never leaves the health agent
     intents: {
       book_doctor: ['khám', 'bác sĩ', 'phòng khám', 'doctor', 'clinic', 'appointment with', '診察', '医者', '病院', 'クリニック'],
-      symptom_check: ['đau', 'sốt', 'ho', 'mệt', 'chóng mặt', 'triệu chứng', 'mất ngủ', 'pain', 'fever', 'cough', 'tired', 'dizzy', 'symptom', 'insomnia', '痛い', '痛み', '熱', '咳', 'だるい', 'めまい', '症状', '眠れない'],
+      symptom_check: ['đau', 'sốt', 'ho', 'mệt', 'chóng mặt', 'triệu chứng', 'mất ngủ', 'pain', 'fever', 'cough', 'tired', 'dizzy', 'symptom', 'insomnia', 'allergy', 'allergies', 'allergic', 'dị ứng', '痛い', '痛み', '熱', '咳', 'だるい', 'めまい', '症状', '眠れない', 'アレルギー'],
       medication: ['thuốc', 'uống thuốc', 'đơn thuốc', 'medication', 'medicine', 'pill', 'prescription', '薬', '服薬', '処方'],
     },
   },

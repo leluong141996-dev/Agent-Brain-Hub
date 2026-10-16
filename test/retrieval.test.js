@@ -60,3 +60,21 @@ test('identifiers: a question with an exact order number reaches that order amon
     assert.ok(r.memories.some((m) => /ORD-48207/.test(m.text)), `${q}: ${r.memories.map((m) => m.text.slice(0, 60)).join(' | ')}`);
   }
 });
+
+test('allergy questions reach the allergy fact (vi / en / ja), and only the health domain sees it', async () => {
+  // Found by the LLM benchmark: "Do I have any food allergies?" found nothing. Offline it passed
+  // only because the extractive summary repeated "peanuts"; an LLM summary says "peanut allergy".
+  for (const [lang, value, ask, want] of [
+    ['en', 'peanuts', 'Do I have any food allergies?', /peanuts/],
+    ['vi', 'hải sản', 'Tôi có bị dị ứng gì không?', /hải sản/],
+    ['ja', 'そば', 'アレルギーはありますか？', /そば/],
+  ]) {
+    const b = new Brain({ store: new Store(null), bus: new NeuralBus(), llm: new LLM({ offline: true }), deterministic: true });
+    await b.remember({ agentId: 'sage', facts: [{ relation: 'allergic_to', value }], lang });
+    b.advanceClock(2 / 24);
+    const r = await b.recall({ agentId: 'sage', text: ask, lang });
+    assert.ok(r.memories.some((m) => m.kind === 'semantic' && want.test(m.text)), `${lang}: ${r.memories.map((m) => m.text).join(' | ')}`);
+    const other = await b.recall({ agentId: 'atlas', text: ask, lang });
+    assert.ok(!want.test(other.promptBlock), `${lang}: another domain must not see it`);
+  }
+});
