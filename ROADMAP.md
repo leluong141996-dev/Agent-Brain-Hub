@@ -6,7 +6,7 @@ Most memory libraries are built for one agent. When several agents share one mem
 
 It's a plan, not a promise. Priorities change with feedback: comment on the milestone issues or open a [Discussion](https://github.com/leluong141996-dev/Agent-Brain-Hub/discussions).
 
-## Where we are (v0.7)
+## Where we are (v0.8)
 
 **Solid today**
 - Shared memory with governance: private / shared / global scopes, an owner domain and a write policy per relation, per-agent permissions, append-only audit log.
@@ -16,17 +16,19 @@ It's a plan, not a promise. Priorities change with feedback: comment on the mile
 - Correct over time: facts are invalidated rather than deleted, and `recall({ asOf })` shows what the brain believed at any moment.
 - Connected: facts are grouped into entities per customer, and retrieval follows links between them (multi-hop), explaining each added fact with `via`, inside the same permission checks.
 - Open schema: relations outside the built-in 19 are remembered as provisional, private to the domain that wrote them, until an admin promotes them. When agents disagree, a per-relation policy decides, the decision can be undone, and agent trust is learned from outcomes.
-- Measured: a 46-scenario memory benchmark with a CI gate, also run end to end with a local LLM, plus LongMemEval-S retrieval. Hybrid semantic + lexical search with real embedding models; a per-customer index keeps retrieval under 2 ms at 100,000 episodes.
+- Self-maintaining: agents correct wrong facts and forget on a customer's request (`brain_correct`, `brain_forget`), sleep learns facts from whole sessions, and an LLM proposes how to settle conflicts for a person to accept.
+- Measured: a 50-scenario memory benchmark with a CI gate, also run end to end with a local LLM, plus LongMemEval-S retrieval. Hybrid semantic + lexical search with real embedding models; a per-customer index keeps retrieval under 2 ms at 100,000 episodes.
 
 **Still basic**
 
 | Limitation | Today |
 |---|---|
 | Learned relations are curated by hand | New relations start private and stay provisional until an admin promotes them; nothing suggests a scope, owner or policy yet. Offline, only the "favourite X" family is recognised without an LLM. |
-| Conflicts are decided by rules | Policies pick a value, or a person does. No LLM proposes a resolution with evidence yet. |
+| Summaries and insights outlive the facts they describe | An LLM insight such as "planning a trip to Tokyo next week" has no expiry, and a session summary stays for months, while the fact it came from expires after 30 days. They can still surface, and be read as current. |
+| Forgetting is word for word | `brain_forget` deletes facts for real and scrubs the value from what the agent can see, but a summary an LLM wrote in other words may still describe it. Erasing a whole customer is not an agent tool yet (#4). |
 | Retrieval quality on long histories | On LongMemEval-S, hashing finds the evidence session in the top 4 for about half the questions; preferences and multi-session questions are weakest. |
 | A narrow graph | Entities are assets, trips and profile groups, found with a lexicon; one node per asset type per customer, so two cars are one node. No people or organisations yet. The affinity table is hand-written. |
-| Answers not measured | Benchmarks score what reaches the agent (46 own scenarios, LongMemEval retrieval), not the final answers. The value dashboard's "time saved" is an estimate (20 s per question). |
+| Answers not measured | Benchmarks score what reaches the agent (50 own scenarios, LongMemEval retrieval), not the final answers. The value dashboard's "time saved" is an estimate (20 s per question). |
 | Single process | State lives in memory; SQLite is the persistence layer. |
 
 ## Principles
@@ -101,17 +103,28 @@ These hold for every milestone:
 
 **Result:** "favourite colour" is remembered and recalled in English, Vietnamese and Japanese; the new `open_schema` and `arbitration` categories pass 100% offline; contradiction handling stays at 100% and the leak rate at 0%. Running the whole suite with a local LLM for the first time found four bugs that were fixed in this release (an empty answer from reasoning models, identifiers lost in summaries, exact identifiers outranked, income questions).
 
-**Moved to later** (see Next): an LLM proposing conflict resolutions, `brain_correct` / `brain_forget` for agents, LLM consolidation of episodes into facts, and people and organisations in the graph.
+**Moved to later:** an LLM proposing conflict resolutions, `brain_correct` / `brain_forget` for agents and LLM consolidation of episodes into facts shipped in v0.8; people and organisations in the graph are under Next.
 
-### Next: memory that maintains itself
+### v0.8: Memory that maintains itself ✅ released
 
-- **Conflict resolution during sleep:** an LLM proposes a resolution with evidence; the Review page lets a person accept it.
+*Goal: the memory stays right without a person watching every conversation.*
+
+- [x] **`brain_correct` and `brain_forget`** for agents over REST, the JS SDK and MCP: correct keeps the wrong value as history; forget deletes the value for real (facts in every version, vectors, and the value in conversations the agent can see), with an audit trail that never holds the value.
+- [x] **Facts from whole sessions:** with an LLM, sleep extracts durable facts from each session it stores, through the normal write path.
+- [x] **LLM-proposed conflict resolutions:** advice with a reason, shown on the Review page; a person accepts it.
+
+**Result:** the new `maintenance` benchmark category passes 100% offline, and with a local LLM a fact spread over two messages is learned during sleep. An independent review of the branch found one critical issue (any agent could delete company-wide policies) and five important ones; all are fixed with tests.
+
+**Not done** (see Next): suggestions for learned relations, merging duplicate entities, people and organisations in the graph, and a customer-level erase.
+
+### Next: smaller steps before production
+
+- **Time-aware summaries and insights:** give insights a lifetime and let session summaries age like the facts they mention.
 - **Suggestions for learned relations:** a proposed scope, owner and policy when a provisional relation is worth promoting.
-- Memory tools for agents over MCP and REST: `brain_correct`, `brain_forget`.
-- LLM consolidation in the sleep cycle: distil episodes into facts, merge duplicate entities.
+- LLM merge of duplicate entities in the sleep cycle.
 - Richer graph entities from LLM extraction: people and organisations, and several assets of one type per customer.
 
-### v0.8: Production governance and scale
+### v0.9: Production governance and scale
 
 *Goal: something a team can run for real.*
 

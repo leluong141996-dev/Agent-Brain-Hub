@@ -5,6 +5,43 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-16
+
+Memory that **maintains itself**: agents correct and forget, sleep learns from whole sessions, and an LLM proposes how to settle conflicts.
+
+### Added
+
+- **`brain_correct`** (`POST /v1/correct`, SDK `correct()`, MCP tool). An agent corrects a fact it can see. The wrong value is invalidated with reason `corrected` and kept as history (still visible with `asOf`); an optional new value replaces it; the agent that wrote the wrong value loses trust (once per correction). An agent gets the same "not found" whether the fact does not exist or is another domain's private data.
+- **`brain_forget`** (`POST /v1/forget`, SDK `forget()`, MCP tool). On a customer's request, the facts of a relation that the agent can see (or only one value) are **deleted** in every version, with their vectors, and the value is scrubbed from the episodes, conversation turns, traces, working-memory context and event log the agent can see. The audit entry records the relation and counts, never the value. Matching is word for word (plurals, short Japanese / Vietnamese values and numbers included); a summary an LLM wrote in other words may still describe it, and the tool says so. Company-wide policies cannot be corrected, forgotten or written by agents.
+- **Facts from whole sessions.** With an LLM, sleep re-reads each session it stores and extracts durable facts from the whole conversation, through the normal write path as the session's agent (registry, scope, write policy, audit), marked `origin: consolidation`. At most 10 per session. A value an agent corrected is not brought back.
+- **LLM-proposed conflict resolutions.** During sleep, with an LLM, each open conflict (at most 5 per sleep) gets advice: keep one value, or "not sure", with a reason, from both values, who wrote them, what the customer said and recent conversations. It is never applied automatically: the Review page shows it and *Accept proposal* settles the conflict through the normal path (trust updates; audited as a proposal). A pair is asked once.
+- **Benchmark:** `correct` and `forget` steps, a `maintenance` category (50 scenarios in total, plus two that need an LLM), covered over HTTP too.
+
+  | 0.8.0 | Hashing (offline) | Hybrid with `bge-m3` | With an LLM (qwen3:4b, local) |
+  |---|---|---|---|
+  | Scenario pass rate | 98.0% | 100% | 94.2% |
+  | maintenance | 100% | 100% | 80% |
+  | Leak rate | 0% | 0% | 0% |
+
+  Two LLM scenarios depend on how a 4B model words things and can vary between runs (see the README). LongMemEval-S retrieval is unchanged (53.2% @4).
+
+### Changed
+
+- The MCP server reports the package version, and `brain_remember`'s description no longer lists only the 19 built-in relations.
+- Accepting a conflict value that is no longer current (it was corrected, replaced or resolved) is refused with 409 instead of wiping both sides.
+- Correcting or forgetting one side of a conflict releases the other side.
+
+### Fixed (found by running the whole suite with a local LLM)
+
+- **Sleep brought back what the customer had moved on from.** When two agents spoke back to back and sleep came after, consolidation re-read the older session ("I live in Hanoi") and wrote Hanoi again, in conflict with the newer Saigon. A transcript no longer brings back a value that was replaced, corrected or lost, nor contradicts a newer value of a single-valued relation.
+- **"Do I have any food allergies?" found nothing.** No intent covered the word and the fact text shares no word with the question. Offline the benchmark passed only because the extractive session summary repeated "peanuts". Allergy words now count as a health check (vi / en / ja).
+- **"How many children do I have?" found the children fact only when it was flagged as a conflict.** A question that names a relation now reaches its fact, for built-in relations too (before, only learned ones). Words every sentence has ("with", "has", "for"…) never name a relation. Prompts are 2 tokens longer on average.
+
+### Fixed (found by the independent review of this release)
+
+- Any agent with write permission could delete or rewrite company-wide policies through `/v1/correct`, `/v1/forget` or `/v1/remember`. Agents can no longer touch customer `*`.
+- A replacement value that would be rejected deleted the old value anyway; it is now checked first and reported as an error.
+
 ## [0.7.0] - 2026-10-10
 
 Memory that **remembers anything**, and stays **consistent when several agents write**.
@@ -215,7 +252,8 @@ First public release.
 - README in English (`README.md`) and Vietnamese (`README.vi.md`), `CONTRIBUTING.md`, issue and PR templates, and a CI workflow (tests on Node 18/20/22, Docker build, end-to-end run).
 - 32 unit tests (including the acceptance QA suite: amnesia, contradiction, staleness, skill promotion, 20k-episode load) and an 11-step end-to-end script (`npm run e2e -- --lang vi|en|ja`).
 
-[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.0...v0.6.1

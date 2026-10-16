@@ -2,7 +2,7 @@
   "id": "stale-trip-destination",
   "category": "stale",
   "lang": "en",
-  "description": "A trip destination is relevant for weeks, not forever.",
+  "description": "A trip destination is relevant for weeks, not forever. The check looks at the fact line (\"trip to: Tokyo\"), not at summaries or insights an LLM wrote.",
   "steps": [
     {
       "agent": "atlas",
@@ -28,7 +28,7 @@
       "recall": "What trips do I have planned?",
       "expect": {
         "stale": [
-          "/trip to:? tokyo/i"
+          "/^trip to:? tokyo/i"
         ]
       }
     }
