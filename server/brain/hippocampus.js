@@ -165,7 +165,7 @@ export async function consolidate(B, t, { customerId, sessions = [] }) {
       expiresAt: days ? now + days * DAY : null,
     });
     created.push(ep);
-    sessions.push({ agentId, episodeId: ep.id, transcript });
+    sessions.push({ agentId, episodeId: ep.id, transcript, startedAt: turns[0].at });
     for (const x of turns) x.consolidated = true;
   }
   // Working memory keeps the latest few turns after consolidation, plus every

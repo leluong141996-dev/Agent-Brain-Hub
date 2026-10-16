@@ -367,3 +367,38 @@ test('review fix: forget does not scrub texts of agents a readShared=false agent
   assert.equal(r.removedFacts, 1, 'its own fact is forgotten');
   assert.ok(JSON.stringify(b.state.working).includes('I live in Hanoi'), "Mia's turn, which Kai cannot read, is untouched");
 });
+
+// ---- consolidation must not resurrect what the customer already moved on from ----
+// Found by the full LLM benchmark (arbitration-customer-update-wins, contradiction-explicit-move).
+
+test('consolidation: an old session that says Hanoi does not bring Hanoi back after the customer moved', async () => {
+  const llm = stubLLM((text) => {
+    if (/I live in Hanoi/.test(text)) return [{ relation: 'lives_in', value: 'Hanoi' }];
+    if (/moved to Saigon/.test(text)) return [{ relation: 'lives_in', value: 'Saigon', isUpdate: true }];
+    return [];
+  });
+  const b = makeBrain(llm);
+  await b.think({ agentId: 'mia', text: 'I live in Hanoi', lang: 'en' });
+  await b.think({ agentId: 'atlas', text: 'I moved to Saigon last month', lang: 'en' });
+  await b.sleep({ customerId: 'kh-001', lang: 'en' }); // both sessions are stored now, the older one first
+  assert.deepEqual(live(b, 'lives_in').map((f) => [f.value, f.status]), [['Saigon', 'active']]);
+  assert.equal(b.review('en').conflicts.length, 0);
+});
+
+test('consolidation: a value that was already replaced is not written again, but a newer statement still is', async () => {
+  const llm = stubLLM((text) => (/Customer: I live in Hue/.test(text) ? [{ relation: 'lives_in', value: 'Hue' }] : []));
+  const b = makeBrain(llm);
+  await b.think({ agentId: 'mia', text: 'I live in Hue', lang: 'en' });
+  b.advanceClock(1);
+  await b.think({ agentId: 'mia', text: 'I moved to Saigon last month', lang: 'en' });
+  const before = b.state.facts.filter((f) => f.value === 'Hue').length;
+  await b.sleep({ customerId: 'kh-001', lang: 'en' });
+  assert.equal(b.state.facts.filter((f) => f.value === 'Hue').length, before, 'Hue (replaced) is not written again');
+  // But what only the session knows is still learned.
+  const llm2 = stubLLM((text) => (/two kids/.test(text) ? [{ relation: 'has_children', value: '2' }] : []));
+  const b2 = makeBrain(llm2);
+  await b2.think({ agentId: 'mia', text: 'I live in Hue', lang: 'en' });
+  await b2.think({ agentId: 'mia', text: 'We have two kids', lang: 'en' });
+  await b2.sleep({ customerId: 'kh-001', lang: 'en' });
+  assert.deepEqual(live(b2, 'has_children').map((f) => f.value), ['2']);
+});
