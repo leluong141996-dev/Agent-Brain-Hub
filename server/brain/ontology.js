@@ -47,7 +47,9 @@ export function relationLabel(relation, lang) {
 // Words that name a relation in a question ("colour", "màu", "色" for
 // favourite_colour), without the generic "favourite" part every such label has.
 // Generic words (status, note, order…) don't name a relation on their own.
-const LABEL_STOP = new Set(['favourite', 'favorite', 'yeu', 'thich', 'nhat', 'cua', 'name', 'type', 'info', 'information', 'note', 'notes', 'status', 'order', 'detail', 'details', 'data', 'value', 'number', 'date', 'time', 'list', 'item', 'items', 'thing', 'things', 'customer', 'user', 'current', 'other', 'general', 'misc', 'setting', 'settings']);
+const LABEL_STOP = new Set(['favourite', 'favorite', 'yeu', 'thich', 'nhat', 'cua', 'name', 'type', 'info', 'information', 'note', 'notes', 'status', 'order', 'detail', 'details', 'data', 'value', 'number', 'date', 'time', 'list', 'item', 'items', 'thing', 'things', 'customer', 'user', 'current', 'other', 'general', 'misc', 'setting', 'settings',
+  // Words every sentence has: labels like "pays with" or "has an issue" must not name a relation through them.
+  'with', 'has', 'have', 'for', 'from', 'that', 'this', 'pays', 'issue', 'likes', 'condition', 'availability']);
 export function relationKeywords(relation) {
   const words = new Set();
   const l = RELATIONS[relation]?.label || CUSTOM_LABELS.get(relation) || {};

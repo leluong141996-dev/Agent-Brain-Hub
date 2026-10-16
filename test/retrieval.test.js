@@ -78,3 +78,23 @@ test('allergy questions reach the allergy fact (vi / en / ja), and only the heal
     assert.ok(!want.test(other.promptBlock), `${lang}: another domain must not see it`);
   }
 });
+
+test('a question that names a relation reaches its fact (children, size, home), without pulling unrelated ones', async () => {
+  // Found by the LLM benchmark: "How many children do I have?" found the children fact only
+  // when it happened to be flagged as a conflict. Naming the relation is enough to ask for it.
+  const make = () => new Brain({ store: new Store(null), bus: new NeuralBus(), llm: new LLM({ offline: true }), deterministic: true });
+  const ask = async (facts, q, agent = 'mia') => {
+    const b = make();
+    await b.remember({ agentId: 'mia', facts, lang: 'en' });
+    b.advanceClock(2 / 24);
+    return b.recall({ agentId: agent, text: q, lang: 'en' });
+  };
+  const facts = [{ relation: 'has_children', value: 'two' }, { relation: 'diet', value: 'vegetarian' }, { relation: 'payment_method', value: 'credit card' }];
+  const kids = await ask(facts, 'How many children do I have?');
+  assert.ok(kids.memories.some((m) => m.kind === 'semantic' && /children: two/.test(m.text)), kids.memories.map((m) => m.text).join(' | '));
+  const diet = await ask(facts, 'What is my diet?');
+  assert.ok(diet.memories.some((m) => /vegetarian/.test(m.text)));
+  // Words every sentence has ("with", "for") must not name a relation: "pays with" is payment_method.
+  const other = await ask(facts, 'Can you help me with something for tomorrow?');
+  assert.ok(!other.memories.some((m) => /credit card/.test(m.text)), other.memories.map((m) => m.text).join(' | '));
+});

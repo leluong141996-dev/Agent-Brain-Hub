@@ -3,7 +3,7 @@
   "category": "maintenance",
   "lang": "en",
   "requires": "llm",
-  "description": "With an LLM, sleep learns a fact spread over two messages (measured only with --llm).",
+  "description": "With an LLM, the brain ends up knowing a fact (not just a summary) that the customer spread over two messages (measured only with --llm). Both online extraction and the sleep cycle's consolidation can learn it; the unit tests isolate consolidation with a stub.",
   "steps": [
     {
       "agent": "mia",
@@ -18,10 +18,10 @@
     },
     {
       "agent": "mia",
-      "recall": "Plan a family weekend for us",
+      "recall": "How many children do I have?",
       "expect": {
         "remembers": [
-          "/(child|kid)[^:\\n]*:\\s*(2|two)/i"
+          "/^[^\\[:]*(child|kid)[^:]*:.*(2|two)/i"
         ]
       }
     }

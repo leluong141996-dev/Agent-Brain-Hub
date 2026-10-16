@@ -173,11 +173,13 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     blocked: blocked.length,
   }, { from: 'ras', status: blocked.length ? 'warn' : 'ok' });
 
-  // --- Open schema (v0.7): a question that names a learned relation ---
-  // "What colour…?" names favourite_colour. Core relations are reached through
-  // intents; learned ones only have their name, so the name counts as a match.
+  // --- A question that names a relation ---
+  // "What colour…?" names favourite_colour, "How many children…?" names
+  // has_children. Intents reach some relations; learned ones only have their
+  // name; and a fact whose text shares no word with the question ("children:
+  // two") is easily below the threshold. Naming the relation asks for it.
   for (const c of fCands) {
-    if (relationOf(B, c.relation)?.status === 'core' || !mentionsRelation(query, c.relation)) continue;
+    if (!mentionsRelation(query, c.relation)) continue;
     c.parts.relationMention = 1;
     c.score = Math.max(c.score, 0.35);
   }
