@@ -2,11 +2,27 @@
 // (PII redaction, crisis reflex) and on the way out (output compliance).
 import { L } from '../i18n.js';
 
+// An IBAN is only an IBAN when its check digits are right (ISO 13616, mod 97).
+function validIban(s) {
+  const iban = s.replace(/\s/g, '').toUpperCase();
+  if (iban.length < 15 || iban.length > 34) return false;
+  const digits = (iban.slice(4) + iban.slice(0, 4)).replace(/[A-Z]/g, (c) => c.charCodeAt(0) - 55);
+  let rem = 0;
+  for (const d of digits) rem = (rem * 10 + Number(d)) % 97;
+  return rem === 1;
+}
+
+// Order matters: an IBAN contains runs of digits a card pattern would take.
 const PII = [
   { type: 'EMAIL', re: /[\w.+-]+@[\w-]+\.[\w.]+/g },
+  { type: 'IBAN', re: /\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,3})?\b/g, valid: validIban },
   { type: 'CARD', re: /\b(?:\d[ -]?){13,16}\b/g },
   { type: 'CCCD', re: /\b\d{12}\b/g },
+  // US SSN, written with separators (a bare 9-digit number is far too common), never 000 / 666 / 9xx, 00 or 0000.
+  { type: 'SSN', re: /\b(?!000|666|9\d\d)\d{3}[- ](?!00)\d{2}[- ](?!0000)\d{4}\b/g },
   { type: 'PHONE', re: /(?:\+84|\+81|\b0)(?:[\s.-]?\d){9,10}\b/g },
+  // Any other international number: "+", a country code and 6 to 12 more digits (8 to 15 in all).
+  { type: 'PHONE', re: /\+[1-9]\d{0,2}(?:[\s.()-]*\d){6,12}(?!\d)/g },
 ];
 
 const CRISIS = ['tự tử', 'muốn chết', 'không muốn sống', 'tự làm hại', 'suicide', 'kill myself', 'end my life', 'hurt myself', '死にたい', '自殺', '消えたい', '生きていたくない'];
@@ -14,8 +30,9 @@ const CRISIS = ['tự tử', 'muốn chết', 'không muốn sống', 'tự làm
 export function redact(text) {
   const found = [];
   let out = text;
-  for (const { type, re } of PII) {
+  for (const { type, re, valid } of PII) {
     out = out.replace(re, (m) => {
+      if (valid && !valid(m)) return m;
       found.push({ type, sample: m.slice(0, 2) + '•••' });
       return `[${type}]`;
     });

@@ -129,7 +129,7 @@ Màn hình Agents có sẵn cấu hình `mcpServers` cho Claude Desktop/Cursor, 
   - `write`: có được ghi/học vào bộ não hay không. Agent đối tác có thể để chỉ-đọc.
 - **Quy tắc ghi theo từng quan hệ:** mỗi quan hệ có một miền sở hữu và một quy tắc (`latest`, `owner`, `trust` hoặc `human`) để quyết định khi hai agent ghi hai giá trị khác nhau. Giá trị thua được giữ làm lịch sử, mọi quyết định tự động đều có audit và hoàn tác được, còn mâu thuẫn chưa giải thì chờ ở trang **Duyệt** (xem [Schema mở và quy tắc ghi](#schema-mở-và-quy-tắc-ghi)).
 - **Audit log:** ghi lại mọi `read`, `write`, `blocked` (lượt đọc bị chặn vì private hoặc không có quyền), `recall`, `remember`, `handoff`, `feedback`, kèm agent ghi gốc. Đây cũng là nguồn số liệu cho dashboard giá trị.
-- **Brainstem:** che PII (SĐT VN/JP, email, thẻ, CCCD) trước khi bất cứ thứ gì được ghi nhớ. Có phản xạ khủng hoảng bằng cả 3 ngôn ngữ.
+- **Brainstem:** che PII (SĐT mọi quốc gia, email, thẻ, SSN của Mỹ, IBAN, CCCD) trước khi bất cứ thứ gì được ghi nhớ. Có phản xạ khủng hoảng bằng cả 3 ngôn ngữ.
 - **API key:** lưu dạng SHA-256 và so sánh constant-time. Có thể xoay key; key cũ mất hiệu lực ngay.
 
 ## Dashboard giá trị — các chỉ số đo thế nào

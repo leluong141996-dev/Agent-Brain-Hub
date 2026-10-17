@@ -141,7 +141,7 @@ The Agents screen generates the `mcpServers` config for Claude Desktop and Curso
   - `write`: whether the agent may write to and learn into the brain. Partner agents can be read-only.
 - **Write policies per relation:** each relation has an owner domain and a policy (`latest`, `owner`, `trust` or `human`) that decides when two agents write different values. The losing value is kept as history, every automatic decision is audited and can be undone, and open conflicts wait on the **Review** page (see [Open schema and write policies](#open-schema-and-write-policies)).
 - **Audit log:** records every `read`, `write`, `blocked` (a read refused because the memory is private or the agent lacks permission), `recall`, `remember`, `handoff` and `feedback`, together with the agent that originally wrote the memory. It is also the data source for the value dashboard.
-- **Brainstem:** redacts PII (Vietnamese and Japanese phone numbers, email, card numbers, Vietnamese ID numbers) before anything is remembered, and has a crisis reflex in all 3 languages.
+- **Brainstem:** redacts PII (phone numbers worldwide, email, card numbers, US social security numbers, IBANs, Vietnamese ID numbers) before anything is remembered, and has a crisis reflex in all 3 languages.
 - **API keys:** stored as SHA-256 and compared in constant time. Keys can be rotated; the old key stops working immediately.
 
 ## Value dashboard: how the metrics are measured
