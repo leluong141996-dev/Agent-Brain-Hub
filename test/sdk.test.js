@@ -72,7 +72,7 @@ except ValueError:
     out['needs_key'] = True
 print(json.dumps(out))
 `;
-    const r = spawnSync('python3', ['-c', code, path.join(here, '..', 'sdk'), url, apiKey], { encoding: 'utf8' });
+    const r = spawnSync('python3', ['-B', '-c', code, path.join(here, '..', 'sdk'), url, apiKey], { encoding: 'utf8' });
     assert.equal(r.status, 0, r.stderr);
     const out = JSON.parse(r.stdout);
     assert.equal(out.me, 'personal');

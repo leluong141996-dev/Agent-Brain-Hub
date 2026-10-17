@@ -10,3 +10,5 @@ media/
 # local Claude Code settings
 .claude/
 docs/superpowers/
+__pycache__/
+*.pyc
