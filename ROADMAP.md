@@ -148,8 +148,8 @@ These hold for every milestone:
 
 ## Housekeeping (any time)
 
-- Move the six demo agents and their domains into `examples/`, so the core is domain-agnostic.
-- Label the value dashboard's estimates as estimates until they're measured.
+- Move the six demo agents and their domains into `examples/`, so the core is domain-agnostic. Not a small move: the owner domains of the built-in relations, the intent keywords per domain and the benchmark scenarios all depend on them, so it needs configurable domains first (a v1.0 item).
+- ~~Label the value dashboard's estimates as estimates~~ (done in v0.8.1: "≈ N minutes saved (an estimate) · assuming 20 seconds per question").
 - ~~Rename the `semantic (graph + SQL)` trace label to match what exists~~ (done in v0.4: `semantic (facts)`).
 
 ## Not planned
