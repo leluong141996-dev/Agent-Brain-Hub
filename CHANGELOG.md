@@ -5,6 +5,34 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-17
+
+A hardening release before v0.9: data protection, a Python client, honest multi-hop scenarios, and two retrieval fixes.
+
+### Added
+
+- **Export and erase one customer** ([#4](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/4)). `GET /api/customers/:id/export` returns everything the brain holds about the customer as one JSON file, every fact with its history; `DELETE /api/customers/:id` erases it all (facts in every version, episodes, working memory, insights, traces, decisions, sleep history, the id and values in learned relations, matching events of the live log) and survives a restart. Admin only; the append-only audit log keeps ids and counts (an `erase` entry), never a value; company-wide policies (`*`) cannot be erased. A *Customer data* card in Settings does both (erase asks you to type the id).
+- **More PII formats** ([#2](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/2)): US social security numbers (formatted, never 000 / 666 / 9xx), IBANs (valid check digits), and international phone numbers. Order numbers, dates and amounts are not redacted.
+- **A Python client** ([#1](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/1)): `sdk/brain_client.py`, standard library only, the same calls and errors as the JS client, including `correct` and `forget`. The JS client's `recall` now takes `asOf`.
+- **Five harder multi-hop scenarios** (15 in all): the question only names a trip or a car, and the facts hang off it, including a two-hop chain and a dozen unrelated facts. With hashing, multi_hop is 100% with the graph and 26.7% without. The Audit page can filter the operations added since v0.7.
+
+  | 0.8.1 | Hashing (offline) | Hybrid with `bge-m3` |
+  |---|---|---|
+  | Scenario pass rate (55) | 98.2% | 98.2% |
+  | multi_hop (15) | 100% | 93.3% |
+  | Leak rate | 0% | 0% |
+
+  `bge-m3` fails `multi-hop-trip-among-many-facts` with or without the graph: its scores are not calibrated (see the ROADMAP). The LLM column in the README is still the v0.8.0 run.
+
+### Fixed
+
+- **Insights outlived the facts they described.** An LLM insight such as "planning a trip to Tokyo next week" had no expiry, and reflection re-read the last 15 episodes whatever their age, so a stale insight could even be regenerated from an old session. Insights now live 30 days and are built only from the last month's episodes.
+- **Facts pulled in by the entity graph lost the top-10 cut** to generic profile facts when a customer had a dozen facts (score 0.17). They now score about 0.4 one hop away and 0.34 two hops away.
+
+### Changed
+
+- The dashboard's time saved reads "≈ N minutes saved (an estimate) · assuming 20 seconds per question".
+
 ## [0.8.0] - 2026-10-16
 
 Memory that **maintains itself**: agents correct and forget, sleep learns from whole sessions, and an LLM proposes how to settle conflicts.
@@ -252,7 +280,8 @@ First public release.
 - README in English (`README.md`) and Vietnamese (`README.vi.md`), `CONTRIBUTING.md`, issue and PR templates, and a CI workflow (tests on Node 18/20/22, Docker build, end-to-end run).
 - 32 unit tests (including the acceptance QA suite: amnesia, contradiction, staleness, skill promotion, 20k-episode load) and an 11-step end-to-end script (`npm run e2e -- --lang vi|en|ja`).
 
-[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/leluong141996-dev/Agent-Brain-Hub/compare/v0.6.1...v0.6.2

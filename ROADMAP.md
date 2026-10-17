@@ -6,7 +6,7 @@ Most memory libraries are built for one agent. When several agents share one mem
 
 It's a plan, not a promise. Priorities change with feedback: comment on the milestone issues or open a [Discussion](https://github.com/leluong141996-dev/Agent-Brain-Hub/discussions).
 
-## Where we are (v0.8)
+## Where we are (v0.8.1)
 
 **Solid today**
 - Shared memory with governance: private / shared / global scopes, an owner domain and a write policy per relation, per-agent permissions, append-only audit log.
@@ -17,7 +17,8 @@ It's a plan, not a promise. Priorities change with feedback: comment on the mile
 - Connected: facts are grouped into entities per customer, and retrieval follows links between them (multi-hop), explaining each added fact with `via`, inside the same permission checks.
 - Open schema: relations outside the built-in 19 are remembered as provisional, private to the domain that wrote them, until an admin promotes them. When agents disagree, a per-relation policy decides, the decision can be undone, and agent trust is learned from outcomes.
 - Self-maintaining: agents correct wrong facts and forget on a customer's request (`brain_correct`, `brain_forget`), sleep learns facts from whole sessions, and an LLM proposes how to settle conflicts for a person to accept.
-- Measured: a 50-scenario memory benchmark with a CI gate, also run end to end with a local LLM, plus LongMemEval-S retrieval. Hybrid semantic + lexical search with real embedding models; a per-customer index keeps retrieval under 2 ms at 100,000 episodes.
+- Governed for data protection: an admin can export everything about one customer (with history) and erase it; more PII formats are redacted (US SSN, IBAN, international phone numbers).
+- Measured: a 55-scenario memory benchmark with a CI gate, also run end to end with a local LLM, plus LongMemEval-S retrieval. Hybrid semantic + lexical search with real embedding models; a per-customer index keeps retrieval under 2 ms at 100,000 episodes.
 
 **Still basic**
 
@@ -26,10 +27,10 @@ It's a plan, not a promise. Priorities change with feedback: comment on the mile
 | Learned relations are curated by hand | New relations start private and stay provisional until an admin promotes them; nothing suggests a scope, owner or policy yet. Offline, only the "favourite X" family is recognised without an LLM. |
 | Embedding scores are not calibrated | With `bge-m3`, almost any two short texts have a cosine near 0.4, so every fact looks a little relevant. A customer with a dozen facts gets a crowded top 10, and facts linked through the entity graph can still lose the cut (the `multi-hop-trip-among-many-facts` scenario fails with `bge-m3`, with or without the graph). Each model needs its own baseline. |
 | Session summaries outlive the facts they describe | Insights now live 30 days and are built from the last month only (v0.8.1), but a session summary stays for months while the fact it mentions expires after 30 days. It shows its age in the prompt, and recency ranks it lower, but it can still surface. |
-| Forgetting is word for word | `brain_forget` deletes facts for real and scrubs the value from what the agent can see, but a summary an LLM wrote in other words may still describe it. Erasing a whole customer is not an agent tool yet (#4). |
+| Forgetting is word for word | `brain_forget` deletes facts for real and scrubs the value from what the agent can see, but a summary an LLM wrote in other words may still describe it. Erasing a whole customer is an admin action (v0.8.1), not an agent tool. |
 | Retrieval quality on long histories | On LongMemEval-S, hashing finds the evidence session in the top 4 for about half the questions; preferences and multi-session questions are weakest. |
 | A narrow graph | Entities are assets, trips and profile groups, found with a lexicon; one node per asset type per customer, so two cars are one node. No people or organisations yet. The affinity table is hand-written. |
-| Answers not measured | Benchmarks score what reaches the agent (50 own scenarios, LongMemEval retrieval), not the final answers. The value dashboard's "time saved" is an estimate (20 s per question). |
+| Answers not measured | Benchmarks score what reaches the agent (55 own scenarios, LongMemEval retrieval), not the final answers. The value dashboard's "time saved" is an estimate (20 s per question). |
 | Single process | State lives in memory; SQLite is the persistence layer. |
 
 ## Principles
@@ -116,7 +117,7 @@ These hold for every milestone:
 
 **Result:** the new `maintenance` benchmark category passes 100% offline, and with a local LLM a fact spread over two messages is learned during sleep. An independent review of the branch found one critical issue (any agent could delete company-wide policies) and five important ones; all are fixed with tests.
 
-**Not done** (see Next): suggestions for learned relations, merging duplicate entities, people and organisations in the graph, and a customer-level erase.
+**Not done** (see Next): suggestions for learned relations, merging duplicate entities, and people and organisations in the graph. (The customer-level erase shipped in v0.8.1.)
 
 ### Next: smaller steps before production
 
@@ -132,7 +133,7 @@ These hold for every milestone:
 
 - [ ] **Policy as code** (YAML): purpose-based access, e.g. the travel agent may read `allergic_to` only when choosing a meal. Policies are tested like code.
 - [ ] Tamper-evident audit log (hash chain).
-- [ ] Customer data export and delete ([#4](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/4)); more PII formats ([#2](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/2)).
+- [x] Customer data export and delete ([#4](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/4)) and more PII formats ([#2](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/2)): shipped early, in v0.8.1.
 - [ ] PostgreSQL + pgvector storage adapter; several hub processes behind a load balancer; sleep jobs on a worker queue.
 - [ ] OpenTelemetry export of brain traces (Jaeger, Langfuse, …); Prometheus metrics.
 - [ ] Multi-tenancy; scoped, expiring API keys; per-agent rate limits.
@@ -141,7 +142,7 @@ These hold for every milestone:
 
 ### v1.0: Stable and documented
 
-- [ ] Stable, versioned Brain API (`/v1`) and SDKs: JS, Python ([#1](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/1)).
+- [ ] Stable, versioned Brain API (`/v1`). SDKs: JS and Python ([#1](https://github.com/leluong141996-dev/Agent-Brain-Hub/issues/1), shipped in v0.8.1) are in; a published package for each is not.
 - [ ] Adapters for agent frameworks (LangGraph, CrewAI, OpenAI Agents SDK).
 - [ ] Documentation site with architecture, governance model and benchmark methodology.
 - [ ] Published benchmark report.

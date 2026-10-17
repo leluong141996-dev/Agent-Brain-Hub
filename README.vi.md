@@ -366,6 +366,15 @@ Bốn việc giúp bộ nhớ luôn đúng mà không cần người ngồi xem 
 
 ![Trang Duyệt: một mâu thuẫn kèm đề xuất của LLM và nút Chấp nhận](docs/review-proposal.png)
 
+### Dữ liệu khách hàng: xuất và xoá
+
+Hai thao tác của admin (cần `BRAIN_ADMIN_TOKEN` nếu đã đặt), cũng có ở **Cài đặt → Dữ liệu khách hàng**:
+
+- `GET /api/customers/:id/export` trả về một file JSON chứa mọi thứ bộ não giữ về khách: hồ sơ, từng fact **kèm lịch sử** (bị thay thế, bị sửa, thua phân xử), episode, working memory, insight và các quyết định phân xử. Không có embedding.
+- `DELETE /api/customers/:id` xoá hết: fact ở mọi phiên bản, episode, working memory, insight, trace, quyết định, lịch sử ngủ, id và giá trị của khách trong các quan hệ đã học, và các sự kiện tương ứng trong nhật ký trực tiếp. Việc xoá vẫn còn sau khi khởi động lại. Audit log chỉ được thêm vào và không bao giờ bị cắt, nên nó giữ id và số lượng (một dòng `erase`), không bao giờ giữ giá trị. Chính sách chung của công ty (`*`) không xoá được. Trên giao diện, bạn gõ lại id của khách để xác nhận.
+
+Nếu chỉ muốn quên một quan hệ, agent dùng `brain_forget`.
+
 ### Tìm kiếm theo ngữ nghĩa (embeddings)
 
 Mặc định, ký ức được so khớp bằng vector feature hashing chạy local: không cần mạng, không cần cài đặt, nhưng chỉ bắt được từ trùng nhau. Muốn tìm được cả câu diễn đạt khác ("Mai tôi tự lái ra sân bay được không?" → "không có xe 3 ngày"), hãy chọn model embedding trong **Cài đặt → Tìm kiếm theo ngữ nghĩa**: OpenAI, Gemini, Ollama, vLLM, LM Studio hoặc bất kỳ endpoint `/embeddings` tương thích OpenAI nào. Với tiếng Việt và tiếng Nhật, `bge-m3` chạy qua Ollama là lựa chọn local tốt.
@@ -377,20 +386,20 @@ Mặc định, ký ức được so khớp bằng vector feature hashing chạy 
 
 ## Benchmark
 
-`npm run bench` chấm bộ nhớ dùng chung trên 50 kịch bản nhiều agent: nhớ chéo giữa agent, fact hết hạn, mâu thuẫn, rò rỉ dữ liệu private, câu hỏi nhiều bước, hội thoại dài, khớp chính xác (mã đơn hàng, tên model), xem lại quá khứ, quan hệ ngoài danh sách có sẵn, cách xử lý khi hai agent bất đồng, và việc agent sửa, quên fact, bằng tiếng Anh kèm các ca tiếng Việt và tiếng Nhật. Chạy offline dưới một giây, và CI chặn mọi thay đổi làm tụt một chỉ số chất lượng ([bench/README.md](bench/README.md)).
+`npm run bench` chấm bộ nhớ dùng chung trên 55 kịch bản nhiều agent: nhớ chéo giữa agent, fact hết hạn, mâu thuẫn, rò rỉ dữ liệu private, câu hỏi nhiều bước, hội thoại dài, khớp chính xác (mã đơn hàng, tên model), xem lại quá khứ, quan hệ ngoài danh sách có sẵn, cách xử lý khi hai agent bất đồng, và việc agent sửa, quên fact, bằng tiếng Anh kèm các ca tiếng Việt và tiếng Nhật. Chạy offline dưới một giây, và CI chặn mọi thay đổi làm tụt một chỉ số chất lượng ([bench/README.md](bench/README.md)).
 
-| v0.8.0 | Hashing (mặc định, offline) | Lai với `bge-m3` (Ollama, CPU) | Có LLM (`qwen3:4b`, chạy trên máy) |
+| v0.8.1 | Hashing (mặc định, offline) | Lai với `bge-m3` (Ollama, CPU) | Có LLM (`qwen3:4b`, chạy trên máy; lần chạy v0.8.0) |
 |---|---|---|---|
-| Scenario pass rate | 98,0% | **100%** | 94,2% |
-| Recall accuracy | 98,1% | **100%** | 96,4% |
+| Scenario pass rate | 98,2% | 98,2% | 94,2% |
+| Recall accuracy | 98,5% | 98,5% | 96,4% |
 | Schema mở / phân xử / bảo trì | **100%** / **100%** / **100%** | **100%** / **100%** / **100%** | **100%** / **100%** / 80% |
-| Câu hỏi nhiều bước | **100%** (40% khi tắt đồ thị) | **100%** | **100%** |
+| Câu hỏi nhiều bước (15) | **100%** (26,7% khi tắt đồ thị) | 93,3% | **100%** (10 kịch bản) |
 | Leak rate | **0%** | **0%** | **0%** |
 | Stale-use rate | **0%** | **0%** | 6,3%\*\* |
-| Độ trễ recall (p50) | 0,5 ms | 93 ms | 0,7 ms |
-| Prompt tokens (trung bình) | 414 | 492 | 440 |
+| Độ trễ recall (p50) | 0,5 ms | 94 ms | 0,7 ms |
+| Prompt tokens (trung bình) | 426 | 500 | 440 |
 
-Đây là kịch bản do dự án tự viết, nên dùng để so các phiên bản của chính dự án. Đồ thị thực thể nâng tỷ lệ đạt khi chạy offline từ 86,0% lên 98,0% (`--no-graph` chạy cùng bộ kịch bản khi tắt đồ thị). Kịch bản duy nhất trượt khi chạy offline là một câu diễn đạt khác, không có từ nào trùng với ký ức.
+Đây là kịch bản do dự án tự viết, nên dùng để so các phiên bản của chính dự án. Đồ thị thực thể nâng tỷ lệ đạt khi chạy offline từ 78,2% lên 98,2% (`--no-graph` chạy cùng bộ kịch bản khi tắt đồ thị). Với `bge-m3`, đồ thị ít thay đổi kết quả ở khách có ít fact, vì với một model có điểm số chưa được hiệu chỉnh thì fact nào cũng "hơi liên quan"; còn kịch bản nhiều bước có hơn chục fact thì hỏng dù có hay không có đồ thị (xem ROADMAP). Kịch bản duy nhất trượt khi chạy offline là một câu diễn đạt khác, không có từ nào trùng với ký ức.
 
 **Với LLM thật.** Cột LLM chạy toàn bộ kịch bản với một LLM trên máy (`qwen3:4b` qua Ollama): LLM trích fact, viết bản tóm tắt phiên, tìm fact xuyên suốt cả phiên và đề xuất cách giải mâu thuẫn. Có cả những kịch bản chỉ LLM mới đạt được: quan hệ phải tự đặt ra, và fact nằm rải qua hai tin nhắn (tổng 52 kịch bản). Không cần key cloud, nhưng chậm trên một GPU phổ thông (RTX 3060): khoảng 43 giây mỗi tin nhắn, 3 giờ 6 phút cho cả bộ.
 
@@ -402,7 +411,7 @@ Ba kịch bản không đạt ở lần chạy đó: câu diễn đạt khác (o
 
 ## Test
 
-- `npm test`: 159 unit test, gồm:
+- `npm test`: 177 unit test, gồm:
   - bộ QA nghiệm thu của tài liệu: amnesia, contradiction, staleness, skill promotion, load 20k episode;
   - phân quyền và rò rỉ prompt;
   - tiếng Anh, tiếng Nhật;
@@ -412,8 +421,9 @@ Ba kịch bản không đạt ở lần chạy đó: câu diễn đạt khác (o
   - vòng ngủ tự động (im lặng, áp lực, ban đêm), nguồn gốc và tuổi của fact trong prompt, nhà cung cấp embedding (với server giả lập), và chính bộ benchmark;
   - bộ nhớ theo thời gian (`asOf`, lịch sử) và đồ thị thực thể: gộp thực thể, truy xuất nhiều bước không bao giờ chạm tới fact private hay đã hết hạn, API đồ thị;
   - schema mở và quy tắc ghi: registry quan hệ (tên, bí mật, giới hạn, lưu qua restart), quan hệ tạm giữ riêng tư theo từng miền, nâng cấp / gộp / xoá, từng policy, hoàn tác, độ tin cậy, hàng chờ duyệt;
+  - dữ liệu khách hàng (xuất, xoá, lưu qua restart), client Python và JS chạy với một hub thật, các định dạng PII và những thứ không được che;
   - bộ nhớ tự duy trì: sửa và quên (quyền, không để lại dấu vết, cùng một câu trả lời cho fact ẩn và fact không có, chính sách chung nằm ngoài tầm với), gom fact từ cả phiên, đề xuất giải mâu thuẫn của LLM và vòng đời của nó (kể cả qua REST, SDK và MCP).
-- `npm run bench`: benchmark bộ nhớ. 50 kịch bản nhiều agent (nhớ chéo, fact hết hạn, mâu thuẫn, rò rỉ, nhiều bước, hội thoại dài, khớp chính xác, xem lại quá khứ, schema mở, phân xử, bảo trì), chấm offline dưới một giây. Ngoài ra có `npm run bench:longmemeval` (bộ dữ liệu công khai, truy xuất) và `npm run bench:scale` (độ trễ khi bộ nhớ lớn). Xem [bench/README.md](bench/README.md); thêm kịch bản chỉ cần một file JSON.
+- `npm run bench`: benchmark bộ nhớ. 55 kịch bản nhiều agent (nhớ chéo, fact hết hạn, mâu thuẫn, rò rỉ, nhiều bước, hội thoại dài, khớp chính xác, xem lại quá khứ, schema mở, phân xử, bảo trì), chấm offline dưới một giây. Ngoài ra có `npm run bench:longmemeval` (bộ dữ liệu công khai, truy xuất) và `npm run bench:scale` (độ trễ khi bộ nhớ lớn). Xem [bench/README.md](bench/README.md); thêm kịch bản chỉ cần một file JSON.
 - `npm run e2e -- --lang vi|en|ja`: 11 bước chạy trên server đang chạy, với bất kỳ cấu hình LLM nào (offline, Claude, GPT, model local…). Bao gồm cả agent connected qua SDK và MCP server qua stdio. Bài test dùng một khách hàng mới nên không đụng dữ liệu đang có, nhưng tua đồng hồ mô phỏng thêm 7 ngày.
 
 ## Cấu trúc
