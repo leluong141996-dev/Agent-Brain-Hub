@@ -402,3 +402,28 @@ test('consolidation: a value that was already replaced is not written again, but
   await b2.sleep({ customerId: 'kh-001', lang: 'en' });
   assert.deepEqual(live(b2, 'has_children').map((f) => f.value), ['2']);
 });
+
+// ---- v0.8.1: insights and summaries age ----
+
+test('insights: live 30 days, and an old session cannot regenerate a stale insight', async () => {
+  const seen = [];
+  const llm = stubLLM(() => []);
+  llm.reflect = async (material) => {
+    seen.push(material);
+    return /Tokyo/.test(material) ? ['The customer is planning a trip to Tokyo next week'] : [];
+  };
+  const b = makeBrain(llm);
+  await b.think({ agentId: 'atlas', text: "I'm flying to Tokyo next week", lang: 'en' });
+  await b.think({ agentId: 'mia', text: 'I also need a hotel', lang: 'en' });
+  await b.sleep({ customerId: 'kh-001', lang: 'en' });
+  const day0 = b.state.episodes.filter((e) => e.kind === 'insight');
+  assert.equal(day0.length, 1);
+  assert.equal(Math.round((day0[0].expiresAt - b.clock.now()) / 86_400_000), 30, 'an insight lives 30 days');
+  b.advanceClock(45);
+  await b.think({ agentId: 'mia', text: 'I need a new phone case', lang: 'en' });
+  await b.sleep({ customerId: 'kh-001', lang: 'en' });
+  assert.ok(!seen.at(-1)?.includes('Tokyo') || seen.length === 1, 'reflection only reads recent episodes');
+  assert.equal(b.state.episodes.filter((e) => e.kind === 'insight' && /Tokyo/.test(e.text)).length, 0, 'the stale insight is gone and not regenerated');
+  const r = await b.recall({ agentId: 'mia', text: 'What trips do I have planned?', lang: 'en' });
+  assert.ok(!r.memories.some((m) => /\[Insight\].*Tokyo/.test(m.text)));
+});

@@ -4,6 +4,12 @@ import { addEpisode } from './neocortex.js';
 import { considerPromotion, skillName } from './cerebellum.js';
 import { actionLabel } from '../agents.js';
 import { truncate } from '../text.js';
+import { DAY } from '../clock.js';
+
+// An insight describes the recent past, so it lives a month and is built only
+// from the last month's episodes: an old session can't regenerate it, and a
+// "trip next week" insight can't outlive the trip.
+export const INSIGHT_DAYS = 30;
 
 function heuristicInsights(B, t, customerId) {
   const out = [];
@@ -40,7 +46,8 @@ function heuristicInsights(B, t, customerId) {
 
 export async function reflect(B, t, { customerId }) {
   // Insights are shared, so private episodes (e.g. Health) never feed reflection.
-  const eps = B.state.episodes.filter((e) => e.customerId === customerId && e.kind !== 'insight' && e.scope !== 'private');
+  const since = B.clock.now() - INSIGHT_DAYS * DAY;
+  const eps = B.state.episodes.filter((e) => e.customerId === customerId && e.kind !== 'insight' && e.scope !== 'private' && e.createdAt >= since);
   let insights = null;
   if (eps.length >= 2) {
     insights = await B.llm.reflect(eps.slice(-15).map((e) => `- ${e.text}`).join('\n'), t.lang);
@@ -52,7 +59,7 @@ export async function reflect(B, t, { customerId }) {
   for (const text of insights.slice(0, 3)) {
     const full = `[Insight] ${text}`;
     if (existing.has(full)) continue;
-    added.push(addEpisode(B, { customerId, agentId: 'dmn', ownerDomain: 'system', scope: 'shared', kind: 'insight', text: full, importance: 0.85 }));
+    added.push(addEpisode(B, { customerId, agentId: 'dmn', ownerDomain: 'system', scope: 'shared', kind: 'insight', text: full, importance: 0.85, expiresAt: B.clock.now() + INSIGHT_DAYS * DAY }));
     B.state.insights.push({ customerId, text, at: B.clock.now() });
   }
   t.step('dmn', t.L(`Phản tư: ${added.length} insight mới từ ${eps.length} episode`, `Reflection: ${added.length} new insights from ${eps.length} episodes`, `内省：${eps.length}件のエピソードから新しい洞察を${added.length}件`), {
