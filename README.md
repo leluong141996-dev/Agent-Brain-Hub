@@ -99,6 +99,17 @@ const reply = await myLLM({ system: ctx.promptBlock, user: ctx.redactedText });
 await brain.remember({ traceId: ctx.traceId, reply });
 ```
 
+The same loop in Python ([sdk/brain_client.py](sdk/brain_client.py), standard library only, Python 3.8+), with `correct()` and `forget()` as well:
+
+```python
+from brain_client import BrainClient
+brain = BrainClient(url="http://localhost:4317", api_key=os.environ["BRAIN_API_KEY"])
+
+ctx = brain.recall(customer_id="kh-001", text=user_message, lang="en")
+reply = my_llm(system=ctx["promptBlock"], user=ctx["redactedText"])
+brain.remember(trace_id=ctx["traceId"], reply=reply)
+```
+
 A sample agent you can run right away (open the UI next to it to watch the brain light up and the conversation appear in the chat):
 
 ```bash

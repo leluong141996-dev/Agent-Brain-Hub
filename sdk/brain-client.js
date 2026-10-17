@@ -43,9 +43,10 @@ export class BrainClient {
    * Retrieve the memory context for a user message.
    * Returns { traceId, intent, salience, handoff, playbook, memories[], suggestedActions[], promptBlock }.
    * Put `promptBlock` in your own system prompt.
+   * `asOf` (ms or an ISO date) asks what the brain believed at that time; it is read-only.
    */
-  recall({ customerId, text, lang = 'vi', includeSteps = false }) {
-    return this.#call('POST', '/v1/recall', { customerId, text, lang, includeSteps });
+  recall({ customerId, text, lang = 'vi', includeSteps = false, asOf }) {
+    return this.#call('POST', '/v1/recall', { customerId, text, lang, includeSteps, asOf });
   }
 
   /**

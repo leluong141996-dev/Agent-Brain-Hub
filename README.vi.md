@@ -87,6 +87,17 @@ const reply = await myLLM({ system: ctx.promptBlock, user: ctx.redactedText });
 await brain.remember({ traceId: ctx.traceId, reply });
 ```
 
+Vòng lặp tương tự bằng Python ([sdk/brain_client.py](sdk/brain_client.py), chỉ dùng thư viện chuẩn, Python 3.8+), có cả `correct()` và `forget()`:
+
+```python
+from brain_client import BrainClient
+brain = BrainClient(url="http://localhost:4317", api_key=os.environ["BRAIN_API_KEY"])
+
+ctx = brain.recall(customer_id="kh-001", text=user_message, lang="ja")
+reply = my_llm(system=ctx["promptBlock"], user=ctx["redactedText"])
+brain.remember(trace_id=ctx["traceId"], reply=reply)
+```
+
 Agent mẫu chạy được ngay (mở UI song song để xem bộ não sáng lên và hội thoại hiện trong chat):
 
 ```bash
