@@ -239,6 +239,11 @@ const server = http.createServer(async (req, res) => {
         if (req.method === 'PATCH' && !m[2]) return send(res, 200, brain.updateAgent(m[1], await readBody(req)));
         if (req.method === 'POST' && m[2]) return send(res, 200, brain.rotateKey(m[1]));
       }
+      const cust = url.pathname.match(/^\/api\/customers\/([\w.-]{1,64})(\/export)?$/);
+      if (cust) {
+        if (req.method === 'GET' && cust[2]) return send(res, 200, brain.exportCustomer(cust[1]));
+        if (req.method === 'DELETE' && !cust[2]) return send(res, 200, brain.eraseCustomer(cust[1]));
+      }
       const rel = url.pathname.match(/^\/api\/relations\/([\w-]+)$/);
       if (rel) {
         if (req.method === 'PUT') return send(res, 200, brain.updateRelation(rel[1], await readBody(req)));

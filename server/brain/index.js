@@ -22,6 +22,7 @@ import { handoff } from './corpusCallosum.js';
 import { encodeOnline, encodeOutcome, consolidate, describeReason } from './hippocampus.js';
 import { forget } from './forgetting.js';
 import { factsFromSessions } from './consolidation.js';
+import { exportCustomer as exportData, eraseCustomer as eraseData } from './customerdata.js';
 import { proposeResolutions, proposalOf, olderFirst } from './proposals.js';
 import { reflect } from './dmn.js';
 import { emptySleepState, recordSleep } from './sleepScheduler.js';
@@ -610,6 +611,20 @@ export class Brain {
     c.vip = !!vip;
     this.store.save();
     return c;
+  }
+
+  // ---------------- Customer data (admin) ----------------
+  exportCustomer(customerId) {
+    const r = exportData(this, customerId);
+    audit(this, { op: 'export', customerId, kind: `${r.facts.length} facts, ${r.episodes.length} episodes` });
+    return r;
+  }
+
+  eraseCustomer(customerId) {
+    const counts = eraseData(this, customerId);
+    audit(this, { op: 'erase', customerId, kind: `${counts.facts} facts, ${counts.episodes} episodes, ${counts.turns} turns, ${counts.insights} insights, ${counts.traces} traces` });
+    this.store.save();
+    return counts;
   }
 
   // ---------------- Memory admin ----------------

@@ -850,3 +850,11 @@ button.popover-row:hover, label.popover-row:hover { background: var(--hover); }
 .rv-proposal-text { display: flex; gap: 8px; align-items: flex-start; color: var(--violet); min-width: 0; }
 .rv-proposal-text b { color: var(--text); }
 .rv-proposal-text span { overflow-wrap: anywhere; }
+
+/* v0.8.1: customer data */
+.cd-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.cd-row label { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--text-2); }
+.op-arbitrate, .op-resolve, .op-schema { background: var(--violet-soft); color: var(--violet); }
+.op-correct { background: var(--warning-soft); color: var(--warning); }
+.op-forget, .op-erase { background: var(--danger-soft); color: var(--danger); }
+.op-export { background: var(--info-soft); color: var(--info); }

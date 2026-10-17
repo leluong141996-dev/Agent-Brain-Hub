@@ -75,12 +75,15 @@ export async function render(root, ctx) {
 
       <div class="card" id="schema"></div>
 
+      <div class="card" id="custData"></div>
+
       ${storageCard(storage)}
     </div>`;
 
   drawEmbeddings($('#embCard', root), emb);
   drawSleep($('#sleepCard', root), sleep);
   drawSchema($('#schema', root), relations, () => render(root, ctx));
+  drawCustomerData($('#custData', root), ctx);
   drawForm(root, byId, config);
   $$('.prov-tile', root).forEach((b) => {
     b.onclick = () => {
@@ -447,4 +450,40 @@ function drawSchema(box, relations, rerender) {
       put(tr.dataset.form, { action: 'promote', scope: v('scope'), policy: v('policy'), label: { vi: v('vi'), en: v('en'), ja: v('ja') } });
     };
   });
+}
+
+// ---------------- Customer data (v0.8.1) ----------------
+// Export everything the brain holds about one customer as a JSON file, or erase
+// it. Erasing asks to type the customer's id; the audit log keeps counts only.
+function drawCustomerData(box, ctx) {
+  const customers = (ctx.ui.snap?.customers || []).filter((c) => c.id !== '*');
+  box.innerHTML = `
+    <div class="card-head">
+      <div class="ico-tile neutral">${icon('shield', 18)}</div>
+      <div style="flex:1;min-width:0"><div class="card-title">${t('cd_title')}</div><div class="card-sub">${t('cd_sub')}</div></div>
+    </div>
+    <div class="card-body settings-body">
+      <div class="cd-row">
+        <label>${t('th_customer')} <select class="input sm" id="cdCustomer">${customers.map((c) => `<option value="${esc(c.id)}">${esc(c.name)} (${esc(c.id)})</option>`).join('')}</select></label>
+        <button class="btn sm" id="cdExport">${icon('download', 13)}<span>${t('cd_export')}</span></button>
+        <button class="btn sm danger" id="cdErase">${icon('trash', 13)}<span>${t('cd_erase')}</span></button>
+      </div>
+    </div>`;
+  const id = () => $('#cdCustomer', box).value;
+  $('#cdExport', box).onclick = async () => {
+    const data = await api(`/api/customers/${encodeURIComponent(id())}/export`);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+    a.download = `customer-${id()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  $('#cdErase', box).onclick = async () => {
+    const typed = prompt(t('cd_confirm', { id: id() }));
+    if (typed === null) return;
+    if (typed.trim() !== id()) return void toast(esc(t('cd_wrong')), 'info', icon('alert'));
+    const r = await api(`/api/customers/${encodeURIComponent(id())}`, undefined, 'DELETE');
+    toast(esc(t('cd_done', { facts: r.facts, episodes: r.episodes })), 'success', icon('check'));
+    await ctx.refresh();
+  };
 }

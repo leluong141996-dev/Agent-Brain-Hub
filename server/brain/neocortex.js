@@ -324,7 +324,7 @@ export function correctFact(B, { agent, customerId, relation, wrongValue, value,
 // "peanut snacks"). Matched as whole words (never inside "$5000" for "$500");
 // CJK has no word boundaries and is matched as is. Best effort: an LLM-written
 // summary may paraphrase a value in words that are not there to match.
-function scrubPatterns(values) {
+export function scrubPatterns(values) {
   const esc = (v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return values.map((v) => {
     if (/[぀-鿿]/.test(v)) return new RegExp(esc(v), 'gu');

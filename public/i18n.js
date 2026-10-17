@@ -7,6 +7,13 @@ export const LANGS = [
 
 const D = {
   vi: {
+    cd_title: "Dữ liệu khách hàng",
+    cd_sub: "Xuất mọi thứ bộ não giữ về một khách thành file JSON (kèm lịch sử), hoặc xoá hẳn. Nhật ký audit chỉ giữ số lượng, không giữ nội dung.",
+    cd_export: "Xuất JSON",
+    cd_erase: "Xoá dữ liệu khách",
+    cd_confirm: "Xoá toàn bộ dữ liệu của khách \"{id}\"? Không thể hoàn tác. Gõ lại id để xác nhận:",
+    cd_wrong: "Id không khớp, chưa xoá gì.",
+    cd_done: "Đã xoá: {facts} fact, {episodes} episode.",
     rv_proposal_keep: "Đề xuất của LLM: giữ \"{value}\".",
     rv_proposal_unsure: "LLM chưa chắc nên giữ giá trị nào.",
     rv_accept_proposal: "Chấp nhận đề xuất",
@@ -170,6 +177,13 @@ const D = {
     adapted: 'Đã tự điều chỉnh cho nhà cung cấp: {list}', source_settings: 'Lưu trong cài đặt', source_env: 'Từ biến môi trường', show: 'Hiện', hide: 'Ẩn', active: 'Đang dùng',
   },
   en: {
+    cd_title: "Customer data",
+    cd_sub: "Export everything the brain holds about one customer as a JSON file (with history), or erase it. The audit log keeps counts, never content.",
+    cd_export: "Export JSON",
+    cd_erase: "Erase customer",
+    cd_confirm: "Erase all data of customer \"{id}\"? This cannot be undone. Type the id to confirm:",
+    cd_wrong: "The id does not match; nothing was erased.",
+    cd_done: "Erased: {facts} facts, {episodes} episodes.",
     rv_proposal_keep: "LLM suggests keeping \"{value}\".",
     rv_proposal_unsure: "The LLM is not sure which value to keep.",
     rv_accept_proposal: "Accept proposal",
@@ -329,6 +343,13 @@ const D = {
     adapted: 'Auto-adjusted for this provider: {list}', source_settings: 'Saved in settings', source_env: 'From environment variables', show: 'Show', hide: 'Hide', active: 'Active',
   },
   ja: {
+    cd_title: "顧客データ",
+    cd_sub: "1人の顧客について脳が保持するすべてをJSONで書き出す（履歴付き）か、完全に削除します。監査ログには件数のみが残り、内容は残りません。",
+    cd_export: "JSONで書き出す",
+    cd_erase: "顧客を削除",
+    cd_confirm: "顧客「{id}」のデータをすべて削除しますか？元に戻せません。確認のためIDを入力してください：",
+    cd_wrong: "IDが一致しないため、何も削除していません。",
+    cd_done: "削除しました：事実{facts}件、エピソード{episodes}件。",
     rv_proposal_keep: "LLMの提案：「{value}」を採用。",
     rv_proposal_unsure: "LLMはどちらを採用すべきか判断できませんでした。",
     rv_accept_proposal: "提案を採用",
