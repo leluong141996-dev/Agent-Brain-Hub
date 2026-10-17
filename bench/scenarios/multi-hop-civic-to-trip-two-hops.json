@@ -1,0 +1,33 @@
+{
+  "id": "multi-hop-civic-to-trip-two-hops",
+  "category": "multi_hop",
+  "lang": "en",
+  "description": "Two hops: \"my Civic\" is the car, the car is in the shop, and that matters for the trip next week, which the question never mentions.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "My car is a Honda Civic"
+    },
+    {
+      "agent": "kai",
+      "say": "The car broke down, it will be in the shop for 3 days"
+    },
+    {
+      "agent": "atlas",
+      "say": "I'm flying to Osaka next week"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "mia",
+      "recall": "What is up with my Civic?",
+      "expect": {
+        "remembers": [
+          "no car for 3 days",
+          "Osaka"
+        ]
+      }
+    }
+  ]
+}

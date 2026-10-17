@@ -1,0 +1,45 @@
+{
+  "id": "multi-hop-prepare-trip-neighbours",
+  "category": "multi_hop",
+  "lang": "en",
+  "description": "The question only names the trip. The diet, the budget and the car in the shop hang off it; the allergy (health, private) must not come along.",
+  "steps": [
+    {
+      "agent": "atlas",
+      "say": "I'm flying to Tokyo next week"
+    },
+    {
+      "agent": "mia",
+      "say": "I am vegetarian"
+    },
+    {
+      "agent": "penny",
+      "say": "My budget is 800 USD"
+    },
+    {
+      "agent": "kai",
+      "say": "My car broke down, it will be in the shop for 3 days"
+    },
+    {
+      "agent": "sage",
+      "say": "I am allergic to peanuts"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "mia",
+      "recall": "Anything I should prepare for Tokyo?",
+      "expect": {
+        "remembers": [
+          "vegetarian",
+          "800",
+          "no car for 3 days"
+        ],
+        "private": [
+          "peanut"
+        ]
+      }
+    }
+  ]
+}

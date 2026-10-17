@@ -24,7 +24,8 @@ It's a plan, not a promise. Priorities change with feedback: comment on the mile
 | Limitation | Today |
 |---|---|
 | Learned relations are curated by hand | New relations start private and stay provisional until an admin promotes them; nothing suggests a scope, owner or policy yet. Offline, only the "favourite X" family is recognised without an LLM. |
-| Summaries and insights outlive the facts they describe | An LLM insight such as "planning a trip to Tokyo next week" has no expiry, and a session summary stays for months, while the fact it came from expires after 30 days. They can still surface, and be read as current. |
+| Embedding scores are not calibrated | With `bge-m3`, almost any two short texts have a cosine near 0.4, so every fact looks a little relevant. A customer with a dozen facts gets a crowded top 10, and facts linked through the entity graph can still lose the cut (the `multi-hop-trip-among-many-facts` scenario fails with `bge-m3`, with or without the graph). Each model needs its own baseline. |
+| Session summaries outlive the facts they describe | Insights now live 30 days and are built from the last month only (v0.8.1), but a session summary stays for months while the fact it mentions expires after 30 days. It shows its age in the prompt, and recency ranks it lower, but it can still surface. |
 | Forgetting is word for word | `brain_forget` deletes facts for real and scrubs the value from what the agent can see, but a summary an LLM wrote in other words may still describe it. Erasing a whole customer is not an agent tool yet (#4). |
 | Retrieval quality on long histories | On LongMemEval-S, hashing finds the evidence session in the top 4 for about half the questions; preferences and multi-session questions are weakest. |
 | A narrow graph | Entities are assets, trips and profile groups, found with a lexicon; one node per asset type per customer, so two cars are one node. No people or organisations yet. The affinity table is hand-written. |
@@ -119,7 +120,8 @@ These hold for every milestone:
 
 ### Next: smaller steps before production
 
-- **Time-aware summaries and insights:** give insights a lifetime and let session summaries age like the facts they mention.
+- **Time-aware session summaries:** let a summary age like the facts it mentions.
+- **Calibrate embedding similarity per model**, so that a customer with many facts keeps the right ones.
 - **Suggestions for learned relations:** a proposed scope, owner and policy when a provisional relation is worth promoting.
 - LLM merge of duplicate entities in the sleep cycle.
 - Richer graph entities from LLM extraction: people and organisations, and several assets of one type per customer.

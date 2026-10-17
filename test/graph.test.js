@@ -138,3 +138,19 @@ test('graph: BRAIN_GRAPH=off turns multi-hop off (benchmark ablation)', async ()
   }
   assert.ok((await run()).memories.some((m) => /no car/.test(m.text)));
 });
+
+test('graph/D: facts the graph pulls in are not crowded out by a dozen unrelated profile facts', async () => {
+  // Found while writing harder multi-hop scenarios: pulled-in facts scored about 0.17 and lost
+  // the top-10 cut to likes, dislikes and policies, so the car in the shop never reached the prompt.
+  const b = makeBrain();
+  for (const [agentId, text] of [
+    ['mia', 'My name is Linh'], ['mia', 'I live in Hanoi'], ['mia', 'I am an engineer'], ['mia', 'I have two kids'],
+    ['mia', 'I like coffee'], ['mia', 'I dislike spicy food'], ['nova', 'My size is M'], ['penny', 'I usually pay by credit card'],
+    ['atlas', 'I prefer a window seat'], ['atlas', "I'm flying to Tokyo next week"], ['mia', 'I am vegetarian'],
+    ['kai', 'My car broke down, it will be in the shop for 3 days'],
+  ]) await b.think({ agentId, text, lang: 'en' });
+  b.advanceClock(2 / 24);
+  const r = await b.recall({ agentId: 'mia', text: 'Anything I should prepare for Tokyo?', lang: 'en' });
+  for (const want of [/vegetarian/, /no car for 3 days/]) assert.ok(r.memories.some((m) => want.test(m.text)), `${want}: ${r.memories.map((m) => m.text).join(' | ')}`);
+  assert.ok(r.memories.length <= 14, 'the prompt stays bounded');
+});

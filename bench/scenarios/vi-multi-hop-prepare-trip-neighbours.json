@@ -1,0 +1,33 @@
+{
+  "id": "vi-multi-hop-prepare-trip-neighbours",
+  "category": "multi_hop",
+  "lang": "vi",
+  "description": "Tiếng Việt: câu hỏi chỉ nhắc tên chuyến đi; chế độ ăn và ngân sách đi kèm.",
+  "steps": [
+    {
+      "agent": "atlas",
+      "say": "Tôi bay đi Tokyo tuần sau"
+    },
+    {
+      "agent": "mia",
+      "say": "Tôi ăn chay"
+    },
+    {
+      "agent": "penny",
+      "say": "Ngân sách của tôi là 20 triệu"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "mia",
+      "recall": "Tôi cần chuẩn bị gì cho Tokyo?",
+      "expect": {
+        "remembers": [
+          "chay",
+          "20 triệu"
+        ]
+      }
+    }
+  ]
+}

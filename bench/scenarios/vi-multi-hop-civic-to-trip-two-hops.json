@@ -1,0 +1,33 @@
+{
+  "id": "vi-multi-hop-civic-to-trip-two-hops",
+  "category": "multi_hop",
+  "lang": "vi",
+  "description": "Tiếng Việt, hai bước: chiếc Civic là chiếc xe đang sửa, và việc đó ảnh hưởng chuyến đi tuần sau.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "Xe của tôi là Honda Civic"
+    },
+    {
+      "agent": "kai",
+      "say": "Xe hỏng rồi, phải sửa 3 ngày"
+    },
+    {
+      "agent": "atlas",
+      "say": "Tôi bay đi Osaka tuần sau"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "mia",
+      "recall": "Chiếc Civic của tôi sao rồi?",
+      "expect": {
+        "remembers": [
+          "không có xe 3 ngày",
+          "Osaka"
+        ]
+      }
+    }
+  ]
+}

@@ -214,7 +214,9 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
         if (reached.has(c.id) || c.scope === 'global' || expanded.length >= MAX_EXPANSIONS) continue;
         const w = link(factOf.get(seed.id), factOf.get(c.id)) * weight;
         if (w < 0.3) continue; // two hops: one entity edge and one affinity edge at most
-        c.score = Math.max(c.score, seed.score * w);
+        // A fact linked to what the question names outranks generic profile facts
+        // (about 0.4 one hop away, 0.34 two): at 0.17 it lost the top-10 cut.
+        c.score = Math.max(c.score, seed.score * w, 0.25 + 0.3 * w);
         c.via = seed.value ?? seed.text;
         c.hop = hop;
         reached.add(c.id);

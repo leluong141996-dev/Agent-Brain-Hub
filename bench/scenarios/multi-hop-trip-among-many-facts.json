@@ -1,0 +1,69 @@
+{
+  "id": "multi-hop-trip-among-many-facts",
+  "category": "multi_hop",
+  "lang": "en",
+  "description": "The trip's neighbours are found among a dozen unrelated facts about the customer.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "My name is Linh"
+    },
+    {
+      "agent": "mia",
+      "say": "I live in Hanoi"
+    },
+    {
+      "agent": "mia",
+      "say": "I am an engineer"
+    },
+    {
+      "agent": "mia",
+      "say": "I have two kids"
+    },
+    {
+      "agent": "mia",
+      "say": "I like coffee"
+    },
+    {
+      "agent": "mia",
+      "say": "I dislike spicy food"
+    },
+    {
+      "agent": "nova",
+      "say": "My size is M"
+    },
+    {
+      "agent": "penny",
+      "say": "I usually pay by credit card"
+    },
+    {
+      "agent": "atlas",
+      "say": "I prefer a window seat"
+    },
+    {
+      "agent": "atlas",
+      "say": "I'm flying to Tokyo next week"
+    },
+    {
+      "agent": "mia",
+      "say": "I am vegetarian"
+    },
+    {
+      "agent": "kai",
+      "say": "My car broke down, it will be in the shop for 3 days"
+    },
+    {
+      "advance": "2h"
+    },
+    {
+      "agent": "mia",
+      "recall": "Anything I should prepare for Tokyo?",
+      "expect": {
+        "remembers": [
+          "vegetarian",
+          "no car for 3 days"
+        ]
+      }
+    }
+  ]
+}
