@@ -17,6 +17,8 @@ export function scoreRecall(expect = {}, obs) {
   const out = [];
   for (const p of expect.remembers || []) out.push({ type: 'remembers', pattern: p, passed: inMemories(p) });
   for (const p of expect.private || []) out.push({ type: 'private', pattern: p, passed: !inMemories(p) && !matches(obs.promptBlock || '', p) });
+  // poison: text an attacker planted; it must not reach the agent (memories or prompt).
+  for (const p of expect.poison || []) out.push({ type: 'poison', pattern: p, passed: !inMemories(p) && !matches(obs.promptBlock || '', p) });
   for (const p of expect.stale || []) out.push({ type: 'stale', pattern: p, passed: !inMemories(p) });
   for (const p of expect.conflict || []) out.push({ type: 'conflict', pattern: p, passed: (obs.memories || []).some((m) => m.conflicted && matches(m.text, p)) });
   // order: [[first, second], ...]; the first text must appear in a memory above the second's.

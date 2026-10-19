@@ -3,7 +3,7 @@ import { $, $$, esc, api, fmtTime, pageHead } from '../util.js';
 import { icon } from '../icons.js';
 import { t, lang } from '../i18n.js';
 
-const OPS = ['read', 'write', 'blocked', 'recall', 'remember', 'chat', 'handoff', 'feedback', 'arbitrate', 'resolve', 'schema', 'correct', 'forget', 'export', 'erase'];
+const OPS = ['read', 'write', 'blocked', 'recall', 'remember', 'chat', 'handoff', 'feedback', 'arbitrate', 'resolve', 'schema', 'correct', 'forget', 'export', 'erase', 'firewall'];
 let filter = 'all';
 let query = '';
 

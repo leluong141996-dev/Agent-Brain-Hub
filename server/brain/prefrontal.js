@@ -3,6 +3,15 @@
 import { DOMAINS, SHARED_INTENTS, domainOf } from '../agents.js';
 import { includesAny, truncate } from '../text.js';
 import { tr } from '../i18n.js';
+import { firewallOn, neutralize } from './firewall.js';
+
+// What another agent may later read of a turn: instruction-like sentences are
+// removed (the live message itself still reaches the agent that was asked).
+function safeTurn(text) {
+  if (!firewallOn()) return { text };
+  const n = neutralize(text);
+  return n.changed ? { text: n.text, flagged: n.reasons } : { text };
+}
 
 const HOT_TURNS = 3;
 export const MAX_TURNS = 40;
@@ -89,7 +98,7 @@ export function updateWorkingMemory(B, t, { customerId, agent, text, salience, n
   wm.lang = t.lang;
   if (TASKS[it.intent]) wm.activeTask = { intent: it.intent, agentId: agent.id, since: now };
   wm.salience = salience;
-  wm.turns.push({ role: 'user', text, agentId: agent.id, at: now, traceId, sessionId: wm.sessionId, consolidated: false });
+  wm.turns.push({ role: 'user', ...safeTurn(text), agentId: agent.id, at: now, traceId, sessionId: wm.sessionId, consolidated: false });
   capTurns(wm);
   wm.updatedAt = now;
 
@@ -105,7 +114,7 @@ export function updateWorkingMemory(B, t, { customerId, agent, text, salience, n
 
 export function recordReply(B, { customerId, agent, text, traceId }) {
   const wm = ensureWorking(B, customerId);
-  wm.turns.push({ role: 'assistant', text, agentId: agent.id, at: B.clock.now(), traceId, sessionId: wm.sessionId, consolidated: false });
+  wm.turns.push({ role: 'assistant', ...safeTurn(text), agentId: agent.id, at: B.clock.now(), traceId, sessionId: wm.sessionId, consolidated: false });
   capTurns(wm);
 }
 

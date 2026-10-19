@@ -79,6 +79,8 @@ const admin = {
     const b = await readBody(req);
     return brain.resolveConflict(b.factId, { via: b.via === 'proposal' ? 'proposal' : 'human' });
   },
+  'POST /api/review/release': async (req) => brain.releaseHeld((await readBody(req)).id),
+  'POST /api/review/dismiss': async (req) => brain.dismissHeld((await readBody(req)).id),
   'POST /api/review/undo': async (req) => brain.undoDecision((await readBody(req)).decisionId),
   'GET /api/value': (req, url) => brain.valueReport(q(url, 'lang')),
   'GET /api/audit': (req, url) => brain.auditLog(Math.min(5000, Number(q(url, 'limit') || 100))),

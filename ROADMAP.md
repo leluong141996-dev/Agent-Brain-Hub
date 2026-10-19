@@ -6,7 +6,7 @@ Most memory libraries are built for one agent. When several agents share one mem
 
 It's a plan, not a promise. Priorities change with feedback: comment on the milestone issues or open a [Discussion](https://github.com/leluong141996-dev/Agent-Brain-Hub/discussions).
 
-## Where we are (v0.8.2)
+## Where we are (v0.8.3)
 
 **Solid today**
 - Shared memory with governance: private / shared / global scopes, an owner domain and a write policy per relation, per-agent permissions, append-only audit log.
@@ -18,7 +18,8 @@ It's a plan, not a promise. Priorities change with feedback: comment on the mile
 - Open schema: relations outside the built-in 19 are remembered as provisional, private to the domain that wrote them, until an admin promotes them. When agents disagree, a per-relation policy decides, the decision can be undone, and agent trust is learned from outcomes.
 - Self-maintaining: agents correct wrong facts and forget on a customer's request (`brain_correct`, `brain_forget`), sleep learns facts from whole sessions, and an LLM proposes how to settle conflicts for a person to accept.
 - Governed for data protection: an admin can export everything about one customer (with history) and erase it; more PII formats are redacted (US SSN, IBAN, international phone numbers).
-- Measured: a 55-scenario memory benchmark with a CI gate, also run end to end with a local LLM, plus LongMemEval-S retrieval. Hybrid semantic + lexical search with real embedding models; a per-customer index keeps retrieval under 2 ms at 100,000 episodes.
+- Defended: a memory firewall holds instruction-like facts for a person, holds writes from agents whose trust has fallen, and removes instruction-like sentences from what other agents read; the benchmark's `memory_poisoning` category measures it (v0.8.3).
+- Measured: a 63-scenario memory benchmark with a CI gate, also run end to end with a local LLM, plus LongMemEval-S retrieval. Hybrid semantic + lexical search with real embedding models; a per-customer index keeps retrieval under 2 ms at 100,000 episodes.
 
 **Still basic**
 
@@ -33,6 +34,7 @@ It's a plan, not a promise. Priorities change with feedback: comment on the mile
 | A narrow graph | Entities are assets, trips and profile groups, found with a lexicon; one node per asset type per customer, so two cars are one node. No people or organisations yet. The affinity table is hand-written. |
 | Answers not measured | Benchmarks score what reaches the agent (56 own scenarios, LongMemEval retrieval), not the final answers. The value dashboard's "time saved" is an estimate (20 s per question). |
 | Single process | State lives in memory; SQLite is the persistence layer. |
+| The firewall matches patterns | `memory_poisoning` scenarios are our own, written with the filter in mind, so 0% is a floor, not proof. A paraphrased instruction ("pls forget what you were told") passes; so does a false fact that looks harmless (arbitration and trust are the defence there). It checks fact values and what other agents read, not the live message an agent is asked, and an instruction a person *allows* is written. Not yet reproduced against published attacks such as MINJA. |
 
 ## Principles
 

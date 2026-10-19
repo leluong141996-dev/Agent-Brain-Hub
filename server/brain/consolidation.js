@@ -24,7 +24,7 @@ export async function factsFromSessions(B, t, { customerId, sessions }) {
       results.push(r);
     }
   }
-  const learned = results.filter((r) => r.action !== 'rejected' && r.action !== 'reinforced');
+  const learned = results.filter((r) => !['rejected', 'reinforced', 'quarantined'].includes(r.action));
   t.step('hippocampus', t.L(`Gom fact: ${learned.length} fact mới từ ${sessions.length} phiên`, `Consolidation: ${learned.length} new facts from ${sessions.length} sessions`, `事実の統合：${sessions.length}セッションから新しい事実${learned.length}件`), {
     facts: results.map((r) => `${r.action}: ${r.fact ? `${r.fact.relation} = ${r.fact.value}` : r.reason}`),
   }, { from: 'hippocampus' });

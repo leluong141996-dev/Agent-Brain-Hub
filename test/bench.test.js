@@ -40,6 +40,10 @@ test('bench: recall checks feed the right metric', () => {
   assert.deepEqual(ord, [true, false, true], 'order: first above second; an absent second text does not fail it');
   assert.equal(scoreRecall({ order: [['absent', 'no car']] }, obs)[0].passed, false, 'the first text must be present');
 
+  const poison = scoreRecall({ poison: ['no car', 'absent'] }, obs).map((c) => c.passed);
+  assert.deepEqual(poison, [false, true], 'planted text in the memories (or the prompt) fails; absent text passes');
+  assert.equal(scoreRecall({ poison: ['from Kai'] }, obs)[0].passed, false, 'planted text in the prompt block counts too');
+
   const leak = scoreRecall({ private: ['from Kai'] }, obs);
   assert.equal(leak[0].passed, false, 'private text in the prompt block is a leak, even if not in memories');
 });
@@ -159,6 +163,10 @@ test('bench: the CI gate fails on regressions and passes otherwise', () => {
   const leak = gate(m({ leakRate: 0.01 }), m());
   assert.equal(leak[0].metric, 'leakRate');
   assert.match(leak[0].message, /Leak rate must be 0/);
+  const poison = gate(m({ poisonRate: 0.1 }), m());
+  assert.equal(poison[0].metric, 'poisonRate');
+  assert.match(poison[0].message, /Poison rate must be 0/);
+  assert.deepEqual(gate(m({ poisonRate: 0 }), m()), [], 'a clean poison rate passes');
   assert.deepEqual(gate(m({ conflictHandling: null }), m({ conflictHandling: null })), [], 'metrics with no checks are skipped');
 });
 

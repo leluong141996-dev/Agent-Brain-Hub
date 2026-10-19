@@ -38,6 +38,7 @@ export function emptyState() {
     relations: {}, // registry: core overrides + relations learned at runtime (v0.7)
     decisions: [], // arbitration decisions, newest last, capped (v0.7)
     trust: {}, // agentId → { up, down } (v0.7)
+    quarantine: [], // writes held by the memory firewall, waiting for a person (v0.8.3)
     seq: 0,
   };
 }
@@ -207,6 +208,7 @@ export class Store {
     s.relations = JSON.parse(this.meta('relations') || '{}');
     s.decisions = JSON.parse(this.meta('decisions') || '[]');
     s.trust = JSON.parse(this.meta('trust') || '{}');
+    s.quarantine = JSON.parse(this.meta('quarantine') || '[]');
     s.audit = [];
     this.state = s;
   }
@@ -282,6 +284,7 @@ export class Store {
       this.stmt.setMeta.run('relations', JSON.stringify(this.state.relations || {}));
       this.stmt.setMeta.run('decisions', JSON.stringify(this.state.decisions || []));
       this.stmt.setMeta.run('trust', JSON.stringify(this.state.trust || {}));
+      this.stmt.setMeta.run('quarantine', JSON.stringify(this.state.quarantine || []));
     })();
     this.lastFlush = { upserts, deletes, ms: +(performance.now() - t0).toFixed(1) };
     return this.lastFlush;

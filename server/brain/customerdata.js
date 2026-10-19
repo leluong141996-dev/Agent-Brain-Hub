@@ -25,6 +25,8 @@ export function exportCustomer(B, customerId) {
     working: B.state.working[customerId] || null,
     insights: B.state.insights.filter(own),
     decisions: (B.state.decisions || []).filter(own),
+    // Writes the memory firewall is holding for review: not memories yet.
+    held: (B.state.quarantine || []).filter(own).map(({ input, ...h }) => h),
   };
 }
 
@@ -42,11 +44,13 @@ export function eraseCustomer(B, customerId) {
     insights: s.insights.filter(mine).length,
     traces: Object.values(s.traces).filter(mine).length,
     decisions: (s.decisions || []).filter(mine).length,
+    held: (s.quarantine || []).filter(mine).length,
   };
   s.facts = s.facts.filter((f) => !mine(f));
   s.episodes = s.episodes.filter((e) => !mine(e));
   s.insights = s.insights.filter((i) => !mine(i));
   s.decisions = (s.decisions || []).filter((d) => !mine(d));
+  s.quarantine = (s.quarantine || []).filter((h) => !mine(h));
   for (const [id, rec] of Object.entries(s.traces)) if (mine(rec)) delete s.traces[id];
   delete s.working[customerId];
   delete s.customers[customerId];

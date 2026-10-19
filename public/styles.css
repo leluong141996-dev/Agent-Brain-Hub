@@ -849,6 +849,7 @@ button.popover-row:hover, label.popover-row:hover { background: var(--hover); }
 .rv-proposal { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: var(--violet-soft); display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
 .rv-proposal-text { display: flex; gap: 8px; align-items: flex-start; color: var(--violet); min-width: 0; }
 .rv-proposal-text b { color: var(--text); }
+.rv-actions { margin-top: 10px; display: flex; gap: 8px; }
 .rv-proposal-text span { overflow-wrap: anywhere; }
 
 /* v0.8.1: customer data */

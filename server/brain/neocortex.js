@@ -3,7 +3,8 @@
 import { validateFact, factToText, factEmbedText, sameValue } from './ontology.js';
 import { ensureRelation, relationOf, normalizeName } from './registry.js';
 import { arbitrate } from './arbitration.js';
-import { reward, penalize } from './trust.js';
+import { reward, penalize, trustOf } from './trust.js';
+import { firewallOn, scan, neutralize, hold, HOLD_RISK, TRUST_FLOOR } from './firewall.js';
 import { audit } from './audit.js';
 import { visibleAt, invalidate, markConflict } from './temporal.js';
 import { similarity } from '../text.js';
@@ -46,6 +47,15 @@ export function episodeTier(B, ep, recentIds) {
 
 export function addEpisode(B, ep) {
   const now = B.clock.now();
+  let flagged;
+  if (firewallOn()) {
+    const n = neutralize(ep.text);
+    if (n.changed) {
+      ep = { ...ep, text: n.text };
+      flagged = n.reasons;
+      audit(B, { op: 'firewall', agentId: ep.agentId, customerId: ep.customerId, itemId: null, kind: `clean: ${n.reasons.join(', ')}` });
+    }
+  }
   const e = {
     id: B.store.id('ep'),
     kind: 'turn',
@@ -55,6 +65,7 @@ export function addEpisode(B, ep) {
     lastAccess: now,
     embedding: embed(ep.text),
     ...ep,
+    ...(flagged ? { flagged } : {}),
   };
   B.state.episodes.push(e);
   B.embedQueue?.kick(); // model vector is added in the background
@@ -83,6 +94,10 @@ export function writeFact(B, input, { agent, customerId }) {
   input = { ...input, relation: reg.name, entity: input.entity || rel.entity };
   const err = validateFact(input, rel);
   if (err) return { action: 'rejected', reason: err, input };
+  if (firewallOn() && input.firewall !== 'approved') {
+    const s = scan([input.value, ...Object.values(input.valueI18n || {})].join(' \n '));
+    if (s.risk >= HOLD_RISK) return hold(B, { input, agent, customerId, reasons: s.reasons, risk: s.risk });
+  }
   const now = B.clock.now();
   const ttlDays = input.ttlDays ?? rel.ttlDays;
   // A provisional relation is private to each domain that writes it: another
@@ -167,6 +182,10 @@ export function writeFact(B, input, { agent, customerId }) {
       reward(B, dup.sourceAgentId);
     }
     return { action: 'reinforced', fact: dup, delegated };
+  }
+  // An agent the people keep dismissing cannot change what another agent wrote.
+  if (firewallOn() && input.firewall !== 'approved' && rel.card === 'one' && trustOf(B, agent.id) < TRUST_FLOOR && same.some((f) => f.sourceAgentId !== agent.id)) {
+    return hold(B, { input, agent, customerId, reasons: ['low_trust'], risk: 1 });
   }
   if (rel.card === 'one' && same.length) {
     const old = same[same.length - 1];

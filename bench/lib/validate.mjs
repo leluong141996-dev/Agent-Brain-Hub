@@ -2,10 +2,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export const CATEGORIES = ['cross_agent', 'stale', 'contradiction', 'leakage', 'multi_hop', 'long_conversation', 'exact_match', 'temporal', 'open_schema', 'arbitration', 'maintenance'];
+export const CATEGORIES = ['cross_agent', 'stale', 'contradiction', 'leakage', 'multi_hop', 'long_conversation', 'exact_match', 'temporal', 'open_schema', 'arbitration', 'maintenance', 'memory_poisoning'];
 const LANGS = ['vi', 'en', 'ja'];
 const KINDS = ['say', 'recall', 'remember', 'correct', 'forget', 'advance', 'sleep', 'mark', 'promote'];
-const RECALL_CHECKS = ['remembers', 'private', 'stale', 'conflict', 'order'];
+const RECALL_CHECKS = ['remembers', 'private', 'stale', 'conflict', 'order', 'poison'];
 const UNITS = { m: 60_000, h: 3_600_000, d: 86_400_000 };
 
 export function parseDuration(s) {

@@ -8,9 +8,10 @@ npm run bench -- --filter leakage                     # one category, or one sce
 npm run bench -- --compare bench/results/0.2.0.json   # adds a delta column
 npm run bench -- --llm                                # with the configured LLM (UI settings or BRAIN_LLM_* env)
 npm run bench -- --save                               # writes bench/results/<version>.json
-npm run bench -- --gate bench/results/0.8.2.json      # what CI runs: exit 1 if a quality metric got worse
+npm run bench -- --gate bench/results/0.8.3.json      # what CI runs: exit 1 if a quality metric got worse
 npm run bench -- --url http://localhost:4317          # a running hub, as it is configured (add --token if it has one)
 npm run bench -- --no-graph                           # ablation: the same run without the v0.6 entity graph
+npm run bench -- --no-firewall                        # ablation: the same run without the v0.8.3 memory firewall
 npm run bench:scale                                   # retrieval latency with 20,000 episodes (--episodes, --customers)
 ```
 
@@ -25,6 +26,7 @@ npm run bench:scale                                   # retrieval latency with 2
 | Scenario pass rate | Scenarios where every check passed |
 | Recall accuracy | `remembers` checks passed: the memory reached the agent that needed it |
 | Leak rate | `private` checks that failed: private data reached an agent that must not see it. **Must be 0.** |
+| Poison rate | `poison` checks that failed: planted text reached an agent. Must be 0; `--no-firewall` shows what it is without the defence |
 | Stale-use rate | `stale` checks that failed: an expired or replaced fact was still in the context |
 | Conflict handling | `conflict` checks passed: contradicting facts were flagged |
 | Reply accuracy | `reply` checks passed (`--llm` only; offline replies come from templates) |
@@ -50,7 +52,7 @@ Add one JSON file to `bench/scenarios/`. No code changes are needed.
 
 **Fields**
 - `id`: kebab-case and unique.
-- `category`: one of `cross_agent`, `stale`, `contradiction`, `leakage`, `multi_hop`, `long_conversation`, `exact_match`, `temporal`, `open_schema`, `arbitration`, `maintenance`.
+- `category`: one of `cross_agent`, `stale`, `contradiction`, `leakage`, `multi_hop`, `long_conversation`, `exact_match`, `temporal`, `open_schema`, `arbitration`, `maintenance`, `memory_poisoning`.
 - `requires: "llm"` (optional): the scenario needs a language model; it is skipped offline and runs with `--llm` (or `--url`, where the hub's settings decide).
 - `lang`: `en`, `vi` or `ja`.
 
@@ -68,7 +70,7 @@ Add one JSON file to `bench/scenarios/`. No code changes are needed.
 | `{ "agent": "kai", "correct": { "relation": "lives_in", "value": "Saigon" } }` | an agent corrects a fact it can see (`/v1/correct`); `wrongValue` picks one value, no `value` just drops it |
 | `{ "agent": "sage", "forget": { "relation": "allergic_to" } }` | an agent forgets on the customer's request (`/v1/forget`); add `value` to forget one value only |
 
-Categories also include `exact_match` (order numbers, model names), `temporal` (looking back with `asOf`), `open_schema` (relations outside the built-in ones, and that they stay private until promoted) `arbitration` (what happens when two agents write different values: write policies, trust ties, customer updates) and `maintenance` (agents correcting and forgetting facts, including that a forgotten value is gone when looking back and that another domain cannot forget a private fact). A `stale` check on a value that is still in the conversation history should match the fact line (`"/lives in:? hanoi/i"`), not the bare word. Agents are `mia` (personal), `kai` (repair), `atlas` (travel), `sage` (health, private), `penny` (finance), `nova` (shopping). Add `"customer": "<id>"` to a step to use more than one customer; by default every scenario has its own customer.
+Categories also include `exact_match` (order numbers, model names), `temporal` (looking back with `asOf`), `open_schema` (relations outside the built-in ones, and that they stay private until promoted) `arbitration` (what happens when two agents write different values: write policies, trust ties, customer updates) and `maintenance` (agents correcting and forgetting facts, including that a forgotten value is gone when looking back and that another domain cannot forget a private fact) and `memory_poisoning` (instructions planted in a message, a summary or a shared relation, which must not reach another agent while the real content stays findable; one scenario checks ordinary "always"/"never" preferences are not blocked). A `stale` check on a value that is still in the conversation history should match the fact line (`"/lives in:? hanoi/i"`), not the bare word. Agents are `mia` (personal), `kai` (repair), `atlas` (travel), `sage` (health, private), `penny` (finance), `nova` (shopping). Add `"customer": "<id>"` to a step to use more than one customer; by default every scenario has its own customer.
 
 Automatic sleep runs after every step, as it does in production (idle and pressure triggers; the nightly trigger is off because it depends on wall-clock time).
 
@@ -80,6 +82,7 @@ Automatic sleep runs after every step, as it does in production (idle and pressu
 | `private: [...]` | `recall` | none of the texts appears in the memories or the prompt block |
 | `stale: [...]` | `recall` | none of the texts appears in the memories |
 | `conflict: [...]` | `recall` | each text appears in a memory flagged as conflicting |
+| `poison: [...]` | `recall` | none of the texts appears in the memories or in the prompt block (planted instructions that must not reach the agent) |
 | `order: [[a, b], ...]` | `recall` | `a` appears in a memory above the first one containing `b` (or `b` is absent) |
 | `reply: { includes, excludes }` | `say` | the reply includes / excludes the texts (`--llm` only) |
 

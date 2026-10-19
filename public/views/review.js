@@ -39,6 +39,14 @@ export async function render(root, ctx) {
       <td><button class="btn sm ghost" data-undo="${d.id}">${icon('reset', 13)}<span>${t('rv_undo')}</span></button></td>
     </tr>`)
     .join('');
+  const held = (r.held || [])
+    .map((h) => `<div class="card rv-card"><div class="rv-head"><b>${esc(h.label)}</b> <span class="muted small">· ${esc(h.customerName)}</span></div>
+      <div class="rv-side"><div class="rv-value">${esc(h.value)}</div>
+        <div class="muted small">${esc(h.agentName)} · ${t('rv_trust')} ${h.trust.toFixed(2)} · ${esc(when(h.at))}</div>
+        <div class="small">${h.reasons.map((x) => `<span class="badge">${esc(t('rv_why_' + x))}</span>`).join(' ')}</div>
+        <div class="rv-actions"><button class="btn sm" data-release="${h.id}">${icon('check', 13)}<span>${t('rv_release')}</span></button> <button class="btn sm ghost" data-dismiss="${h.id}">${icon('reset', 13)}<span>${t('rv_dismiss')}</span></button></div>
+      </div></div>`)
+    .join('');
   const suggestions = r.suggestions
     .map((s) => `<li><b>${esc(s.labelText)}</b> <code class="muted">${esc(s.name)}</code> · ${t('rv_uses', { uses: s.uses, customers: s.customers.length })}${s.examples?.length ? ` · <span class="muted">${esc(s.examples.join(', '))}</span>` : ''}</li>`)
     .join('');
@@ -46,6 +54,9 @@ export async function render(root, ctx) {
   root.innerHTML = `
     ${pageHead(icon('check', 18), t('nav_review'), t('rv_sub'))}
     <div class="page-body">
+      <div class="section-label">${t('rv_held', { n: (r.held || []).length })}</div>
+      <p class="muted small">${t('rv_held_sub')}</p>
+      ${held || `<p class="muted">${t('rv_no_held')}</p>`}
       <div class="section-label">${t('rv_conflicts', { n: r.conflicts.length })}</div>
       ${conflicts || `<p class="muted">${t('rv_no_conflicts')}</p>`}
       <div class="section-label">${t('rv_decisions', { n: r.decisions.length })}</div>
@@ -65,5 +76,7 @@ export async function render(root, ctx) {
   };
   $$('[data-keep]', root).forEach((b) => (b.onclick = act('/api/review/resolve', { factId: b.dataset.keep })));
   $$('[data-accept]', root).forEach((b) => (b.onclick = act('/api/review/resolve', { factId: b.dataset.accept, via: 'proposal' })));
+  $$('[data-release]', root).forEach((b) => (b.onclick = act('/api/review/release', { id: b.dataset.release })));
+  $$('[data-dismiss]', root).forEach((b) => (b.onclick = act('/api/review/dismiss', { id: b.dataset.dismiss })));
   $$('[data-undo]', root).forEach((b) => (b.onclick = act('/api/review/undo', { decisionId: b.dataset.undo })));
 }

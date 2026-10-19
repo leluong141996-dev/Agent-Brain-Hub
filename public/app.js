@@ -134,7 +134,7 @@ function renderShell() {
   ms.title = s.llm.lastError ? t('model_err', { err: s.llm.lastError.slice(0, 160) }) : '';
   $('#navAgentCount').textContent = s.agents.length;
   // Conflicts waiting for a human (v0.7 review queue).
-  api(`/api/review?lang=${lang()}`).then((r) => ($('#navReviewCount').textContent = r.conflicts.length || '')).catch(() => {});
+  api(`/api/review?lang=${lang()}`).then((r) => ($('#navReviewCount').textContent = (r.conflicts.length + (r.held?.length || 0)) || '')).catch(() => {});
   $('#sleepBtn').title = s.autoSleep?.enabled ? t('sleep_btn_auto') : '';
   const sel = $('#customerSelect');
   if (!s.customers.some((c) => c.id === ui.customerId) && s.customers[0]) ui.customerId = s.customers[0].id;

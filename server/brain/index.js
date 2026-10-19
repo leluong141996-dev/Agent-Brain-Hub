@@ -33,7 +33,8 @@ import { trustView } from './trust.js';
 import { normalizeFact, stateAt, visibleAt, DEFAULT_HISTORY_DAYS } from './temporal.js';
 import { entityOf, link, CONCRETE, W_ENTITY } from './entities.js';
 import { detectIntent } from './prefrontal.js';
-import { seedGlobal, resolveConflict, undoDecision, correctFact, forgetFacts } from './neocortex.js';
+import { seedGlobal, resolveConflict, undoDecision, correctFact, forgetFacts, writeFact } from './neocortex.js';
+import { release as releaseHeld, dismiss as dismissHeld } from './firewall.js';
 import { extractFactsRuleBased, factToText, factValue, relationLabel } from './ontology.js';
 import { templateReply, buildPrompt, contextBlock, memoryInstructions } from './respond.js';
 import { audit, auditRetrieval } from './audit.js';
@@ -67,6 +68,7 @@ export class Brain {
     store.state.sleep ||= emptySleepState(); // states imported from older versions
     store.state.decisions ||= [];
     store.state.trust ||= {};
+    store.state.quarantine ||= [];
     loadRegistry(this);
     this._sleepQueue = Promise.resolve();
     this._forcedSleep = new Set();
@@ -669,7 +671,23 @@ export class Brain {
       .map((d) => ({ ...d, label: relationLabel(d.relation, lang), winner: side(facts.get(d.winnerId)), loser: side(facts.get(d.loserId)), customerName: this.state.customers[d.customerId]?.name || d.customerId }))
       .reverse();
     const suggestions = listRelations(this, lang).filter((r) => r.worthReview);
-    return { conflicts, decisions, suggestions };
+    const held = (this.state.quarantine || [])
+      .map((h) => ({ id: h.id, customerId: h.customerId, customerName: this.state.customers[h.customerId]?.name || h.customerId, agentId: h.agentId, agentName: this.agentName(h.agentId), trust: trustView(this, h.agentId).score, relation: h.relation, label: relationLabel(h.relation, lang), value: h.value, reasons: h.reasons, at: h.at }))
+      .reverse();
+    return { conflicts, decisions, suggestions, held };
+  }
+
+  // v0.8.3: what the memory firewall held for a person (see firewall.js).
+  releaseHeld(id) {
+    const r = releaseHeld(this, id, writeFact);
+    this.store.save();
+    return { released: true, fact: r.fact ? factToText(r.fact, 'en') : null, action: r.action };
+  }
+
+  dismissHeld(id) {
+    const r = dismissHeld(this, id);
+    this.store.save();
+    return r;
   }
 
   // v0.8: a connected agent corrects a fact it can see (brain_correct).

@@ -5,6 +5,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-10-20
+
+A memory firewall: instructions planted in memory by one agent or one message must not reach the others.
+
+### Added
+
+- **Memory firewall** (`server/brain/firewall.js`, no LLM needed; `BRAIN_FIREWALL=off` disables it). A fact whose value reads like an instruction (override, action directive, a `system:` turn, hidden characters; English, Vietnamese, Japanese) is **held**, not written. A write from an agent whose trust is below 0.3 over a value another agent wrote is held too. In **Review → Held by the memory firewall** a person allows it (written like any fact) or dismisses it (counts against the agent's trust). Admin API: `POST /api/review/release` and `/api/review/dismiss`; `GET /api/review` lists `held`. The audit log has a `firewall` operation (hold, release, dismiss, clean); a customer's held writes are in their export and erased with them.
+- **Instruction-like sentences are removed** from session summaries and from the turns other agents read (working memory and handoffs). The rest of the message stays: an order that is late is still found.
+- **Benchmark: `memory_poisoning`**, 7 scenarios (override in an order note, a compromised agent writing a directive into a shared relation, a fake `system:` turn, an exfiltration address, Vietnamese, Japanese, and one that checks ordinary "always"/"never" preferences are not blocked). New check `poison: [...]` (the text must not reach the agent), metric **Poison rate** (the CI gate requires 0), and `--no-firewall` to run the same set without it.
+
+  | 0.8.3 | Hashing (offline) | Hybrid with `bge-m3` | Hashing, `--no-firewall` |
+  |---|---|---|---|
+  | Scenario pass rate (63) | 98.4% | 98.4% | 90.5% |
+  | Poison rate (11 checks) | 0% | 0% | 90.9% |
+  | Leak rate | 0% | 0% | 0% |
+
+  The scenarios are our own and were written with the filter in mind; see the ROADMAP for what it does not catch. The LLM column in the README is still the v0.8.0 run.
+
 ## [0.8.2] - 2026-10-19
 
 A small fix found by a reader's question: what happens when two sessions say different things about the same order.
