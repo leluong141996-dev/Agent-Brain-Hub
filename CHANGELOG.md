@@ -5,6 +5,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-10-19
+
+A small fix found by a reader's question: what happens when two sessions say different things about the same order.
+
+### Fixed
+
+- **Newer wins for one identifier.** "Order ORD-48207 was cancelled" and, two days later, "ORD-48207 has shipped": both stay as history, but a question that names the order now ranks the newer session above the older one. Before, the older one could rank slightly ahead, because recency is a small part of the score. A different order (`ORD-48199`) still ranks below both. This does not decide which statement is *true*; it makes the newest word the first one the agent reads.
+
+### Added
+
+- **A new benchmark check, `order: [[a, b]]`**: `a` must appear above `b` in the recalled memories. The scenario `exact-order-newer-status` uses it (56 scenarios; it fails without the fix).
+
+| 0.8.2 | Hashing (offline) | Hybrid with `bge-m3` |
+|---|---|---|
+| Scenario pass rate (56) | 98.2% | 98.2% |
+| Leak rate | 0% | 0% |
+
+The LLM column in the README is still the v0.8.0 run.
+
 ## [0.8.1] - 2026-10-17
 
 A hardening release before v0.9: data protection, a Python client, honest multi-hop scenarios, and two retrieval fixes.

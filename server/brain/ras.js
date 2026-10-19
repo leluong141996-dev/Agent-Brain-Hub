@@ -122,6 +122,13 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     if (tier === 'cold' && sim < 0.3 && !idMatch) continue; // cold store only queried on strong match
     epCands.push({ kind: 'episodic', id: e.id, text: e.text, tier, scope: e.scope, owner: e.ownerDomain, source: e.agentId, episodeKind: e.kind, at: e.createdAt, validUntil: e.expiresAt || null, score, parts: { sim, recency, importance: e.importance, idMatch: idMatch ? 1 : 0 } });
   }
+  // Several sessions can name the same order ("cancelled", then "shipped"). They
+  // are all history, so all stay, but the newest is the current word: an older
+  // one never ranks above a newer one that names the same identifier.
+  const named = epCands.filter((c) => c.parts.idMatch).sort((a, b) => b.at - a.at);
+  for (let i = 1; i < named.length; i++) {
+    if (named[i].at < named[i - 1].at) named[i].score = Math.min(named[i].score, named[i - 1].score - 0.001);
+  }
   t.step('neocortex', t.L(`Episodic: quét ${mine.length} episode`, `Episodic: scanned ${mine.length} episodes`, `エピソード記憶：${mine.length}件を走査`), {
     store: 'episodic (vector)',
     scanned: mine.length,

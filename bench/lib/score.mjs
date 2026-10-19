@@ -19,6 +19,12 @@ export function scoreRecall(expect = {}, obs) {
   for (const p of expect.private || []) out.push({ type: 'private', pattern: p, passed: !inMemories(p) && !matches(obs.promptBlock || '', p) });
   for (const p of expect.stale || []) out.push({ type: 'stale', pattern: p, passed: !inMemories(p) });
   for (const p of expect.conflict || []) out.push({ type: 'conflict', pattern: p, passed: (obs.memories || []).some((m) => m.conflicted && matches(m.text, p)) });
+  // order: [[first, second], ...]; the first text must appear in a memory above the second's.
+  for (const [a, b] of expect.order || []) {
+    const ia = mem.findIndex((t) => matches(t, a));
+    const ib = mem.findIndex((t) => matches(t, b));
+    out.push({ type: 'order', pattern: `${a} before ${b}`, passed: ia >= 0 && (ib < 0 || ia < ib) });
+  }
   return out.map((c) => ({ ...c, counted: true, observed: mem }));
 }
 

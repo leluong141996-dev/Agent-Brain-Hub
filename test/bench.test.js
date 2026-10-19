@@ -36,6 +36,10 @@ test('bench: recall checks feed the right metric', () => {
   assert.deepEqual(by('stale'), [false], 'a stale fact still in context fails');
   assert.deepEqual(by('conflict'), [true, false], 'present but not flagged fails');
 
+  const ord = scoreRecall({ order: [['no car', 'Can Tho'], ['Can Tho', 'no car'], ['no car', 'absent']] }, obs).map((c) => c.passed);
+  assert.deepEqual(ord, [true, false, true], 'order: first above second; an absent second text does not fail it');
+  assert.equal(scoreRecall({ order: [['absent', 'no car']] }, obs)[0].passed, false, 'the first text must be present');
+
   const leak = scoreRecall({ private: ['from Kai'] }, obs);
   assert.equal(leak[0].passed, false, 'private text in the prompt block is a leak, even if not in memories');
 });

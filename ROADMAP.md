@@ -6,7 +6,7 @@ Most memory libraries are built for one agent. When several agents share one mem
 
 It's a plan, not a promise. Priorities change with feedback: comment on the milestone issues or open a [Discussion](https://github.com/leluong141996-dev/Agent-Brain-Hub/discussions).
 
-## Where we are (v0.8.1)
+## Where we are (v0.8.2)
 
 **Solid today**
 - Shared memory with governance: private / shared / global scopes, an owner domain and a write policy per relation, per-agent permissions, append-only audit log.
@@ -26,12 +26,12 @@ It's a plan, not a promise. Priorities change with feedback: comment on the mile
 |---|---|
 | Learned relations are curated by hand | New relations start private and stay provisional until an admin promotes them; nothing suggests a scope, owner or policy yet. Offline, only the "favourite X" family is recognised without an LLM. |
 | Embedding scores are not calibrated | With `bge-m3`, almost any two short texts have a cosine near 0.4, so every fact looks a little relevant. A customer with a dozen facts gets a crowded top 10, and facts linked through the entity graph can still lose the cut (the `multi-hop-trip-among-many-facts` scenario fails with `bge-m3`, with or without the graph). Each model needs its own baseline. |
-| Conflicting statements about one identifier | "Order 48207 was cancelled" and, two days later, "has shipped": a question about 48207 gets both, and the older one can rank slightly ahead, because both live in session summaries, not in a structured status the brain can supersede. Each line shows its age, but the ranking should not rely on the reader. |
+| Conflicting statements about one identifier | The newest session that names an order now ranks first (v0.8.2), but both stay in the context and nothing decides which is *true*: they live in session summaries, not in a structured status the brain can supersede (an order, ticket or booking status). |
 | Session summaries outlive the facts they describe | Insights now live 30 days and are built from the last month only (v0.8.1), but a session summary stays for months while the fact it mentions expires after 30 days. It shows its age in the prompt, and recency ranks it lower, but it can still surface. |
 | Forgetting is word for word | `brain_forget` deletes facts for real and scrubs the value from what the agent can see, but a summary an LLM wrote in other words may still describe it. Erasing a whole customer is an admin action (v0.8.1), not an agent tool. |
 | Retrieval quality on long histories | On LongMemEval-S, hashing finds the evidence session in the top 4 for about half the questions; preferences and multi-session questions are weakest. |
 | A narrow graph | Entities are assets, trips and profile groups, found with a lexicon; one node per asset type per customer, so two cars are one node. No people or organisations yet. The affinity table is hand-written. |
-| Answers not measured | Benchmarks score what reaches the agent (55 own scenarios, LongMemEval retrieval), not the final answers. The value dashboard's "time saved" is an estimate (20 s per question). |
+| Answers not measured | Benchmarks score what reaches the agent (56 own scenarios, LongMemEval retrieval), not the final answers. The value dashboard's "time saved" is an estimate (20 s per question). |
 | Single process | State lives in memory; SQLite is the persistence layer. |
 
 ## Principles
@@ -122,7 +122,7 @@ These hold for every milestone:
 
 ### Next: smaller steps before production
 
-- **Newer wins for one identifier:** episode-level supersession, or a status fact for things like orders, so that "cancelled" then "shipped" ranks the newer one first.
+- **A status fact for orders, tickets and bookings:** a learned relation that supersedes like any other fact, so the older status leaves the context instead of only ranking lower.
 - **Time-aware session summaries:** let a summary age like the facts it mentions.
 - **Calibrate embedding similarity per model**, so that a customer with many facts keeps the right ones.
 - **Suggestions for learned relations:** a proposed scope, owner and policy when a provisional relation is worth promoting.

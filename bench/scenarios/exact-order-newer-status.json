@@ -1,0 +1,52 @@
+{
+  "id": "exact-order-newer-status",
+  "category": "exact_match",
+  "lang": "en",
+  "description": "An agent hears conflicting statuses of the same order two days apart ('cancelled', then 'shipped'), next to an order whose number differs by one digit. Both stay as history, but the newer statement must rank above the older one, and the other order must not outrank either.",
+  "steps": [
+    {
+      "agent": "nova",
+      "say": "My order ORD-48207 was cancelled"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "agent": "nova",
+      "say": "My order ORD-48199 is being packed"
+    },
+    {
+      "sleep": true
+    },
+    {
+      "advance": "2d"
+    },
+    {
+      "agent": "nova",
+      "say": "My order ORD-48207 has shipped"
+    },
+    {
+      "sleep": true
+    },
+    {
+      "agent": "mia",
+      "recall": "Where is order 48207?",
+      "expect": {
+        "remembers": [
+          "has shipped",
+          "was cancelled"
+        ],
+        "order": [
+          [
+            "has shipped",
+            "was cancelled"
+          ],
+          [
+            "was cancelled",
+            "ORD-48199"
+          ]
+        ]
+      }
+    }
+  ]
+}

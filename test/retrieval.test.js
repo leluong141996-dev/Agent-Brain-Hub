@@ -61,6 +61,24 @@ test('identifiers: a question with an exact order number reaches that order amon
   }
 });
 
+test('identifiers: when two sessions name the same order, the newer one ranks first', async () => {
+  // A reader asked about adversarial duplicates: "cancelled", then two days later "shipped".
+  // Both come back (they are both history), but the older one used to rank slightly ahead.
+  const b = makeBrain();
+  const add = (text) => addEpisode(b, { customerId: 'kh-001', agentId: 'nova', ownerDomain: 'shopping', scope: 'shared', kind: 'session', text });
+  add('[Nova] Customer talked with Nova: My order ORD-48207 was cancelled');
+  add('[Nova] Customer talked with Nova: My order ORD-48199 is being packed');
+  b.advanceClock(2);
+  add('[Nova] Customer talked with Nova: My order ORD-48207 has shipped');
+  for (const q of ['Where is order 48207?', 'Has ORD-48207 shipped yet?']) {
+    const r = await b.recall({ agentId: 'mia', customerId: 'kh-001', text: q, lang: 'en' });
+    const at = (re) => r.memories.findIndex((m) => re.test(m.text));
+    assert.ok(at(/has shipped/) >= 0 && at(/was cancelled/) >= 0, `${q}: both are kept as history`);
+    assert.ok(at(/has shipped/) < at(/was cancelled/), `${q}: newer first: ${r.memories.map((m) => m.text.slice(-30)).join(' | ')}`);
+    assert.ok(at(/ORD-48199/) < 0 || at(/ORD-48199/) > at(/was cancelled/), `${q}: a different order does not outrank it`);
+  }
+});
+
 test('allergy questions reach the allergy fact (vi / en / ja), and only the health domain sees it', async () => {
   // Found by the LLM benchmark: "Do I have any food allergies?" found nothing. Offline it passed
   // only because the extractive summary repeated "peanuts"; an LLM summary says "peanut allergy".

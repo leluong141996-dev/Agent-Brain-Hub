@@ -398,9 +398,9 @@ By default, memories are matched with local feature-hashing vectors: no network,
 
 ## Benchmark
 
-`npm run bench` scores the shared memory on 55 multi-agent scenarios: cross-agent recall, stale facts, contradictions, private-data leakage, multi-hop questions, long conversations, exact matches (order numbers, model names), looking back in time, relations outside the built-in ones, what happens when two agents disagree, and agents correcting and forgetting facts, in English with Vietnamese and Japanese cases. It runs offline in under a second, and CI fails any change that makes a quality metric worse ([bench/README.md](bench/README.md)).
+`npm run bench` scores the shared memory on 56 multi-agent scenarios: cross-agent recall, stale facts, contradictions, private-data leakage, multi-hop questions, long conversations, exact matches (order numbers, model names), looking back in time, relations outside the built-in ones, what happens when two agents disagree, and agents correcting and forgetting facts, in English with Vietnamese and Japanese cases. It runs offline in under a second, and CI fails any change that makes a quality metric worse ([bench/README.md](bench/README.md)).
 
-| v0.8.1 | Hashing (default, offline) | Hybrid with `bge-m3` (Ollama, CPU) | With an LLM (`qwen3:4b`, local; the v0.8.0 run) |
+| v0.8.2 | Hashing (default, offline) | Hybrid with `bge-m3` (Ollama, CPU) | With an LLM (`qwen3:4b`, local; the v0.8.0 run) |
 |---|---|---|---|
 | Scenario pass rate | 98.2% | 98.2% | 94.2% |
 | Recall accuracy | 98.5% | 98.5% | 96.4% |
@@ -408,10 +408,10 @@ By default, memories are matched with local feature-hashing vectors: no network,
 | Multi-hop questions (15) | **100%** (26.7% without the graph) | 93.3% | **100%** (10 scenarios) |
 | Leak rate | **0%** | **0%** | **0%** |
 | Stale-use rate | **0%** | **0%** | 6.3%\*\* |
-| recall latency (p50) | 0.5 ms | 94 ms | 0.7 ms |
-| Prompt tokens (mean) | 426 | 500 | 440 |
+| recall latency (p50) | 0.5 ms | 100 ms | 0.7 ms |
+| Prompt tokens (mean) | 427 | 503 | 440 |
 
-These are our own scenarios, so they compare versions of this project. The entity graph lifts the offline pass rate from 78.2% to 98.2% (`--no-graph` runs the same set without it). With `bge-m3` the graph changes little on small customers, because almost every fact looks a little relevant to a model whose scores are not calibrated, and the one multi-hop scenario with a dozen facts fails with or without it (see the ROADMAP). The one scenario that fails offline is a paraphrase that shares no words with the memory.
+These are our own scenarios, so they compare versions of this project. The entity graph lifts the offline pass rate from 78.6% to 98.2% (`--no-graph` runs the same set without it). With `bge-m3` the graph changes little on small customers, because almost every fact looks a little relevant to a model whose scores are not calibrated, and the one multi-hop scenario with a dozen facts fails with or without it (see the ROADMAP). The one scenario that fails offline is a paraphrase that shares no words with the memory.
 
 **With a real LLM.** The LLM column runs the whole suite end to end with a local LLM (`qwen3:4b` on Ollama), which extracts facts, writes the session summaries, finds facts across a session and proposes how to settle conflicts. It includes scenarios only an LLM can pass: a relation it has to invent, and a fact spread over two messages (52 scenarios in total). It needs no cloud key, but it is slow on one consumer GPU (RTX 3060): about 43 s per message, 3 h 6 min for the suite.
 
@@ -435,7 +435,7 @@ Three scenarios do not pass in that run: the paraphrase that fails offline too, 
   - open schema and write policies: the relation registry (names, secrets, limits, persistence), provisional relations staying private per domain, promote / merge / delete, each policy, undo, trust, the review queue;
   - customer data (export and erase, persistence), the Python and JS clients against a running hub, PII formats and what must not be redacted;
   - self-maintaining memory: correct and forget (permissions, nothing left behind, same answer for hidden and missing facts, company-wide policies out of reach), consolidation from whole sessions, LLM conflict proposals and their lifecycle (REST, SDK and MCP included).
-- `npm run bench`: the memory benchmark. 55 multi-agent scenarios (cross-agent recall, stale facts, contradictions, leakage, multi-hop, long conversations, exact matches, looking back in time, open schema, arbitration, maintenance) scored offline in under a second. Also `npm run bench:longmemeval` (public dataset, retrieval) and `npm run bench:scale` (latency with a large memory). See [bench/README.md](bench/README.md); adding a scenario is one JSON file.
+- `npm run bench`: the memory benchmark. 56 multi-agent scenarios (cross-agent recall, stale facts, contradictions, leakage, multi-hop, long conversations, exact matches, looking back in time, open schema, arbitration, maintenance) scored offline in under a second. Also `npm run bench:longmemeval` (public dataset, retrieval) and `npm run bench:scale` (latency with a large memory). See [bench/README.md](bench/README.md); adding a scenario is one JSON file.
 - `npm run e2e -- --lang vi|en|ja`: 11 steps against a running server, with any LLM configuration (offline, Claude, GPT, local models…). Includes a connected agent through the SDK and the MCP server over stdio. The test uses a new customer so existing data is left alone, but it advances the simulated clock by 7 days.
 
 ## Project structure

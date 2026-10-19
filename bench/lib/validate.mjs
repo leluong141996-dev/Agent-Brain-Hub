@@ -5,7 +5,7 @@ import path from 'node:path';
 export const CATEGORIES = ['cross_agent', 'stale', 'contradiction', 'leakage', 'multi_hop', 'long_conversation', 'exact_match', 'temporal', 'open_schema', 'arbitration', 'maintenance'];
 const LANGS = ['vi', 'en', 'ja'];
 const KINDS = ['say', 'recall', 'remember', 'correct', 'forget', 'advance', 'sleep', 'mark', 'promote'];
-const RECALL_CHECKS = ['remembers', 'private', 'stale', 'conflict'];
+const RECALL_CHECKS = ['remembers', 'private', 'stale', 'conflict', 'order'];
 const UNITS = { m: 60_000, h: 3_600_000, d: 86_400_000 };
 
 export function parseDuration(s) {
@@ -78,6 +78,13 @@ export function validateScenario(s, file, { agents }) {
       if (RECALL_CHECKS.includes(k)) {
         if (kind !== 'recall') { err(`"${k}" is only allowed on recall steps`, n); continue; }
         if (!Array.isArray(v) || !v.length) { err(`expect.${k} must be a list of texts`, n); continue; }
+        if (k === 'order') {
+          v.forEach((pair) => {
+            if (!Array.isArray(pair) || pair.length !== 2) return err('expect.order must be a list of [first, second] pairs', n);
+            pair.forEach((p) => { const e = patternError(p); if (e) err(`expect.order: ${JSON.stringify(p)} ${e}`, n); });
+          });
+          continue;
+        }
         v.forEach((p) => { const e = patternError(p); if (e) err(`expect.${k}: ${JSON.stringify(p)} ${e}`, n); });
       } else if (k === 'reply') {
         if (kind !== 'say') { err('"reply" is only allowed on say steps', n); continue; }
