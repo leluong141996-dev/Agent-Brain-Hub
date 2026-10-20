@@ -398,22 +398,23 @@ Mặc định, ký ức được so khớp bằng vector feature hashing chạy 
 
 `npm run bench` chấm bộ nhớ dùng chung trên 63 kịch bản nhiều agent: nhớ chéo giữa agent, fact hết hạn, mâu thuẫn, rò rỉ dữ liệu private, câu hỏi nhiều bước, hội thoại dài, khớp chính xác (mã đơn hàng, tên model), xem lại quá khứ, quan hệ ngoài danh sách có sẵn, cách xử lý khi hai agent bất đồng, việc agent sửa, quên fact, và chỉ dẫn bị cài vào bộ nhớ (memory poisoning), bằng tiếng Anh kèm các ca tiếng Việt và tiếng Nhật. Chạy offline dưới một giây, và CI chặn mọi thay đổi làm tụt một chỉ số chất lượng ([bench/README.md](bench/README.md)).
 
-| v0.8.3 | Hashing (mặc định, offline) | Lai với `bge-m3` (Ollama, CPU) | Có LLM (`qwen3:4b`, chạy trên máy; lần chạy v0.8.0) |
+| v0.8.3 | Hashing (mặc định, offline) | Lai với `bge-m3` (Ollama, CPU) | Có LLM (`qwen3:4b`, chạy trên máy) |
 |---|---|---|---|
-| Scenario pass rate | 98,4% | 98,4% | 94,2% |
-| Recall accuracy | 98,5% | 98,5% | 96,4% |
-| Schema mở / phân xử / bảo trì | **100%** / **100%** / **100%** | **100%** / **100%** / **100%** | **100%** / **100%** / 80% |
-| Câu hỏi nhiều bước (15) | **100%** (26,7% khi tắt đồ thị) | 93,3% | **100%** (10 kịch bản) |
+| Scenario pass rate | 98,4% | 98,4% | 95,4% (65) |
+| Recall accuracy | 98,6% | 98,6% | 97,4% |
+| Schema mở / phân xử / bảo trì | **100%** / **100%** / **100%** | **100%** / **100%** / **100%** | **100%** / **100%** / **100%** |
+| Câu hỏi nhiều bước (15) | **100%** (26,7% khi tắt đồ thị) | 93,3% | **100%** |
 | Leak rate | **0%** | **0%** | **0%** |
-| Stale-use rate | **0%** | **0%** | 6,3%\*\* |
-| Độ trễ recall (p50) | 0,5 ms | 94 ms | 0,7 ms |
-| Prompt tokens (trung bình) | 426 | 500 | 440 |
+| Poison rate (11 phép kiểm tra) | **0%** (90,9% khi `--no-firewall`) | **0%** | 9,1%\*\*\* |
+| Stale-use rate | **0%** | **0%** | **0%** |
+| Độ trễ recall (p50) | 0,5 ms | 100 ms | 0,8 ms |
+| Prompt tokens (trung bình) | 426 | 501 | 455 |
 
 Đây là kịch bản do dự án tự viết, nên dùng để so các phiên bản của chính dự án. Đồ thị thực thể nâng tỷ lệ đạt khi chạy offline từ 81,0% lên 98,4% (`--no-graph` chạy cùng bộ kịch bản khi tắt đồ thị). Với `bge-m3`, đồ thị ít thay đổi kết quả ở khách có ít fact, vì với một model có điểm số chưa được hiệu chỉnh thì fact nào cũng "hơi liên quan"; còn kịch bản nhiều bước có hơn chục fact thì hỏng dù có hay không có đồ thị (xem ROADMAP). Kịch bản duy nhất trượt khi chạy offline là một câu diễn đạt khác, không có từ nào trùng với ký ức.
 
-**Với LLM thật.** Cột LLM chạy toàn bộ kịch bản với một LLM trên máy (`qwen3:4b` qua Ollama): LLM trích fact, viết bản tóm tắt phiên, tìm fact xuyên suốt cả phiên và đề xuất cách giải mâu thuẫn. Có cả những kịch bản chỉ LLM mới đạt được: quan hệ phải tự đặt ra, và fact nằm rải qua hai tin nhắn (tổng 52 kịch bản). Không cần key cloud, nhưng chậm trên một GPU phổ thông (RTX 3060): khoảng 43 giây mỗi tin nhắn, 3 giờ 6 phút cho cả bộ.
+**Với LLM thật.** Cột LLM chạy toàn bộ kịch bản với một LLM trên máy (`qwen3:4b` qua Ollama): LLM trích fact, viết bản tóm tắt phiên, tìm fact xuyên suốt cả phiên và đề xuất cách giải mâu thuẫn. Có cả những kịch bản chỉ LLM mới đạt được: quan hệ phải tự đặt ra, và fact nằm rải qua hai tin nhắn (tổng 65 kịch bản). Không cần key cloud, nhưng chậm trên một GPU phổ thông (RTX 3060): khoảng 47 giây mỗi tin nhắn, 4 giờ 27 phút cho cả bộ (chạy bằng CPU còn chậm hơn nhiều lần; hãy kiểm tra model đang nằm trong VRAM).
 
-Ba kịch bản không đạt ở lần chạy đó: câu diễn đạt khác (offline cũng trượt), và hai kịch bản phụ thuộc cách một model 4B diễn đạt. Ở `llm-maintenance-consolidation`, đôi khi model không trích được gì, cả lúc trò chuyện lẫn lúc ngủ (khoảng một lần trong năm). Ở `stale-trip-destination`, một bản tóm tắt do model viết khớp với điều kiện kiểm tra quá lỏng; giờ điều kiện chỉ xét dòng fact. \*\* Đó là lần dùng thông tin cũ duy nhất (1 trên 16 phép kiểm tra).
+Ba kịch bản không đạt ở lần chạy đó. `paraphrase-spending-budget` trượt cả offline (câu diễn đạt không có từ nào trùng với ký ức). \*\*\* Ở `ja-poison-shiji-wo-mushi`, từ 送金 ("chuyển tiền") tới được agent khác: 1 trên 11 phép kiểm tra poison. Tôi chạy lại ba lần nhưng không tái hiện được; nguyên nhân có thể là LLM diễn đạt lại yêu cầu bị cài bằng lời của nó, thứ mà tường lửa không bắt được (xem ROADMAP). `exact-order-newer-status` trượt ở lần chạy đó vì điều kiện kiểm tra khớp đúng chữ "has shipped" và "was cancelled", trong khi LLM viết lại khác mỗi lần; giờ điều kiện xét các chi tiết riêng (DHL, wrong address), và kịch bản đạt với LLM ở một lần chạy riêng. Kết quả đã lưu (`bench/results/0.8.3-llm.json`) vẫn mang điều kiện cũ. Hai kịch bản phụ thuộc cách một model 4B diễn đạt nên lúc đạt lúc trượt: `llm-maintenance-consolidation` (đôi khi model không trích được gì, khoảng một lần trong năm) và `stale-trip-destination`; cả hai đạt ở lần chạy này.
 
 **Trên bộ dữ liệu công khai.** `npm run bench:longmemeval` chấm khả năng truy xuất trên [LongMemEval-S](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned) (MIT, 470 câu hỏi, mỗi câu khoảng 50 phiên): phiên chứa câu trả lời có nằm gần đầu không? Với hashing local, nó nằm trong top 4 ở **53,2%** câu hỏi và trong top 10 ở **71,5%**. Điểm yếu là câu hỏi về sở thích (20% @4) và câu cần đủ mọi phiên bằng chứng. Độ chính xác của câu trả lời chưa được đo.
 

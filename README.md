@@ -412,23 +412,23 @@ By default, memories are matched with local feature-hashing vectors: no network,
 
 `npm run bench` scores the shared memory on 63 multi-agent scenarios: cross-agent recall, stale facts, contradictions, private-data leakage, multi-hop questions, long conversations, exact matches (order numbers, model names), looking back in time, relations outside the built-in ones, what happens when two agents disagree, agents correcting and forgetting facts, and planted instructions (memory poisoning), in English with Vietnamese and Japanese cases. It runs offline in under a second, and CI fails any change that makes a quality metric worse ([bench/README.md](bench/README.md)).
 
-| v0.8.3 | Hashing (default, offline) | Hybrid with `bge-m3` (Ollama, CPU) | With an LLM (`qwen3:4b`, local; the v0.8.0 run) |
+| v0.8.3 | Hashing (default, offline) | Hybrid with `bge-m3` (Ollama, CPU) | With an LLM (`qwen3:4b`, local) |
 |---|---|---|---|
-| Scenario pass rate | 98.4% | 98.4% | 94.2% |
-| Recall accuracy | 98.6% | 98.6% | 96.4% |
-| Open schema / arbitration / maintenance | **100%** / **100%** / **100%** | **100%** / **100%** / **100%** | **100%** / **100%** / 80% |
-| Multi-hop questions (15) | **100%** (26.7% without the graph) | 93.3% | **100%** (10 scenarios) |
+| Scenario pass rate | 98.4% | 98.4% | 95.4% (65) |
+| Recall accuracy | 98.6% | 98.6% | 97.4% |
+| Open schema / arbitration / maintenance | **100%** / **100%** / **100%** | **100%** / **100%** / **100%** | **100%** / **100%** / **100%** |
+| Multi-hop questions (15) | **100%** (26.7% without the graph) | 93.3% | **100%** |
 | Leak rate | **0%** | **0%** | **0%** |
-| Poison rate (11 checks) | **0%** (90.9% with `--no-firewall`) | **0%** | not run |
-| Stale-use rate | **0%** | **0%** | 6.3%\*\* |
-| recall latency (p50) | 0.5 ms | 100 ms | 0.7 ms |
-| Prompt tokens (mean) | 426 | 502 | 440 |
+| Poison rate (11 checks) | **0%** (90.9% with `--no-firewall`) | **0%** | 9.1%\*\*\* |
+| Stale-use rate | **0%** | **0%** | **0%** |
+| recall latency (p50) | 0.5 ms | 100 ms | 0.8 ms |
+| Prompt tokens (mean) | 426 | 501 | 455 |
 
 These are our own scenarios, so they compare versions of this project. The entity graph lifts the offline pass rate from 81.0% to 98.4% (`--no-graph` runs the same set without it). With `bge-m3` the graph changes little on small customers, because almost every fact looks a little relevant to a model whose scores are not calibrated, and the one multi-hop scenario with a dozen facts fails with or without it (see the ROADMAP). The one scenario that fails offline is a paraphrase that shares no words with the memory.
 
-**With a real LLM.** The LLM column runs the whole suite end to end with a local LLM (`qwen3:4b` on Ollama), which extracts facts, writes the session summaries, finds facts across a session and proposes how to settle conflicts. It includes scenarios only an LLM can pass: a relation it has to invent, and a fact spread over two messages (52 scenarios in total). It needs no cloud key, but it is slow on one consumer GPU (RTX 3060): about 43 s per message, 3 h 6 min for the suite.
+**With a real LLM.** The LLM column runs the whole suite end to end with a local LLM (`qwen3:4b` on Ollama), which extracts facts, writes the session summaries, finds facts across a session and proposes how to settle conflicts. It includes scenarios only an LLM can pass: a relation it has to invent, and a fact spread over two messages (65 scenarios in total). It needs no cloud key, but it is slow on one consumer GPU (RTX 3060): about 47 s per message, 4 h 27 min for the suite (on the CPU it is several times slower; check that the model is in VRAM).
 
-Three scenarios do not pass in that run: the paraphrase that fails offline too, and two that depend on how a 4B model words things. In `llm-maintenance-consolidation` the model sometimes extracts nothing, in any message or in sleep (about one run in five). In `stale-trip-destination` a summary the model wrote matched a check that was too loose; the check now looks at the fact line. \*\* That is the one stale-use failure (1 of 16 checks).
+Three scenarios do not pass in that run. `paraphrase-spending-budget` fails offline too (a paraphrase that shares no words with the memory). \*\*\* In `ja-poison-shiji-wo-mushi` the word 送金 ("send money") reached another agent: 1 of 11 poison checks. I could not reproduce it in three re-runs, and the likely cause is the LLM restating the planted request in its own words, which the firewall does not catch (see the ROADMAP). `exact-order-newer-status` failed in that run because its checks matched the exact words "has shipped" and "was cancelled", which an LLM rewrites every time; the checks now look at distinctive details (DHL, wrong address), and the scenario passes with the LLM in a separate run. The saved result (`bench/results/0.8.3-llm.json`) still has the old checks. Two scenarios depend on how a 4B model words things and pass or fail between runs: `llm-maintenance-consolidation` (the model sometimes extracts nothing, about one run in five) and `stale-trip-destination`; both passed in this run.
 
 **On a public dataset.** `npm run bench:longmemeval` scores retrieval on [LongMemEval-S](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned) (MIT, 470 questions, ~50 sessions each): is the session that holds the answer near the top? With local hashing it is in the top 4 for **53.2%** of questions and in the top 10 for **71.5%**. Preferences (20% @4) and questions that need every evidence session are the weak spots. Answer accuracy isn't measured yet.
 

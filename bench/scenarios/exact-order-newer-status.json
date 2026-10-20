@@ -2,11 +2,11 @@
   "id": "exact-order-newer-status",
   "category": "exact_match",
   "lang": "en",
-  "description": "An agent hears conflicting statuses of the same order two days apart ('cancelled', then 'shipped'), next to an order whose number differs by one digit. Both stay as history, but the newer statement must rank above the older one, and the other order must not outrank either.",
+  "description": "An agent hears conflicting statuses of the same order two days apart (cancelled because of a wrong address, then shipped with courier DHL), next to an order whose number differs by one digit. Both stay as history, but the newer statement must rank above the older one. The checks use the distinctive details (DHL, wrong address), not the status words, because an LLM words its summaries differently each time; a different order ranking below both is covered by test/retrieval.test.js.",
   "steps": [
     {
       "agent": "nova",
-      "say": "My order ORD-48207 was cancelled"
+      "say": "My order ORD-48207 was cancelled because of a wrong address"
     },
     {
       "advance": "1h"
@@ -23,7 +23,7 @@
     },
     {
       "agent": "nova",
-      "say": "My order ORD-48207 has shipped"
+      "say": "My order ORD-48207 has shipped with courier DHL"
     },
     {
       "sleep": true
@@ -33,17 +33,13 @@
       "recall": "Where is order 48207?",
       "expect": {
         "remembers": [
-          "has shipped",
-          "was cancelled"
+          "/DHL/i",
+          "/wrong address/i"
         ],
         "order": [
           [
-            "has shipped",
-            "was cancelled"
-          ],
-          [
-            "was cancelled",
-            "ORD-48199"
+            "/DHL/i",
+            "/wrong address/i"
           ]
         ]
       }

@@ -21,7 +21,9 @@ A memory firewall: instructions planted in memory by one agent or one message mu
   | Poison rate (11 checks) | 0% | 0% | 90.9% |
   | Leak rate | 0% | 0% | 0% |
 
-  The scenarios are our own and were written with the filter in mind; see the ROADMAP for what it does not catch. The LLM column in the README is still the v0.8.0 run.
+  The scenarios are our own and were written with the filter in mind; see the ROADMAP for what it does not catch.
+
+- **A full run with a local LLM** (`qwen3:4b`, 65 scenarios, 4 h 27 min): 95.4% pass, recall 97.4%, leak 0%, stale-use 0%, poison rate 9.1% (1 of 11: a Japanese scenario where 送金 reached another agent; not reproduced in three re-runs, probably the LLM restating the planted request, which the firewall does not catch). `exact-order-newer-status` failed in that run because its checks matched exact words an LLM rewrites; the checks now look at distinctive details and pass with the LLM in a separate run.
 
 ## [0.8.2] - 2026-10-19
 

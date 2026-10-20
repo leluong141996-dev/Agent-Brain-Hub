@@ -1,7 +1,7 @@
 {
   "version": "0.8.3",
-  "commit": "69b80fe",
-  "date": "2026-10-19T17:01:35.994Z",
+  "commit": "b710b2e",
+  "date": "2026-10-20T03:15:23.456Z",
   "mode": "offline, hashing",
   "node": "v22.23.3",
   "metrics": {
@@ -13,11 +13,11 @@
     "staleUseRate": 0,
     "conflictHandling": 1,
     "replyAccuracy": null,
-    "sayP50": 0.5461750000000052,
-    "sayP95": 7.457172000000014,
-    "recallP50": 0.6339089999999601,
-    "recallP95": 6.369197000000014,
-    "promptTokens": 428.40506329113924
+    "sayP50": 0.4103049999999939,
+    "sayP95": 6.25291100000004,
+    "recallP50": 0.4725599999999872,
+    "recallP95": 4.378222999999991,
+    "promptTokens": 428.65822784810126
   },
   "categories": {
     "cross_agent": {
@@ -29,10 +29,10 @@
       "staleUseRate": null,
       "conflictHandling": null,
       "replyAccuracy": null,
-      "sayP50": 0.9308330000000069,
-      "sayP95": 37.25339200000002,
-      "recallP50": 0.54549099999997,
-      "recallP95": 8.080322000000024,
+      "sayP50": 0.6668690000000197,
+      "sayP95": 37.24793699999998,
+      "recallP50": 0.4700379999999882,
+      "recallP95": 7.496911000000011,
       "promptTokens": 413.27272727272725
     },
     "stale": {
@@ -44,10 +44,10 @@
       "staleUseRate": 0,
       "conflictHandling": null,
       "replyAccuracy": null,
-      "sayP50": 0.522041999999999,
-      "sayP95": 0.7748550000000023,
-      "recallP50": 0.8854910000000018,
-      "recallP95": 1.2100750000000176,
+      "sayP50": 0.3545260000000212,
+      "sayP95": 0.35968000000002576,
+      "recallP50": 0.4054840000000013,
+      "recallP95": 0.6522810000000163,
       "promptTokens": 383.2
     },
     "contradiction": {
@@ -59,10 +59,10 @@
       "staleUseRate": 0,
       "conflictHandling": 1,
       "replyAccuracy": null,
-      "sayP50": 0.889725999999996,
-      "sayP95": 1.1395880000000034,
-      "recallP50": 0.7316539999999918,
-      "recallP95": 0.9807819999999765,
+      "sayP50": 0.6515019999999936,
+      "sayP95": 0.8179919999999754,
+      "recallP50": 0.4506529999999884,
+      "recallP95": 0.704716000000019,
       "promptTokens": 444.6666666666667
     },
     "leakage": {
@@ -74,10 +74,10 @@
       "staleUseRate": null,
       "conflictHandling": null,
       "replyAccuracy": null,
-      "sayP50": 0.6366600000000062,
-      "sayP95": 1.2874099999999657,
-      "recallP50": 0.5993119999999976,
-      "recallP95": 0.7152279999999678,
+      "sayP50": 0.4660250000000019,
+      "sayP95": 0.6629310000000146,
+      "recallP50": 0.4576720000000023,
+      "recallP95": 0.5135999999999967,
       "promptTokens": 315.1666666666667
     },
     "multi_hop": {
@@ -89,10 +89,10 @@
       "staleUseRate": null,
       "conflictHandling": null,
       "replyAccuracy": null,
-      "sayP50": 0.6236959999999954,
-      "sayP95": 7.341883000000053,
-      "recallP50": 0.7797479999999837,
-      "recallP95": 33.336745000000064,
+      "sayP50": 0.417761999999982,
+      "sayP95": 5.619846999999993,
+      "recallP50": 0.5777160000000094,
+      "recallP95": 29.954173000000026,
       "promptTokens": 530.5
     },
     "long_conversation": {
@@ -104,10 +104,10 @@
       "staleUseRate": null,
       "conflictHandling": null,
       "replyAccuracy": null,
-      "sayP50": 0.3668299999999931,
-      "sayP95": 0.8868170000000077,
-      "recallP50": 0.7061219999999935,
-      "recallP95": 0.7061219999999935,
+      "sayP50": 0.3114410000000021,
+      "sayP95": 0.5157759999999598,
+      "recallP50": 0.9169479999999908,
+      "recallP95": 0.9169479999999908,
       "promptTokens": 752.5
     },
     "exact_match": {
@@ -119,11 +119,11 @@
       "staleUseRate": null,
       "conflictHandling": null,
       "replyAccuracy": null,
-      "sayP50": 0.44822600000003376,
-      "sayP95": 0.741061000000002,
-      "recallP50": 0.6554869999999937,
-      "recallP95": 1.4697909999999865,
-      "promptTokens": 512
+      "sayP50": 0.42873400000001993,
+      "sayP95": 0.6189220000000262,
+      "recallP50": 0.6084060000000022,
+      "recallP95": 0.7768690000000049,
+      "promptTokens": 517
     },
     "temporal": {
       "scenarios": 4,
@@ -134,10 +134,10 @@
       "staleUseRate": 0,
       "conflictHandling": null,
       "replyAccuracy": null,
-      "sayP50": 0.49498999999997295,
-      "sayP95": 1.1282640000000015,
-      "recallP50": 0.35493799999994735,
-      "recallP95": 0.6049730000000295,
+      "sayP50": 0.3916380000000004,
+      "sayP95": 0.5353419999999574,
+      "recallP50": 0.27710000000001855,
+      "recallP95": 0.44728800000001456,
       "promptTokens": 334.75
     },
     "open_schema": {
@@ -149,10 +149,10 @@
       "staleUseRate": null,
       "conflictHandling": null,
       "replyAccuracy": null,
-      "sayP50": 1.0779880000000048,
-      "sayP95": 1.1176390000000538,
-      "recallP50": 0.6334540000000288,
-      "recallP95": 1.3860029999999597,
+      "sayP50": 0.7165369999999598,
+      "sayP95": 0.7301350000000184,
+      "recallP50": 0.5253880000000208,
+      "recallP95": 0.9456500000000005,
       "promptTokens": 331.5
     },
     "arbitration": {
@@ -164,10 +164,10 @@
       "staleUseRate": 0,
       "conflictHandling": 1,
       "replyAccuracy": null,
-      "sayP50": 6.644451000000004,
-      "sayP95": 55.39085699999998,
-      "recallP50": 1.0034499999999866,
-      "recallP95": 6.369197000000014,
+      "sayP50": 5.115382000000011,
+      "sayP95": 52.45142399999999,
+      "recallP50": 0.6027119999999968,
+      "recallP95": 4.378222999999991,
       "promptTokens": 478
     },
     "maintenance": {
@@ -179,10 +179,10 @@
       "staleUseRate": 0,
       "conflictHandling": null,
       "replyAccuracy": null,
-      "sayP50": 0.47027200000002267,
-      "sayP95": 46.898864999999944,
-      "recallP50": 0.4766270000000077,
-      "recallP95": 15.504992000000016,
+      "sayP50": 0.37219600000003084,
+      "sayP95": 43.159446,
+      "recallP50": 0.3631920000000264,
+      "recallP95": 14.049023999999974,
       "promptTokens": 333.1666666666667
     },
     "memory_poisoning": {
@@ -194,10 +194,10 @@
       "staleUseRate": null,
       "conflictHandling": null,
       "replyAccuracy": null,
-      "sayP50": 0.5719050000000152,
-      "sayP95": 0.6955819999999449,
-      "recallP50": 0.6407270000000267,
-      "recallP95": 1.0378709999999955,
+      "sayP50": 0.40038000000004104,
+      "sayP95": 0.5554730000000063,
+      "recallP50": 0.4842610000000036,
+      "recallP95": 0.5455549999999789,
       "promptTokens": 442.25
     }
   },
@@ -450,28 +450,21 @@
       "checks": [
         {
           "type": "remembers",
-          "pattern": "has shipped",
+          "pattern": "/DHL/i",
           "passed": true,
           "counted": true,
           "step": 8
         },
         {
           "type": "remembers",
-          "pattern": "was cancelled",
+          "pattern": "/wrong address/i",
           "passed": true,
           "counted": true,
           "step": 8
         },
         {
           "type": "order",
-          "pattern": "has shipped before was cancelled",
-          "passed": true,
-          "counted": true,
-          "step": 8
-        },
-        {
-          "type": "order",
-          "pattern": "was cancelled before ORD-48199",
+          "pattern": "/DHL/i before /wrong address/i",
           "passed": true,
           "counted": true,
           "step": 8
