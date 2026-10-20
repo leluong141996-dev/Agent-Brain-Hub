@@ -314,6 +314,15 @@ export function correctFact(B, { agent, customerId, relation, wrongValue, value,
   const now = B.clock.now();
   const newValue = value === undefined || value === null ? '' : String(value).trim();
   if (newValue.length > 160) throw Object.assign(new Error('value is too long (160 characters at most)'), { status: 400 });
+  // An instruction posing as a correction is held before anything is invalidated:
+  // the real value must not be destroyed to make room for a value nobody will read.
+  if (newValue && firewallOn()) {
+    const s = scan(newValue);
+    if (s.risk >= HOLD_RISK) {
+      hold(B, { input: { relation: name, value: newValue, evidence: reason ? `correction: ${reason}` : 'correction', via: 'agent' }, agent, customerId, reasons: s.reasons, risk: s.risk });
+      return { corrected: [], fact: null, held: true };
+    }
+  }
   const targets = B.state.facts.filter(
     (f) => f.customerId === customerId && !isGlobal(f) && f.relation === name && visibleAt(f, now) && visible(f, agent) && (wrongValue === undefined || wrongValue === null || wrongValue === '' || sameValue(f.value, wrongValue))
   );
@@ -331,7 +340,7 @@ export function correctFact(B, { agent, customerId, relation, wrongValue, value,
   if (newValue) {
     // Not an "update": only the corrected values are replaced; values this
     // agent cannot see still go through arbitration as usual.
-    const r = writeFact(B, { relation: name, value: newValue, evidence: reason ? `correction: ${reason}` : 'correction' }, { agent, customerId });
+    const r = writeFact(B, { relation: name, value: newValue, evidence: reason ? `correction: ${reason}` : 'correction', via: 'agent' }, { agent, customerId });
     written = r.fact || null;
     if (written) for (const f of targets) f.invalidatedBy = f.supersededBy = written.id;
   }

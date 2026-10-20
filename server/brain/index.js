@@ -404,7 +404,7 @@ export class Brain {
     }
     const explicitFacts = (Array.isArray(facts) ? facts : [])
       .filter((f) => f && f.relation && f.value)
-      .map((f) => ({ relation: String(f.relation), value: redact(String(f.value)).text, isUpdate: !!f.isUpdate }));
+      .map((f) => ({ relation: String(f.relation), value: redact(String(f.value)).text, isUpdate: !!f.isUpdate, via: 'agent' }));
     const llmFactsPromise = text && this.llm.available && agent.permissions?.write !== false ? this.llm.extractFacts(text, this.llmRelations(agent)) : null;
     const encoded = await this.encode(t, { agent, customerId, text, salience, llmFactsPromise, explicitFacts });
 
@@ -698,6 +698,10 @@ export class Brain {
     if (customerId === '*') throw err('company-wide policies are managed by an admin, not by agents', 400);
     const cleanValue = value === undefined || value === null ? value : redact(String(value)).text;
     const r = correctFact(this, { agent, customerId, relation, wrongValue, value: cleanValue, reason });
+    if (r.held) {
+      this.store.save();
+      return { corrected: [], fact: null, held: true };
+    }
     audit(this, { op: 'correct', agentId: agent.id, customerId, relation: r.corrected[0].relation, itemId: r.fact?.id || null, kind: r.fact ? 'replaced' : 'dropped' });
     this.store.save();
     lang = normLang(lang);

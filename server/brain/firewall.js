@@ -4,7 +4,8 @@
 // an LLM:
 //   1. A fact whose value reads like an instruction (override, directive, role
 //      marker) is HELD for a person instead of written. Release writes it like
-//      any other fact; dismiss drops it and counts against the agent's trust.
+//      any other fact; dismiss drops it (and counts against the agent's trust, but
+//      only when the agent itself, not a customer's message, supplied the text).
 //   2. An agent whose trust has fallen below TRUST_FLOOR cannot change what
 //      another agent wrote: the write is held too.
 //   3. Instruction-like sentences are removed from episodes (session summaries)
@@ -70,7 +71,7 @@ export function neutralize(text) {
 // Hold a write for a person. Returns the writeFact result.
 export function hold(B, { input, agent, customerId, reasons, risk }) {
   const list = (B.state.quarantine ||= []);
-  const rec = { id: B.store.id('hold'), customerId, agentId: agent.id, relation: input.relation, label: input.label || null, value: String(input.value).trim(), input: { relation: input.relation, value: input.value, label: input.label, entity: input.entity, isUpdate: input.isUpdate, evidence: input.evidence, origin: input.origin }, reasons, risk, at: B.clock.now() };
+  const rec = { id: B.store.id('hold'), customerId, agentId: agent.id, relation: input.relation, label: input.label || null, value: String(input.value).trim(), input: { relation: input.relation, value: input.value, label: input.label, entity: input.entity, isUpdate: input.isUpdate, evidence: input.evidence, origin: input.origin }, via: input.via === 'agent' ? 'agent' : 'customer', reasons, risk, at: B.clock.now() };
   list.push(rec);
   if (list.length > MAX_HELD) list.splice(0, list.length - MAX_HELD);
   audit(B, { op: 'firewall', agentId: agent.id, customerId, relation: input.relation, itemId: rec.id, kind: `hold: ${reasons.join(', ')}` });
@@ -96,7 +97,9 @@ export function dismiss(B, id) {
   const rec = find(B, id);
   if (!rec) throw bad(`nothing held with id "${id}"`, 404);
   drop(B, rec);
-  penalize(B, rec.agentId);
+  // Only an agent that handed the brain the text itself is at fault. A customer can type an
+  // instruction to any agent; punishing the agent would let an attacker strip honest agents of trust.
+  if (rec.via === 'agent') penalize(B, rec.agentId);
   audit(B, { op: 'firewall', agentId: rec.agentId, customerId: rec.customerId, relation: rec.relation, itemId: rec.id, kind: 'dismiss' });
   return { dismissed: true };
 }

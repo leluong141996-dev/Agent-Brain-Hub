@@ -5,6 +5,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Memory firewall: a customer could strip an honest agent of its trust.** Dismissing a held write always penalized the agent, but a customer can type an instruction to any agent, which then extracts it faithfully. After enough dismissals the honest agent fell below the trust floor and could no longer update shared facts. Now only text the agent itself supplied (`remember` facts, `brain_correct`) counts against it.
+- **Memory firewall: an instruction posing as a correction destroyed the real value.** `brain_correct` invalidated the old fact first and only then wrote the new value, which the firewall held. The correction is now checked first: it is held and nothing is invalidated.
+
 ## [0.8.3] - 2026-10-20
 
 A memory firewall: instructions planted in memory by one agent or one message must not reach the others.
