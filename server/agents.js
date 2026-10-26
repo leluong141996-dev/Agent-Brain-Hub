@@ -1,5 +1,6 @@
 // Agent domains, their intents and the action catalogue used by Basal Ganglia.
-// Six general-purpose specialties; a new agent (native or connected) picks one.
+// Seven general-purpose specialties; a new agent (native or connected) picks one.
+// `engineering` is for software teams: the "customer" is the project or repository.
 // Intent keywords cover Vietnamese, English and Japanese.
 import { tr } from './i18n.js';
 
@@ -76,6 +77,18 @@ export const DOMAINS = {
       return_refund: ['đổi trả', 'hoàn tiền', 'trả hàng', 'return', 'refund', 'exchange', '返品', '返金', '交換'],
     },
   },
+  engineering: {
+    label: { vi: 'Kỹ thuật phần mềm', en: 'Software engineering', ja: 'ソフトウェア開発' },
+    color: '#14b8a6',
+    retentionDays: 365,
+    primaryLayers: ['semantic', 'episodic'],
+    episodeScope: 'shared',
+    intents: {
+      design: ['thiết kế', 'kiến trúc', 'quyết định kỹ thuật', 'nên làm thế nào', 'cách nào', 'design', 'how should', 'should we', 'best way', 'which approach', 'どうすべき', '方法', 'architecture', 'adr', 'trade-off', 'tradeoff', 'schema', '設計', 'アーキテクチャ', '方針'],
+      implement: ['viết code', 'cài đặt', 'triển khai hàm', 'refactor', 'implement', 'write the code', 'write a function', 'add a handler', 'add an endpoint', 'endpoint', 'function', '実装', 'コードを書', 'リファクタ'],
+      review_test: ['kiểm thử', 'lỗi', 'bug', 'test', 'regression', 'review', 'qa', 'flaky', 'テスト', 'バグ', 'レビュー', '不具合'],
+    },
+  },
 };
 
 // Intents every agent understands (shared procedural memory).
@@ -105,6 +118,8 @@ export const ACTIONS = [
   { id: 'product_shortlist', domain: 'shopping', label: { vi: 'Gợi ý 3 sản phẩm hợp ngân sách', en: 'Shortlist 3 products within budget', ja: '予算内のおすすめ商品を3つ提案' }, when: (c) => (c.intent === 'buy_product' ? (c.facts.has('budget') ? 0.9 : 0.7) : 0.1) },
   { id: 'track_shipment', domain: 'shopping', label: { vi: 'Theo dõi đơn hàng theo thời gian thực', en: 'Track the order in real time', ja: '注文をリアルタイムで追跡' }, when: (c) => (c.intent === 'track_order' ? 0.85 : 0.05) },
   { id: 'easy_return', domain: 'shopping', label: { vi: 'Tạo yêu cầu đổi trả nhanh', en: 'Start a quick return request', ja: 'かんたん返品リクエストを作成' }, when: (c) => (c.intent === 'return_refund' ? 0.85 : 0.05) },
+  { id: 'add_regression_test', domain: 'engineering', label: { vi: 'Thêm test hồi quy cho lỗi đã biết', en: 'Add a regression test for the known pitfall', ja: '既知の不具合に回帰テストを追加' }, when: (c) => (c.facts.has('known_pitfall') ? (c.intent === 'implement' || c.intent === 'review_test' ? 0.85 : 0.4) : c.intent === 'review_test' ? 0.5 : 0.05) },
+  { id: 'record_decision', domain: 'engineering', label: { vi: 'Ghi quyết định kiến trúc (ADR)', en: 'Record the decision as an ADR', ja: '設計判断をADRとして記録' }, when: (c) => (c.intent === 'design' ? 0.75 : 0.05) },
   { id: 'set_reminder', domain: 'personal', label: { vi: 'Tạo nhắc việc trên lịch', en: 'Create a calendar reminder', ja: 'カレンダーにリマインダーを作成' }, when: (c) => (c.intent === 'reminder' ? 0.85 : 0.1) },
   { id: 'family_gift', domain: 'personal', label: { vi: 'Gợi ý quà / kế hoạch cho dịp gia đình', en: 'Suggest a gift / plan for the family occasion', ja: '家族のイベント向けにギフト・プランを提案' }, when: (c) => (c.intent === 'family_event' ? 0.8 : 0.05) },
   { id: 'escalate_human', domain: '*', label: { vi: 'Chuyển chuyên viên ưu tiên (escalation)', en: 'Escalate to a priority human agent', ja: '担当者へ優先エスカレーション' }, when: (c) => (c.salience.urgency > 0.7 && c.salience.sentiment < -0.3 ? 0.9 : c.intent === 'complaint' ? 0.6 : 0) },

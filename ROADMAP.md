@@ -15,7 +15,7 @@ It's a plan, not a promise. Priorities change with feedback: comment on the mile
 - Runs offline with zero configuration, or with any LLM. REST, JS SDK and MCP. English, Vietnamese, Japanese.
 - Correct over time: facts are invalidated rather than deleted, and `recall({ asOf })` shows what the brain believed at any moment.
 - Connected: facts are grouped into entities per customer, and retrieval follows links between them (multi-hop), explaining each added fact with `via`, inside the same permission checks.
-- Open schema: relations outside the built-in 19 are remembered as provisional, private to the domain that wrote them, until an admin promotes them. When agents disagree, a per-relation policy decides, the decision can be undone, and agent trust is learned from outcomes.
+- Open schema: relations outside the built-in 21 are remembered as provisional, private to the domain that wrote them, until an admin promotes them. When agents disagree, a per-relation policy decides, the decision can be undone, and agent trust is learned from outcomes.
 - Self-maintaining: agents correct wrong facts and forget on a customer's request (`brain_correct`, `brain_forget`), sleep learns facts from whole sessions, and an LLM proposes how to settle conflicts for a person to accept.
 - Governed for data protection: an admin can export everything about one customer (with history) and erase it; more PII formats are redacted (US SSN, IBAN, international phone numbers).
 - Defended: a memory firewall holds instruction-like facts for a person, holds writes from agents whose trust has fallen, and removes instruction-like sentences from what other agents read; the benchmark's `memory_poisoning` category measures it (v0.8.3).

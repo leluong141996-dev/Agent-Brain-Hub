@@ -14,13 +14,47 @@
 
 The memory is organized like a human brain: 13 regions and a wake/sleep cycle, following the CoALA framework. The architecture draws on the *Vita Cognitive Memory Architecture* document. The UI lets you **watch each brain region work, live**, in **English · Tiếng Việt · 日本語**.
 
-### Example
+### Example: a dev team that stops repeating the same bug
 
-1. A customer tells **Kai**, the repair agent: *"My car is a Honda Civic, it broke down and will be in the shop for 3 days."*
-2. Later they ask **Atlas**, the travel agent: *"I need a flight to Da Nang next week, window seat please."*
-3. Atlas replies: *"I've got the context from Kai. I remember: no car for 3 days, no need to repeat it. I'll look for a suitable flight to Da Nang, window seat preferred. Also: a self-drive rental at the destination, would you like that?"*
+Three agents work on one repository: an **Architect**, a **Coder** and a **QA** agent (Claude Code, Cursor, your own LangGraph nodes, anything that can call REST or MCP). They share one brain, and the "customer" the memory is about is the repository.
 
-Atlas never heard about the car. Kai wrote "car unavailable for 3 days" to **shared** memory, while the repair details stayed **private** to Kai.
+```python
+qa.remember(customer_id="repo:shop-api", facts=[
+    {"relation": "known_pitfall", "value": "parseDate breaks on DST changes; test with Europe/Berlin 2026-03-29 02:30"}])
+architect.remember(customer_id="repo:shop-api", facts=[
+    {"relation": "convention", "value": "store every timestamp in UTC; convert only in the UI"}])
+
+# Days later, a fresh Coder session is asked to touch the same code:
+ctx = coder.recall(customer_id="repo:shop-api", text="Implement parseDate for order timestamps")
+```
+```text
+known pitfall: parseDate breaks on DST changes; test with Europe/Berlin 2026-03-29 02:30   (from QA, 3 days ago)
+convention: store every timestamp in UTC; convert only in the UI                          (from Architect, 3 days ago)
+```
+
+The Coder never talked to QA. `ctx["promptBlock"]` goes into its system prompt with who said what and when. Runnable: [examples/dev_team.py](examples/dev_team.py) (standard library only).
+
+### Example: customer service
+
+A customer tells **Kai**, the repair agent, that their Honda Civic will be in the shop for 3 days. Later **Atlas**, the travel agent, books their flight and says: *"I remember: no car for 3 days, no need to repeat it… a self-drive rental at the destination, would you like that?"* Kai wrote "car unavailable for 3 days" to **shared** memory; the repair details stayed **private** to Kai.
+
+## Why Agent Brain Hub?
+
+- **No LLM needed to write memory.** Out of the box it runs on rules and templates: facts, contradictions, expiry, privacy and the benchmark all work offline, for $0 in tokens. Add any LLM (Claude, GPT, Gemini, Ollama, vLLM…) when you want better extraction and summaries.
+- **One SQLite file.** `docker compose up -d` and you have the API, the MCP server and the UI. No vector database, graph database or Postgres to run.
+- **Built for many agents, with governance.** Every relation has a scope (private / shared / global), an owner domain and a write policy; when two agents disagree a policy decides and a person can undo it. Every read and write is in an append-only audit log. A memory firewall holds planted instructions (`memory_poisoning` benchmark: 0% poison rate).
+- **You can watch it think.** The UI traces every request through 13 brain regions live, including requests from external agents, and shows which memory came from where.
+- **Measured.** 63 multi-agent scenarios run in CI (leaks, stale facts, contradictions, multi-hop, poisoning), also end to end with a local LLM, plus LongMemEval retrieval.
+
+How it compares with the memory layers people usually reach for (from their own docs, October 2026; corrections welcome):
+
+| | Agent Brain Hub | [Mem0](https://docs.mem0.ai/core-concepts/how-it-works) (open source) | [Letta](https://docs.letta.com/tutorials/shared-memory-blocks) | [Zep / Graphiti](https://help.getzep.com/graphiti/graphiti/quick-start) |
+|---|---|---|---|---|
+| An LLM to write memory | **Optional** (rules offline) | Yes, for fact extraction (`infer=False` stores raw text) | Yes (agent runtime) | Yes (OpenAI by default; structured output recommended) |
+| Storage to run | **One SQLite file** | A vector store of your choice (Qdrant, pgvector, Chroma…) | The Letta server and its database | A graph database (Neo4j, FalkorDB, Kuzu, Neptune) |
+| Sharing between agents | Per-relation scopes, owner domains, write policies, audit log | Memories scoped by user / agent / run ids | Memory blocks attached to several agents | Graphs per user or group |
+
+Where they are stronger, today: much larger communities and production use, managed cloud offerings, Python-native libraries, storage that scales past one process (this hub is single-process SQLite; Postgres is on the [roadmap](ROADMAP.md)), and published scores on public benchmarks. Mem0 and Zep build richer memories with an LLM than rules can. Pick this hub when several agents share one memory and you need to see and govern who knows what.
 
 ## Quick start
 
@@ -32,6 +66,19 @@ docker compose --profile vllm up -d  # also runs Qwen3-4B locally on vLLM (NVIDI
 ```
 
 Optional configuration: `cp .env.example .env`, then set `PORT`, `BRAIN_ADMIN_TOKEN`, LLM provider keys and so on. With the `vllm` profile, open **Settings → vLLM** and set the base URL to `http://vllm:8000/v1`. An LLM server already running on your machine (Ollama, LM Studio, vLLM) is reachable from the container at `http://host.docker.internal:<port>/v1`, for example `http://host.docker.internal:11434/v1` for Ollama.
+
+Then, from Python, the whole integration is two calls ([sdk/brain_client.py](sdk/brain_client.py), standard library only, no install):
+
+```python
+from brain_client import BrainClient
+brain = BrainClient(url="http://localhost:4317", api_key="abk_...")   # one key per agent, from the UI
+
+ctx = brain.recall(customer_id="user-42", text=user_message)            # what every agent knows, as a prompt block
+reply = my_llm(system=ctx["promptBlock"], user=user_message)
+brain.remember(trace_id=ctx["traceId"], reply=reply)                     # the hub learns from the turn
+```
+
+In LangGraph that is a `recall` node before your model and a `remember` node after it: [examples/langgraph_memory.py](examples/langgraph_memory.py) (tested with LangGraph 1.2). CrewAI, AutoGen or PydanticAI agents make the same two calls around their model, and Claude Code or Cursor use the [MCP server](#3-mcp-for-claude-desktopcode-cursor-and-agent-frameworks).
 
 Or with Node.js ≥ 22:
 
@@ -177,6 +224,8 @@ The Agents screen generates the `mcpServers` config for Claude Desktop and Curso
 | **Sage** | Health | 10 years | 🔒 private |
 | **Penny** | Personal finance (the budget is deliberately shared, income is not) | 5 years | 🔒 private |
 | **Nova** | Shopping & orders | 180 days | shared |
+
+A seventh domain, **Software engineering**, has no built-in agent: create your own (architect, coder, QA…) as connected agents. Its relations are `known_pitfall` and `convention` (shared, kept for a year), and the "customer" is the project or repository.
 
 ## Languages
 
@@ -342,7 +391,7 @@ The **Graph** tab in the Live brain shows a customer's entities and links, also 
 
 ### Open schema and write policies
 
-The brain is no longer limited to its 19 built-in relations. Anything durable a customer says can be remembered:
+The brain is no longer limited to its 21 built-in relations. Anything durable a customer says can be remembered:
 
 ```text
 "My favourite colour is blue"               → favourite colour: blue       (offline, en / vi / ja)
@@ -437,7 +486,7 @@ Three scenarios do not pass in that run. `paraphrase-spending-budget` fails offl
 
 ## Tests
 
-- `npm test`: 191 unit tests, covering:
+- `npm test`: 194 unit tests, covering:
   - the acceptance QA suite from the architecture document: amnesia, contradiction, staleness, skill promotion, 20k-episode load;
   - permissions and prompt leakage;
   - English and Japanese;
@@ -458,7 +507,7 @@ Three scenarios do not pass in that run. `paraphrase-spending-budget` fails offl
 server/
   index.js          HTTP: admin API /api, Brain API /v1 (API keys), SSE, static UI, /healthz
   brain/            13 brain regions, audit, orchestrator (think / recall / remember / sleep)
-  agents.js         6 domains, vi/en/ja intents, next-best-action catalog, default permissions
+  agents.js         7 domains, vi/en/ja intents, next-best-action catalog, default permissions
   store.js          SQLite storage (in-memory cache + row-level writes, audit, legacy JSON import)
   embeddings.js     embedding providers (OpenAI-compatible /embeddings), opt-in
   i18n.js llm.js embed.js bus.js clock.js text.js

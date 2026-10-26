@@ -5,6 +5,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+
+- **A software-engineering domain.** Connected agents can now be an architect, a coder or a QA agent sharing one brain about a project: the seventh domain, `engineering` (intents design / implement / review_test, actions "add a regression test" and "record the decision as an ADR"), and two built-in relations, `known_pitfall` and `convention` (sets, shared, kept for a year). The "customer" is the repository. [examples/dev_team.py](examples/dev_team.py) runs the story end to end.
+- **A LangGraph example**: shared memory as a `recall` node before the model and a `remember` node after it ([examples/langgraph_memory.py](examples/langgraph_memory.py), tested with LangGraph 1.2.17).
+- **README**: the dev-team example and the two-call Python integration come first, and a *Why Agent Brain Hub?* section compares it with Mem0, Letta and Zep / Graphiti from their own docs, including where they are stronger.
+
 ## [0.8.4] - 2026-10-27
 
 Closes the 9.1% the memory firewall still let through with a real LLM, and fixes two flaws found in review.

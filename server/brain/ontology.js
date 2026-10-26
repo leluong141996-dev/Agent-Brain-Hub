@@ -7,7 +7,7 @@ import { assetType } from './entities.js';
 import { stripDiacritics, norm } from '../text.js';
 import { tr } from '../i18n.js';
 
-export const ENTITY_TYPES = ['customer', 'asset', 'trip', 'health_profile', 'finance_profile', 'organization'];
+export const ENTITY_TYPES = ['customer', 'asset', 'trip', 'health_profile', 'finance_profile', 'organization', 'project'];
 
 export const RELATIONS = {
   name: { entity: 'customer', card: 'one', scope: 'shared', writer: 'personal', label: { vi: 'tên', en: 'name', ja: '名前' } },
@@ -28,6 +28,9 @@ export const RELATIONS = {
   budget: { entity: 'finance_profile', card: 'one', scope: 'shared', writer: 'finance', ttlDays: 90, label: { vi: 'ngân sách', en: 'budget', ja: '予算' } },
   income: { entity: 'finance_profile', card: 'one', scope: 'private', writer: 'finance', label: { vi: 'thu nhập', en: 'income', ja: '収入' } },
   payment_method: { entity: 'finance_profile', card: 'one', scope: 'shared', writer: 'finance', label: { vi: 'thanh toán bằng', en: 'pays with', ja: '支払い方法' } },
+  // Software teams (v0.9): the "customer" is the project or repository.
+  known_pitfall: { entity: 'project', card: 'many', scope: 'shared', writer: 'engineering', ttlDays: 365, label: { vi: 'lỗi đã biết', en: 'known pitfall', ja: '既知の落とし穴' } },
+  convention: { entity: 'project', card: 'many', scope: 'shared', writer: 'engineering', label: { vi: 'quy ước', en: 'convention', ja: '規約' } },
   policy: { entity: 'organization', card: 'many', scope: 'global', writer: 'system', label: { vi: 'chính sách', en: 'policy', ja: 'ポリシー' } },
 };
 

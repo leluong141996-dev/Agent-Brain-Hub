@@ -14,6 +14,59 @@
 
 Bộ nhớ được tổ chức theo mô hình bộ não người: 13 vùng não, hai vòng thức/ngủ, theo khung CoALA. Kiến trúc tham khảo từ tài liệu *Vita Cognitive Memory Architecture*. Giao diện cho phép **xem trực tiếp** từng vùng não hoạt động, và hỗ trợ **Tiếng Việt · English · 日本語**.
 
+### Ví dụ: một nhóm dev không lặp lại cùng một lỗi
+
+Ba agent cùng làm trên một repository: **Architect**, **Coder** và **QA** (Claude Code, Cursor, node LangGraph của bạn, bất cứ thứ gì gọi được REST hay MCP). Chúng dùng chung một bộ não, và "khách hàng" mà bộ nhớ nói về chính là repository.
+
+```python
+qa.remember(customer_id="repo:shop-api", facts=[
+    {"relation": "known_pitfall", "value": "parseDate breaks on DST changes; test with Europe/Berlin 2026-03-29 02:30"}])
+architect.remember(customer_id="repo:shop-api", facts=[
+    {"relation": "convention", "value": "store every timestamp in UTC; convert only in the UI"}])
+
+# Vài ngày sau, một phiên Coder mới được giao sửa đúng đoạn code đó:
+ctx = coder.recall(customer_id="repo:shop-api", text="Implement parseDate for order timestamps")
+```
+```text
+known pitfall: parseDate breaks on DST changes; test with Europe/Berlin 2026-03-29 02:30   (from QA, 3 days ago)
+convention: store every timestamp in UTC; convert only in the UI                          (from Architect, 3 days ago)
+```
+
+Coder chưa từng nói chuyện với QA. `ctx["promptBlock"]` được đưa vào system prompt, kèm ai nói gì và khi nào. Chạy được ngay: [examples/dev_team.py](examples/dev_team.py) (chỉ dùng thư viện chuẩn).
+
+### Vì sao chọn Agent Brain Hub?
+
+- **Không cần LLM để ghi nhớ.** Mặc định chạy bằng luật và template: fact, mâu thuẫn, hết hạn, quyền riêng tư và benchmark đều chạy offline, tốn 0 đồng token. Thêm LLM bất kỳ (Claude, GPT, Gemini, Ollama, vLLM…) khi muốn trích fact và tóm tắt tốt hơn.
+- **Một file SQLite.** `docker compose up -d` là có API, MCP server và giao diện. Không cần vector database, graph database hay Postgres.
+- **Làm cho nhiều agent, có quản trị.** Mỗi quan hệ có phạm vi (private / shared / global), miền sở hữu và quy tắc ghi; khi hai agent bất đồng, quy tắc quyết định và người duyệt có thể hoàn tác. Mọi lượt đọc/ghi nằm trong audit log chỉ ghi thêm. Tường lửa bộ nhớ giữ lại chỉ dẫn bị cài (benchmark `memory_poisoning`: tỷ lệ nhiễm độc 0%).
+- **Xem được nó nghĩ.** Giao diện vẽ trực tiếp mỗi yêu cầu đi qua 13 vùng não, kể cả từ agent bên ngoài, và cho biết ký ức nào đến từ đâu.
+- **Có đo lường.** 63 kịch bản nhiều agent chạy trong CI (rò rỉ, fact cũ, mâu thuẫn, nhiều bước, đầu độc), có cả chạy toàn bộ với LLM trên máy, cùng LongMemEval.
+
+So với các lớp bộ nhớ hay được dùng (theo tài liệu của chính họ, tháng 10/2026; nếu sai xin góp ý):
+
+| | Agent Brain Hub | [Mem0](https://docs.mem0.ai/core-concepts/how-it-works) (mã nguồn mở) | [Letta](https://docs.letta.com/tutorials/shared-memory-blocks) | [Zep / Graphiti](https://help.getzep.com/graphiti/graphiti/quick-start) |
+|---|---|---|---|---|
+| Cần LLM để ghi nhớ | **Không bắt buộc** (luật, offline) | Có, để trích fact (`infer=False` lưu nguyên văn) | Có (runtime cho agent) | Có (mặc định OpenAI; nên dùng model hỗ trợ structured output) |
+| Hạ tầng lưu trữ | **Một file SQLite** | Vector store tuỳ chọn (Qdrant, pgvector, Chroma…) | Server Letta và database của nó | Graph database (Neo4j, FalkorDB, Kuzu, Neptune) |
+| Chia sẻ giữa các agent | Phạm vi theo quan hệ, miền sở hữu, quy tắc ghi, audit log | Ký ức gắn theo id user / agent / run | Memory block gắn vào nhiều agent | Đồ thị theo user hoặc group |
+
+Họ mạnh hơn ở: cộng đồng và mức độ dùng thực tế lớn hơn nhiều, có bản cloud, thư viện Python thuần, hạ tầng mở rộng vượt một tiến trình (hub này là SQLite một tiến trình; Postgres nằm trong [ROADMAP](ROADMAP.md)), và có điểm công bố trên benchmark công khai. Mem0 và Zep dựng ký ức bằng LLM nên phong phú hơn luật. Hãy chọn hub này khi nhiều agent dùng chung một bộ nhớ và bạn cần thấy, cần quản được ai biết gì.
+
+### Từ Python: hai lệnh gọi
+
+Chạy hub (`docker compose up -d`), rồi dùng [sdk/brain_client.py](sdk/brain_client.py) (chỉ thư viện chuẩn, không cần cài):
+
+```python
+from brain_client import BrainClient
+brain = BrainClient(url="http://localhost:4317", api_key="abk_...")   # mỗi agent một key, tạo trên giao diện
+
+ctx = brain.recall(customer_id="user-42", text=user_message)            # mọi agent biết gì, dưới dạng prompt block
+reply = my_llm(system=ctx["promptBlock"], user=user_message)
+brain.remember(trace_id=ctx["traceId"], reply=reply)                     # hub học từ lượt hội thoại
+```
+
+Với LangGraph, đó là một node `recall` trước model và một node `remember` sau model: [examples/langgraph_memory.py](examples/langgraph_memory.py) (đã chạy thử với LangGraph 1.2). CrewAI, AutoGen hay PydanticAI cũng gọi đúng hai lệnh đó quanh model; Claude Code và Cursor dùng MCP server.
+
 Yêu cầu: **Node.js ≥ 22** (hoặc chỉ cần Docker). Dữ liệu lưu bằng **SQLite** qua `better-sqlite3` (có sẵn bản build cho Linux/macOS/Windows; nếu nền tảng không có bản build sẵn thì `npm install` cần Python, make và trình biên dịch C++). Docker + GPU NVIDIA chỉ cần khi muốn chạy model local qua vLLM.
 
 ```bash
@@ -165,6 +218,8 @@ Màn hình Agents có sẵn cấu hình `mcpServers` cho Claude Desktop/Cursor, 
 | **Sage** | Sức khoẻ | 10 năm | 🔒 private |
 | **Penny** | Tài chính cá nhân (ngân sách được chia sẻ có chủ đích, thu nhập thì không) | 5 năm | 🔒 private |
 | **Nova** | Mua sắm & đơn hàng | 180 ngày | shared |
+
+Lĩnh vực thứ bảy, **Kỹ thuật phần mềm**, không có agent dựng sẵn: hãy tự tạo (architect, coder, QA…) dưới dạng agent kết nối. Quan hệ của nó là `known_pitfall` và `convention` (shared, giữ một năm), và "khách hàng" là dự án hoặc repository.
 
 ## Ngôn ngữ
 
@@ -330,7 +385,7 @@ Tab **Đồ thị** trong màn hình Bộ não hiển thị thực thể và li�
 
 ### Schema mở và quy tắc ghi
 
-Bộ não không còn bị giới hạn ở 19 loại quan hệ có sẵn. Thông tin lâu dài nào khách nói ra cũng có thể được ghi nhớ:
+Bộ não không còn bị giới hạn ở 21 loại quan hệ có sẵn. Thông tin lâu dài nào khách nói ra cũng có thể được ghi nhớ:
 
 ```text
 "Màu yêu thích của tôi là xanh lá"            → màu yêu thích: xanh lá      (offline, vi / en / ja)
@@ -423,7 +478,7 @@ Ba kịch bản không đạt ở lần chạy đó. `paraphrase-spending-budget
 
 ## Test
 
-- `npm test`: 191 unit test, gồm:
+- `npm test`: 194 unit test, gồm:
   - bộ QA nghiệm thu của tài liệu: amnesia, contradiction, staleness, skill promotion, load 20k episode;
   - phân quyền và rò rỉ prompt;
   - tiếng Anh, tiếng Nhật;
@@ -444,7 +499,7 @@ Ba kịch bản không đạt ở lần chạy đó. `paraphrase-spending-budget
 server/
   index.js          HTTP: admin API /api, Brain API /v1 (API key), SSE, static UI
   brain/            13 vùng não, audit, bộ điều phối (think / recall / remember / sleep)
-  agents.js         6 lĩnh vực, intent vi/en/ja, hành động NBA, quyền mặc định
+  agents.js         7 lĩnh vực, intent vi/en/ja, hành động NBA, quyền mặc định
   store.js          lưu trữ SQLite (cache trong RAM + ghi theo dòng thay đổi, audit, nhập JSON cũ)
   embeddings.js     nhà cung cấp embedding (endpoint /embeddings tương thích OpenAI), tự bật
   i18n.js llm.js embed.js bus.js clock.js text.js

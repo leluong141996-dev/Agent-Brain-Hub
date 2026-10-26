@@ -32,6 +32,9 @@ const INTENT_RELATIONS = {
   buy_product: ['budget', 'clothing_size', 'prefers', 'dislikes', 'payment_method'],
   track_order: ['lives_in'],
   return_refund: ['clothing_size', 'payment_method'],
+  design: ['convention', 'known_pitfall'],
+  implement: ['known_pitfall', 'convention'],
+  review_test: ['known_pitfall', 'convention'],
 };
 const PROFILE = new Set(['name', 'lives_in', 'prefers', 'dislikes', 'occupation', 'diet']);
 // Every agent needs these to address the customer properly.
