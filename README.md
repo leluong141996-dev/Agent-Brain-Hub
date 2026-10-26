@@ -8,7 +8,7 @@
 ![Node.js ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933?logo=node.js&logoColor=white)
 ![Docker](https://img.shields.io/badge/docker-compose%20up-2496ED?logo=docker&logoColor=white)
 
-![Agent Brain Hub — live brain view: a request travels through the brain regions, Atlas recalls what Kai learned](docs/demo.gif)
+![Two terminals: a QA agent records a bug and a planted instruction is held by the memory firewall; a Coder agent then recalls the bug. On the right, the hub's live brain view traces each call through the brain regions](docs/demo-dev.gif)
 
 **One shared brain for all of a company's AI agents.** Create agents in the UI, or plug in agents that already run elsewhere through a REST API, an SDK or MCP. They all read and write **one** memory, so what one agent learns, every agent can use. Customers stop repeating themselves, agents hand off to each other without losing context, and the company builds up knowledge from every conversation.
 
@@ -37,6 +37,8 @@ The Coder never talked to QA. `ctx["promptBlock"]` goes into its system prompt w
 ### Example: customer service
 
 A customer tells **Kai**, the repair agent, that their Honda Civic will be in the shop for 3 days. Later **Atlas**, the travel agent, books their flight and says: *"I remember: no car for 3 days, no need to repeat it… a self-drive rental at the destination, would you like that?"* Kai wrote "car unavailable for 3 days" to **shared** memory; the repair details stayed **private** to Kai.
+
+![Live brain view: a request travels through the brain regions, Atlas recalls what Kai learned](docs/demo.gif)
 
 ## Why Agent Brain Hub?
 
