@@ -1,6 +1,7 @@
 // Brainstem — Safety / Guardrail layer. Runs reflexively on the way in
 // (PII redaction, crisis reflex) and on the way out (output compliance).
 import { L } from '../i18n.js';
+import { firewallOn, neutralize } from './firewall.js';
 
 // An IBAN is only an IBAN when its check digits are right (ISO 13616, mod 97).
 function validIban(s) {
@@ -41,20 +42,28 @@ export function redact(text) {
 }
 
 export function brainstemIn(B, t, text) {
-  const { text: clean, found } = redact(text);
+  const redacted = redact(text);
+  const found = redacted.found;
+  // Memory firewall: an instruction-like sentence is cut here, once, so that no later stage
+  // (the reply, fact extraction, the session summary) ever reads it. A model that never saw the
+  // instruction cannot restate it in its own words, which no pattern filter could catch.
+  const cut = firewallOn() ? neutralize(redacted.text) : { text: redacted.text, changed: false, reasons: [] };
+  const clean = cut.text;
   const low = text.toLowerCase();
   const crisis = CRISIS.some((k) => low.includes(k));
   t.step(
     'brainstem',
     crisis
       ? t.L('Phản xạ an toàn: phát hiện tín hiệu khủng hoảng', 'Safety reflex: crisis signal detected', '安全反射：危機シグナルを検知')
+      : cut.changed
+        ? t.L('Tường lửa: đã cắt câu giống chỉ dẫn khỏi tin nhắn', 'Firewall: cut an instruction-like sentence from the message', 'ファイアウォール：指示のような文をメッセージから除去')
       : found.length
         ? t.L(`Che ${found.length} thông tin PII`, `Redacted ${found.length} PII item(s)`, `個人情報を${found.length}件マスキング`)
         : t.L('Kiểm tra an toàn đầu vào: OK', 'Input safety check: OK', '入力の安全チェック：OK'),
-    { redacted: found, crisis, policy: 'PII redaction + crisis reflex' },
-    { status: crisis ? 'alert' : found.length ? 'warn' : 'ok' }
+    { redacted: found, crisis, injection: cut.changed ? cut.reasons : [], policy: 'PII redaction + crisis reflex + instruction firewall' },
+    { status: crisis ? 'alert' : found.length || cut.changed ? 'warn' : 'ok' }
   );
-  return { text: clean, redactions: found, crisis };
+  return { text: clean, redactions: found, crisis, injection: cut.reasons };
 }
 
 export function brainstemOut(B, t, reply, agent) {

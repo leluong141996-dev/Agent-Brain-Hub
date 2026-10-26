@@ -129,6 +129,7 @@ export class Brain {
   perceive(t, { agentId, customerId, text, lang, qvec = null }) {
     const { agent, newSession, switchedFrom } = thalamus(this, t, { agentId, customerId, text });
     const guard = brainstemIn(this, t, text);
+    if (guard.injection.length) audit(this, { op: 'firewall', agentId: agent.id, customerId, itemId: null, kind: `clean: input (${guard.injection.join(', ')})` });
     const clean = guard.text;
     const salience = amygdala(this, t, { text: clean, customerId });
     let handoffPkg = null;
@@ -390,6 +391,7 @@ export class Brain {
     let salience = { priority: 'normal', sentiment: 0, urgency: 0 };
     if (!record && userText) {
       const guard = brainstemIn(this, t, userText);
+      if (guard.injection.length) audit(this, { op: 'firewall', agentId: agent.id, customerId, itemId: null, kind: `clean: input (${guard.injection.join(', ')})` });
       text = guard.text;
       salience = amygdala(this, t, { text, customerId });
       updateWorkingMemory(this, t, { customerId, agent, text, salience, newSession: !this.state.working[customerId]?.sessionId, traceId: t.id });

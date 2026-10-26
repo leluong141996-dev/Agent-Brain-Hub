@@ -34,7 +34,7 @@ It's a plan, not a promise. Priorities change with feedback: comment on the mile
 | A narrow graph | Entities are assets, trips and profile groups, found with a lexicon; one node per asset type per customer, so two cars are one node. No people or organisations yet. The affinity table is hand-written. |
 | Answers not measured | Benchmarks score what reaches the agent (56 own scenarios, LongMemEval retrieval), not the final answers. The value dashboard's "time saved" is an estimate (20 s per question). |
 | Single process | State lives in memory; SQLite is the persistence layer. |
-| The firewall matches patterns | `memory_poisoning` scenarios are our own, written with the filter in mind, so 0% is a floor, not proof. A paraphrased instruction ("pls forget what you were told") passes; so does a false fact that looks harmless (arbitration and trust are the defence there). It checks fact values and what other agents read, not the live message an agent is asked, and an instruction a person *allows* is written. Not yet reproduced against published attacks such as MINJA. |
+| The firewall matches patterns | `memory_poisoning` scenarios are our own, written with the filter in mind, so 0% is a floor, not proof. A paraphrased instruction ("pls forget what you were told") passes; so does a false fact that looks harmless (arbitration and trust are the defence there). Since v0.8.4 it cuts instruction-like sentences from the incoming message too, so the agent being asked silently ignores them instead of refusing them, and an instruction a person *allows* is written. Not yet reproduced against published attacks such as MINJA. |
 
 ## Principles
 

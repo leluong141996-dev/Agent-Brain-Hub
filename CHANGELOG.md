@@ -5,6 +5,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-10-27
+
+Closes the 9.1% the memory firewall still let through with a real LLM, and fixes two flaws found in review.
+
+### Changed
+
+- **Instructions are cut from the message as it comes in.** With a local LLM, v0.8.3 let 1 of 11 poison checks through: the model had read the planted request and restated it in its own words, which no pattern filter catches. The brainstem now cuts instruction-like sentences from a customer's message (after PII redaction) before the reply, fact extraction or the session summary sees it. The rest of the message is answered as usual; the audit log records each cut (`firewall`, `clean: input`). A re-run of the 7 `memory_poisoning` scenarios with `qwen3:4b` passed all 11 checks (one run; the v0.8.3 leak appeared in one run out of four). Trade-off: the agent being asked ignores the instruction silently instead of refusing it.
+
 ### Fixed
 
 - **Memory firewall: a customer could strip an honest agent of its trust.** Dismissing a held write always penalized the agent, but a customer can type an instruction to any agent, which then extracts it faithfully. After enough dismissals the honest agent fell below the trust floor and could no longer update shared facts. Now only text the agent itself supplied (`remember` facts, `brain_correct`) counts against it.
