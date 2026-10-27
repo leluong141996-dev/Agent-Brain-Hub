@@ -74,6 +74,7 @@ const admin = {
   'GET /api/state': (req, url) => ({ ...brain.snapshot(q(url, 'customerId') || 'kh-001', q(url, 'lang'), q(url, 'asOf')), hubRoot: ROOT, autoSleep: { enabled: sleeper.config.enabled, nextNightly: sleeper.nextNightly() } }),
   'GET /api/graph': (req, url) => brain.graph(q(url, 'customerId') || 'kh-001', q(url, 'lang'), q(url, 'asOf')),
   'GET /api/relations': (req, url) => ({ relations: brain.relations(q(url, 'lang')) }),
+  'GET /api/domains': (req, url) => ({ domains: brain.listDomains(q(url, 'lang')) }),
   'GET /api/review': (req, url) => brain.review(q(url, 'lang')),
   'POST /api/review/resolve': async (req) => {
     const b = await readBody(req);
@@ -245,6 +246,11 @@ const server = http.createServer(async (req, res) => {
       if (cust) {
         if (req.method === 'GET' && cust[2]) return send(res, 200, brain.exportCustomer(cust[1]));
         if (req.method === 'DELETE' && !cust[2]) return send(res, 200, brain.eraseCustomer(cust[1]));
+      }
+      const dom = url.pathname.match(/^\/api\/domains\/([\w-]+)$/);
+      if (dom) {
+        if (req.method === 'PUT') return send(res, 200, brain.putDomain(dom[1], await readBody(req)));
+        if (req.method === 'DELETE') return send(res, 200, brain.deleteDomain(dom[1]));
       }
       const rel = url.pathname.match(/^\/api\/relations\/([\w-]+)$/);
       if (rel) {

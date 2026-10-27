@@ -8,7 +8,7 @@
 ![Node.js ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933?logo=node.js&logoColor=white)
 ![Docker](https://img.shields.io/badge/docker-compose%20up-2496ED?logo=docker&logoColor=white)
 
-**Shared memory for multi-agent systems.** Every agent you run (Claude Code, Cursor, LangGraph nodes, your own bots) reads and writes one memory, so what one agent learns the others can use, without each one seeing everything. It runs locally in one SQLite file, works without an LLM, and shows you live which agent recalled what, and why.
+**Governed shared memory for multi-agent systems.** Every agent you run (Claude Code, Cursor, LangGraph nodes, your own bots) reads and writes one memory, under rules you can see and audit: which agent may read what, which value wins when agents disagree, what has expired, and what looks planted. It runs locally in one SQLite file, works without an LLM, and shows you live which agent recalled what, and why.
 
 ![Two terminals: a QA agent records a bug and a planted instruction is held by the memory firewall; a Coder agent then recalls the bug. On the right, the hub's live brain view traces each call](docs/demo-dev.gif)
 
@@ -69,12 +69,11 @@ brain.remember(trace_id=ctx["traceId"], reply=reply)                     # the h
 
 ## Why Agent Brain Hub
 
-- **No LLM needed to write memory.** Rules and templates extract facts, handle contradictions, expiry and privacy offline, for $0 in tokens. Add any LLM (Claude, GPT, Gemini, Ollama, vLLM…) for better extraction and summaries.
-- **One SQLite file.** No vector database, graph database or Postgres to run.
-- **Built for many agents.** Each relation has a scope (private / shared / global), an owner and a write policy. When agents disagree, the policy decides and a person can undo it. Every read and write goes to an append-only audit log.
-- **Defended.** A memory firewall holds values that read like instructions ("ignore all previous instructions…") and cuts them from messages before any model reads them.
-- **Visible.** The UI traces every request live through the brain's stages and shows where each memory came from.
-- **Measured.** 63 multi-agent scenarios run in CI on every change; the leak rate and poison rate must stay at 0.
+- **Governed by design.** Each relation has a scope (private / shared / global), an owner and a write policy; each agent has its own key and read/write permissions. When agents disagree, the policy decides, the losing value stays as history, and a person can undo it. Every read and write goes to an append-only audit log, and permissions are checked on every path an agent can call (recall, profile, the entity graph, correct, forget).
+- **Measured on what goes wrong between agents.** Most memory benchmarks score one user's questions. This one scores the failures of a shared memory ([the same four a 2026 study names](https://arxiv.org/html/2606.24535v1): leakage, stale propagation, contradictions, lost provenance) plus planted instructions, in 63 scenarios that run in CI on every change. The leak rate and the poison rate must stay at 0.
+- **Defended.** A memory firewall holds values that read like instructions and cuts them from messages before any model reads them. It does not catch a false fact that reads like a true one; nothing that screens text can ([why](https://arxiv.org/pdf/2608.21230)), which is what write policies, trust and provenance are for.
+- **Visible.** The UI traces every request live and shows where each memory came from and why others were left out.
+- **Light to run.** One SQLite file, no vector or graph database. It works without an LLM (rules and templates, $0 in tokens); add any LLM (Claude, GPT, Gemini, Ollama, vLLM…) for better extraction and summaries.
 
 How it compares with the memory layers people usually reach for (from their own docs, October 2026; corrections welcome):
 
@@ -93,6 +92,7 @@ Where they are stronger today: larger communities and production use, managed cl
 | **Governance** | Private / shared / global scopes, per-agent keys and read/write permissions, PII redaction, append-only audit log |
 | **Memory over time** | Facts are invalidated, not deleted; `recall(asOf=…)` shows what the brain believed at any moment |
 | **Entity graph** | "my car", "the Civic" and "車" are one entity; retrieval follows links up to two hops, never into a private fact |
+| **Your own domains** | Define agent specialties (intents, retention, private sessions) over the API or in a JSON file |
 | **Open schema and write policies** | Relations beyond the 21 built-in ones; `latest`, `owner`, `trust` or `human` decides between conflicting values |
 | **Self-maintaining** | Agents correct and forget facts; sleep learns facts from whole sessions; an LLM proposes how to settle conflicts |
 | **Memory firewall** | Instruction-like values are held for review; low-trust agents cannot overwrite others |

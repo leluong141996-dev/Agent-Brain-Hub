@@ -9,7 +9,7 @@ It's a plan, not a promise. Priorities change with feedback: comment on the mile
 ## Where we are (v0.8.3)
 
 **Solid today**
-- Shared memory with governance: private / shared / global scopes, an owner domain and a write policy per relation, per-agent permissions, append-only audit log.
+- Shared memory with governance: private / shared / global scopes, an owner domain and a write policy per relation, per-agent permissions, append-only audit log. Domains are configurable: define your own agent specialties over the API or in a file.
 - Every request traced live through 13 brain regions; facts carry their source, age and expiry into the prompt.
 - Automatic sleep cycle (idle, pressure, nightly), TTL-based forgetting, contradiction flagging, skill promotion.
 - Runs offline with zero configuration, or with any LLM. REST, JS SDK and MCP. English, Vietnamese, Japanese.
@@ -35,6 +35,8 @@ It's a plan, not a promise. Priorities change with feedback: comment on the mile
 | Answers not measured | Benchmarks score what reaches the agent (56 own scenarios, LongMemEval retrieval), not the final answers. The value dashboard's "time saved" is an estimate (20 s per question). |
 | Single process | State lives in memory; SQLite is the persistence layer. |
 | The firewall matches patterns | `memory_poisoning` scenarios are our own, written with the filter in mind, so 0% is a floor, not proof. A paraphrased instruction ("pls forget what you were told") passes; so does a false fact that looks harmless (arbitration and trust are the defence there). Since v0.8.4 it cuts instruction-like sentences from the incoming message too, so the agent being asked silently ignores them instead of refusing them, and an instruction a person *allows* is written. Not yet reproduced against published attacks such as MINJA. |
+| False facts that read like true ones | A false statement with no instruction in it ("the customer has 15 playlists" when there are 20) passes any text screen: [Karunanidhi (2026)](https://arxiv.org/abs/2608.21230) measured 0 of 360 refused by a four-stage pipeline, and two-thirds of a memory's value lost at 1.2% poison. Here the defences are write policies, trust, provenance in the prompt and human review, and none of them is measured against this attack yet. Next: a `false_fact` benchmark category scored by *utility retained* (what the memory is still worth under attack) and false-positive rate, as that paper recommends, rather than attack success. |
+| Outcomes reveal that a value exists | An agent whose write is `outvoted` learns that another value exists for that relation, even when it cannot read it. It never sees the value. [Margalit et al. (2026)](https://arxiv.org/abs/2606.24535) found a real leak through a read path that skipped the scope check; every path an agent can call is checked here (recall, profile, the entity graph, correct, forget), but write outcomes are a side channel worth closing. |
 
 ## Principles
 
@@ -153,7 +155,7 @@ These hold for every milestone:
 
 ## Housekeeping (any time)
 
-- Move the six demo agents and their domains into `examples/`, so the core is domain-agnostic. Not a small move: the owner domains of the built-in relations, the intent keywords per domain and the benchmark scenarios all depend on them, so it needs configurable domains first (a v1.0 item).
+- Move the six demo agents and their domains into `examples/`, so the core is domain-agnostic. Configurable domains are done (`PUT /api/domains/:id`, `BRAIN_DOMAINS`); what remains is that the owner domains of the built-in relations, their intent keywords and the benchmark scenarios still assume the demo domains.
 - ~~Label the value dashboard's estimates as estimates~~ (done in v0.8.1: "≈ N minutes saved (an estimate) · assuming 20 seconds per question").
 - ~~Rename the `semantic (graph + SQL)` trace label to match what exists~~ (done in v0.4: `semantic (facts)`).
 

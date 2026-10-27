@@ -2,6 +2,7 @@
 // allowed into "consciousness" (the prompt): permission/scope filter → TTL
 // filter → hybrid scoring (similarity + recency + importance) → re-rank →
 // token budget. Items hidden by scope are reported as `blocked` for the audit.
+import { intentRelationsOf } from './domains.js';
 import { embed, cosine } from '../embed.js';
 import { dot } from '../embeddings.js';
 import { DAY } from '../clock.js';
@@ -81,7 +82,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     }
     return lexical;
   };
-  const wanted = new Set(INTENT_RELATIONS[intent] || []);
+  const wanted = new Set(INTENT_RELATIONS[intent] || intentRelationsOf(intent) || []);
   t.step('ras', t.L('Lập kế hoạch truy vấn', 'Planning the query', '検索プランを作成'), {
     query: truncate(query, 80),
     intent,

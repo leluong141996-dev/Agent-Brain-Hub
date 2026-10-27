@@ -19,7 +19,7 @@ let form = null; // unsaved form state
 let models = [];
 
 export async function render(root, ctx) {
-  const [{ config, providers }, storage, sleep, emb, { relations }] = await Promise.all([api('/api/settings/llm'), api('/api/storage'), api('/api/settings/sleep'), api('/api/settings/embeddings'), api(`/api/relations?lang=${lang()}`)]);
+  const [{ config, providers }, storage, sleep, emb, { relations }, { domains }] = await Promise.all([api('/api/settings/llm'), api('/api/storage'), api('/api/settings/sleep'), api('/api/settings/embeddings'), api(`/api/relations?lang=${lang()}`), api(`/api/domains?lang=${lang()}`)]);
   const byId = Object.fromEntries(providers.map((p) => [p.id, p]));
   if (!form || form.saved !== config.provider + config.model) {
     form = { ...config, apiKey: '', saved: config.provider + config.model };
@@ -74,6 +74,8 @@ export async function render(root, ctx) {
       <div class="card" id="sleepCard"></div>
 
       <div class="card" id="schema"></div>
+
+      ${domainsCard(domains)}
 
       <div class="card" id="custData"></div>
 
@@ -370,6 +372,28 @@ function storageCard(st) {
   return `<div class="card">
     <div class="card-head"><div class="ico-tile neutral">${icon('database', 18)}</div><div><div class="card-title">${t('storage_title')}</div><div class="card-sub">${t('storage_sub')}</div></div></div>
     <div class="card-body">${body}</div>
+  </div>`;
+}
+
+// ---------------- Domains (v0.9) ----------------
+// Read-only: domains are defined over the admin API or in the BRAIN_DOMAINS file.
+function domainsCard(domains) {
+  const rows = domains
+    .map((d) => `<tr>
+      <td><span class="dot" style="background:${esc(d.color)}"></span> <b>${esc(d.label)}</b> <code class="muted small">${esc(d.id)}</code></td>
+      <td class="small">${Object.keys(d.intents || {}).map((i) => `<code>${esc(i)}</code>`).join(' ') || '—'}</td>
+      <td><span class="badge scope ${d.episodeScope === 'private' ? 'private' : 'shared'}">${esc(d.episodeScope)}</span></td>
+      <td class="num">${d.retentionDays ? esc(t('sc_days', { n: d.retentionDays })) : '∞'}</td>
+      <td class="num">${d.agents}</td>
+      <td><span class="badge">${esc(t('dm_src_' + d.source))}</span></td>
+    </tr>`)
+    .join('');
+  return `<div class="card">
+    <div class="card-head"><div class="ico-tile neutral">${icon('layers', 18)}</div><div style="flex:1;min-width:0"><div class="card-title">${t('dm_title')}</div><div class="card-sub">${t('dm_sub')}</div></div></div>
+    <div class="card-body table-card"><table class="table">
+      <thead><tr><th>${t('dm_domain')}</th><th>${t('dm_intents')}</th><th>${t('dm_sessions')}</th><th class="num">${t('dm_kept')}</th><th class="num">${t('dm_agents')}</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
   </div>`;
 }
 

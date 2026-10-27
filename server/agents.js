@@ -4,7 +4,7 @@
 // Intent keywords cover Vietnamese, English and Japanese.
 import { tr } from './i18n.js';
 
-export const DOMAINS = {
+export const BUILTIN_DOMAINS = {
   personal: {
     label: { vi: 'Trợ lý cá nhân', en: 'Personal assistant', ja: 'パーソナルアシスタント' },
     color: '#a855f7',
@@ -90,6 +90,10 @@ export const DOMAINS = {
     },
   },
 };
+
+// The live registry: the built-in domains plus the ones an admin defined
+// (server/brain/domains.js keeps it in sync with the brain's state).
+export const DOMAINS = { ...BUILTIN_DOMAINS };
 
 // Intents every agent understands (shared procedural memory).
 export const SHARED_INTENTS = {

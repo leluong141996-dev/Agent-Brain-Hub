@@ -35,6 +35,7 @@ import { entityOf, link, CONCRETE, W_ENTITY } from './entities.js';
 import { detectIntent } from './prefrontal.js';
 import { seedGlobal, resolveConflict, undoDecision, correctFact, forgetFacts, writeFact } from './neocortex.js';
 import { release as releaseHeld, dismiss as dismissHeld } from './firewall.js';
+import { loadDomains, putDomain as putDom, deleteDomain as deleteDom, listDomains as listDom } from './domains.js';
 import { extractFactsRuleBased, factToText, factValue, relationLabel } from './ontology.js';
 import { templateReply, buildPrompt, contextBlock, memoryInstructions } from './respond.js';
 import { audit, auditRetrieval } from './audit.js';
@@ -70,6 +71,7 @@ export class Brain {
     store.state.trust ||= {};
     store.state.quarantine ||= [];
     loadRegistry(this);
+    loadDomains(this);
     this._sleepQueue = Promise.resolve();
     this._forcedSleep = new Set();
     seedGlobal(this);
@@ -639,6 +641,25 @@ export class Brain {
   updateRelation(name, body) {
     const r = updateRel(this, name, body);
     audit(this, { op: 'schema', relation: name, kind: body?.action || 'edit' });
+    this.store.save();
+    return r;
+  }
+
+  // v0.9: configurable domains (see domains.js).
+  listDomains(lang) {
+    return listDom(this, normLang(lang));
+  }
+
+  putDomain(id, body) {
+    const d = putDom(this, id, body);
+    audit(this, { op: 'schema', kind: `domain ${id}` });
+    this.store.save();
+    return d;
+  }
+
+  deleteDomain(id) {
+    const r = deleteDom(this, id);
+    audit(this, { op: 'schema', kind: `domain ${id} deleted` });
     this.store.save();
     return r;
   }

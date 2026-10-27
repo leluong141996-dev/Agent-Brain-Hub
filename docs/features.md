@@ -5,6 +5,7 @@
 What the shared memory does, one feature at a time. The [README](../README.md) has the short version.
 
 - [Governance](#governance)
+- [Domains](#domains)
 - [Memory over time](#memory-over-time)
 - [Connected memory (entity graph)](#connected-memory-entity-graph)
 - [Open schema and write policies](#open-schema-and-write-policies)
@@ -27,6 +28,29 @@ What the shared memory does, one feature at a time. The [README](../README.md) h
 - **Audit log:** records every `read`, `write`, `blocked` (a read refused because the memory is private or the agent lacks permission), `recall`, `remember`, `handoff` and `feedback`, together with the agent that originally wrote the memory. It is also the data source for the value dashboard.
 - **Brainstem:** redacts PII (phone numbers worldwide, email, card numbers, US social security numbers, IBANs, Vietnamese ID numbers) before anything is remembered, and has a crisis reflex in all 3 languages.
 - **API keys:** stored as SHA-256 and compared in constant time. Keys can be rotated; the old key stops working immediately.
+
+## Domains
+
+A domain is an agent specialty: the intents its agents recognise, how long their memories live, whether their sessions are private, and which relations an intent needs. Seven are built in (personal, repair, travel, health, finance, shopping, engineering). Define your own without touching code, over the admin API or in a file:
+
+```bash
+curl -X PUT http://localhost:4317/api/domains/legal -H 'content-type: application/json' -d '{
+  "label": { "en": "Legal & compliance", "vi": "Pháp lý" },
+  "retentionDays": 3650,
+  "episodeScope": "private",
+  "intents": { "review_contract": ["contract", "clause", "nda"] },
+  "intentRelations": { "review_contract": ["governing_law"] }
+}'
+```
+
+- `intents`: keywords per intent (any language; CJK is matched as written). An intent name must not clash with a built-in one.
+- `intentRelations`: the relations a question with that intent should bring up, even when it shares no word with them.
+- `episodeScope: "private"`: session summaries of this domain's agents stay with the domain, like health and finance.
+- `retentionDays`: how long episodes are kept (`null` = forever).
+
+Then create agents with `"domain": "legal"`. `GET /api/domains` lists them all, with how many agents use each; `DELETE /api/domains/:id` refuses while an agent or a relation still uses it. Built-in domains cannot be changed.
+
+**As configuration:** `BRAIN_DOMAINS=/path/domains.json` loads domains from a file at startup ([examples/domains.json](../examples/domains.json)). They are read-only over the API, so the file stays the source of truth and can be reviewed like code. **Settings → Domains** shows every domain and where it comes from.
 
 ## Memory over time
 
@@ -118,7 +142,7 @@ Memory is the one place where text an attacker wrote comes back later, in anothe
 
 ![Review: two writes held by the memory firewall, with the reason and Allow / Dismiss](review-firewall.png)
 
-It is a filter with limits, not a guarantee: it matches patterns, so a paraphrased instruction gets through, the agent being asked never sees an instruction it should arguably refuse rather than ignore, and it does nothing about a false fact that looks harmless (arbitration and trust handle that). See the [ROADMAP](../ROADMAP.md). The benchmark's `memory_poisoning` category (7 scenarios, our own) measures what reaches an agent: the poison rate is **0%** with the firewall and **90.9%** without (`--no-firewall`).
+It is a filter with limits, not a guarantee. A 2026 study ([Karunanidhi, arXiv:2608.21230](https://arxiv.org/abs/2608.21230)) shows why it cannot be more: plainly worded **false** statements, with no instruction in them, passed a four-stage write-time screening pipeline 360 times out of 360, and at 1.2% of the memory they cut its value on LongMemEval from 0.85 to 0.30. Falsity is not a property of the text, so the defence against false facts has to come from where a value came from and what else is known: here, write policies, agent trust, provenance in every prompt line and the Review page. Concretely: it matches patterns, so a paraphrased instruction gets through, the agent being asked never sees an instruction it should arguably refuse rather than ignore, and it does nothing about a false fact that looks harmless (arbitration and trust handle that). See the [ROADMAP](../ROADMAP.md). The benchmark's `memory_poisoning` category (7 scenarios, our own) measures what reaches an agent: the poison rate is **0%** with the firewall and **90.9%** without (`--no-firewall`).
 
 ## Semantic search (embeddings)
 

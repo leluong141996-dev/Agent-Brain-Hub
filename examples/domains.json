@@ -1,0 +1,22 @@
+{
+  "domains": {
+    "legal": {
+      "label": { "en": "Legal & compliance", "vi": "Pháp lý & tuân thủ", "ja": "法務・コンプライアンス" },
+      "color": "#0f766e",
+      "retentionDays": 3650,
+      "episodeScope": "private",
+      "intents": {
+        "review_contract": ["contract", "clause", "nda", "hợp đồng", "điều khoản", "契約"],
+        "data_request": ["gdpr", "data request", "dsar", "yêu cầu dữ liệu"]
+      },
+      "intentRelations": { "review_contract": ["governing_law", "contract_party"] }
+    },
+    "hr": {
+      "label": "People & HR",
+      "retentionDays": 730,
+      "episodeScope": "private",
+      "intents": { "leave_request": ["leave", "vacation", "day off", "nghỉ phép", "休暇"] },
+      "intentRelations": { "leave_request": ["leave_balance"] }
+    }
+  }
+}

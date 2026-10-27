@@ -8,7 +8,7 @@
 ![Node.js ≥ 22](https://img.shields.io/badge/node-%E2%89%A5%2022-339933?logo=node.js&logoColor=white)
 ![Docker](https://img.shields.io/badge/docker-compose%20up-2496ED?logo=docker&logoColor=white)
 
-**Bộ nhớ dùng chung cho hệ thống nhiều agent.** Mọi agent bạn chạy (Claude Code, Cursor, node LangGraph, bot của riêng bạn) đọc và ghi vào một bộ nhớ, nên điều một agent học được thì các agent khác dùng được, mà không agent nào thấy hết mọi thứ. Chạy trên máy bằng một file SQLite, không cần LLM, và cho bạn xem trực tiếp agent nào đã nhớ ra điều gì, vì sao.
+**Bộ nhớ dùng chung có quản trị cho hệ thống nhiều agent.** Mọi agent bạn chạy (Claude Code, Cursor, node LangGraph, bot của riêng bạn) đọc và ghi vào một bộ nhớ, theo các quy tắc bạn nhìn thấy và kiểm tra được: agent nào được đọc gì, giá trị nào thắng khi các agent bất đồng, cái gì đã hết hạn, và cái gì trông như bị cài vào. Chạy trên máy bằng một file SQLite, không cần LLM, và cho bạn xem trực tiếp agent nào đã nhớ ra điều gì, vì sao.
 
 ![Hai terminal: agent QA ghi một lỗi, một chỉ dẫn bị cài bị tường lửa giữ lại; agent Coder sau đó nhớ ra lỗi đó. Bên phải là giao diện của hub vẽ từng lệnh gọi](docs/demo-dev.gif)
 
@@ -69,12 +69,11 @@ brain.remember(trace_id=ctx["traceId"], reply=reply)                     # hub h
 
 ## Vì sao chọn Agent Brain Hub
 
-- **Không cần LLM để ghi nhớ.** Luật và template trích fact, xử lý mâu thuẫn, hết hạn và quyền riêng tư ngay khi offline, tốn 0 đồng token. Thêm LLM bất kỳ (Claude, GPT, Gemini, Ollama, vLLM…) để trích fact và tóm tắt tốt hơn.
-- **Một file SQLite.** Không cần vector database, graph database hay Postgres.
-- **Làm cho nhiều agent.** Mỗi quan hệ có phạm vi (private / shared / global), chủ sở hữu và quy tắc ghi. Khi các agent bất đồng, quy tắc quyết định và người duyệt có thể hoàn tác. Mọi lượt đọc và ghi vào audit log chỉ ghi thêm.
-- **Có phòng thủ.** Tường lửa bộ nhớ giữ lại các giá trị đọc như câu lệnh ("ignore all previous instructions…") và cắt chúng khỏi tin nhắn trước khi bất kỳ model nào đọc.
-- **Nhìn thấy được.** Giao diện vẽ trực tiếp từng yêu cầu đi qua các giai đoạn của bộ não và cho biết mỗi ký ức đến từ đâu.
-- **Có đo lường.** 63 kịch bản nhiều agent chạy trong CI ở mỗi thay đổi; tỷ lệ rò rỉ và tỷ lệ nhiễm độc phải giữ ở 0.
+- **Quản trị ngay từ thiết kế.** Mỗi quan hệ có phạm vi (private / shared / global), chủ sở hữu và quy tắc ghi; mỗi agent có key và quyền đọc/ghi riêng. Khi các agent bất đồng, quy tắc quyết định, giá trị thua được giữ làm lịch sử, và người duyệt có thể hoàn tác. Mọi lượt đọc và ghi vào audit log chỉ ghi thêm, và quyền được kiểm tra trên mọi đường mà agent gọi được (recall, profile, đồ thị thực thể, correct, forget).
+- **Đo đúng những gì hỏng giữa các agent.** Phần lớn benchmark bộ nhớ chấm câu hỏi của một người dùng. Benchmark này chấm các lỗi của bộ nhớ dùng chung ([đúng bốn lỗi mà một nghiên cứu năm 2026 nêu ra](https://arxiv.org/html/2606.24535v1): rò rỉ, thông tin cũ lan truyền, mâu thuẫn, mất dấu nguồn gốc) cùng chỉ dẫn bị cài, trong 63 kịch bản chạy trong CI ở mỗi thay đổi. Tỷ lệ rò rỉ và tỷ lệ nhiễm độc phải giữ ở 0.
+- **Có phòng thủ.** Tường lửa bộ nhớ giữ lại các giá trị đọc như câu lệnh và cắt chúng khỏi tin nhắn trước khi bất kỳ model nào đọc. Nó không bắt được fact sai viết như fact thật; không bộ lọc văn bản nào bắt được ([vì sao](https://arxiv.org/pdf/2608.21230)), và đó là việc của quy tắc ghi, độ tin cậy và nguồn gốc.
+- **Nhìn thấy được.** Giao diện vẽ trực tiếp từng yêu cầu và cho biết mỗi ký ức đến từ đâu, vì sao những ký ức khác bị loại.
+- **Nhẹ để vận hành.** Một file SQLite, không cần vector hay graph database. Chạy được không cần LLM (luật và template, 0 đồng token); thêm LLM bất kỳ (Claude, GPT, Gemini, Ollama, vLLM…) để trích fact và tóm tắt tốt hơn.
 
 So với các lớp bộ nhớ hay được dùng (theo tài liệu của chính họ, tháng 10/2026; nếu sai xin góp ý):
 
@@ -93,6 +92,7 @@ Họ mạnh hơn ở: cộng đồng và mức độ dùng thực tế lớn hơ
 | **Quản trị** | Phạm vi private / shared / global, key và quyền đọc/ghi theo agent, che PII, audit log chỉ ghi thêm |
 | **Bộ nhớ theo thời gian** | Fact bị vô hiệu chứ không bị xoá; `recall(asOf=…)` cho biết bộ não đã tin gì vào bất kỳ lúc nào |
 | **Đồ thị thực thể** | "xe của tôi", "chiếc Civic" và "車" là một thực thể; truy xuất đi theo liên kết tối đa hai bước, không bao giờ vào fact private |
+| **Lĩnh vực tự định nghĩa** | Định nghĩa chuyên môn của agent (intent, thời gian giữ, phiên riêng tư) qua API hoặc file JSON |
 | **Schema mở và quy tắc ghi** | Quan hệ ngoài 21 loại có sẵn; `latest`, `owner`, `trust` hoặc `human` quyết định giữa các giá trị mâu thuẫn |
 | **Tự bảo trì** | Agent sửa và xoá fact; giấc ngủ học fact từ cả phiên; LLM đề xuất cách giải mâu thuẫn |
 | **Tường lửa bộ nhớ** | Giá trị giống câu lệnh bị giữ lại chờ duyệt; agent có độ tin cậy thấp không ghi đè được agent khác |

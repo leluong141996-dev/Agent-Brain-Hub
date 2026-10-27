@@ -39,6 +39,7 @@ export function emptyState() {
     decisions: [], // arbitration decisions, newest last, capped (v0.7)
     trust: {}, // agentId → { up, down } (v0.7)
     quarantine: [], // writes held by the memory firewall, waiting for a person (v0.8.3)
+    domains: {}, // domains an admin defined, id → definition (v0.9)
     seq: 0,
   };
 }
@@ -209,6 +210,7 @@ export class Store {
     s.decisions = JSON.parse(this.meta('decisions') || '[]');
     s.trust = JSON.parse(this.meta('trust') || '{}');
     s.quarantine = JSON.parse(this.meta('quarantine') || '[]');
+    s.domains = JSON.parse(this.meta('domains') || '{}');
     s.audit = [];
     this.state = s;
   }
@@ -285,6 +287,7 @@ export class Store {
       this.stmt.setMeta.run('decisions', JSON.stringify(this.state.decisions || []));
       this.stmt.setMeta.run('trust', JSON.stringify(this.state.trust || {}));
       this.stmt.setMeta.run('quarantine', JSON.stringify(this.state.quarantine || []));
+      this.stmt.setMeta.run('domains', JSON.stringify(this.state.domains || {}));
     })();
     this.lastFlush = { upserts, deletes, ms: +(performance.now() - t0).toFixed(1) };
     return this.lastFlush;
