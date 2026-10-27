@@ -15,9 +15,33 @@ npm run bench -- --no-firewall                        # ablation: the same run w
 npm run bench:scale                                   # retrieval latency with 20,000 episodes (--episodes, --customers)
 ```
 
-**The CI gate** fails a PR if scenario pass rate, recall accuracy, stale-use rate, conflict handling or reply accuracy gets worse than the committed baseline, or if anything leaks. Latency and prompt tokens are reported but not gated. If a change is meant to move a number (for example, a new scenario that the current memory fails), re-save the baseline with `--save` in the same PR and say why in the description.
+**The CI gate** fails a PR if scenario pass rate, recall accuracy, stale-use rate, conflict handling or reply accuracy gets worse than the committed baseline, or if anything leaks or any planted instruction reaches an agent (leak rate and poison rate must be 0). Latency and prompt tokens are reported but not gated. If a change is meant to move a number (for example, a new scenario that the current memory fails), re-save the baseline with `--save` in the same PR and say why in the description.
 
-**What the entity graph is worth** (`--no-graph`): the `multi_hop` scenarios are written so the answer needs a link the question does not state: "the XPS" is the laptop at the repair shop, planning a trip should bring up that the car is in the shop, "シビック" is the car being repaired. With hashing, multi_hop passes 100% with the graph and 40% without it (6 of 10 scenarios need it), overall 97.3% vs 81.1%, for about 6 more prompt tokens. `multi-hop-trip-allergy-private` checks the other side: the graph must not carry a private fact to an agent outside its domain.
+**What the entity graph is worth** (`--no-graph`): the `multi_hop` scenarios are written so the answer needs a link the question does not state: "the XPS" is the laptop at the repair shop, planning a trip should bring up that the car is in the shop, "シビック" is the car being repaired. With hashing, multi_hop passes 100% with the graph and 26.7% without it (15 scenarios), overall 98.4% vs 81.0%, for about 5 more prompt tokens. `multi-hop-trip-allergy-private` checks the other side: the graph must not carry a private fact to an agent outside its domain.
+
+## Latest results
+
+| v0.8.4 | Hashing (default, offline) | Hybrid with `bge-m3` (Ollama, CPU) | With an LLM (`qwen3:4b`, local) |
+|---|---|---|---|
+| Scenario pass rate | 98.4% | 98.4% | 95.4% (65) |
+| Recall accuracy | 98.6% | 98.6% | 97.4% |
+| Open schema / arbitration / maintenance | **100%** / **100%** / **100%** | **100%** / **100%** / **100%** | **100%** / **100%** / **100%** |
+| Multi-hop questions (15) | **100%** (26.7% without the graph) | 93.3% | **100%** |
+| Leak rate | **0%** | **0%** | **0%** |
+| Poison rate (11 checks) | **0%** (90.9% with `--no-firewall`) | **0%** | **0%**\*\*\* |
+| Stale-use rate | **0%** | **0%** | **0%** |
+| recall latency (p50) | 0.5 ms | 104 ms | 0.8 ms |
+| Prompt tokens (mean) | 426 | 501 | 455 |
+
+These are our own scenarios, so they compare versions of this project. The entity graph lifts the offline pass rate from 81.0% to 98.4% (`--no-graph` runs the same set without it). With `bge-m3` the graph changes little on small customers, because almost every fact looks a little relevant to a model whose scores are not calibrated, and the one multi-hop scenario with a dozen facts fails with or without it (see the [ROADMAP](../ROADMAP.md)). The one scenario that fails offline is a paraphrase that shares no words with the memory.
+
+**With a real LLM.** The LLM column runs the whole suite end to end with a local LLM (`qwen3:4b` on Ollama), which extracts facts, writes the session summaries, finds facts across a session and proposes how to settle conflicts. It includes scenarios only an LLM can pass: a relation it has to invent, and a fact spread over two messages (65 scenarios in total). It needs no cloud key, but it is slow on one consumer GPU (RTX 3060): about 47 s per message, 4 h 27 min for the suite (on the CPU it is several times slower; check that the model is in VRAM).
+
+Three scenarios do not pass in that run. `paraphrase-spending-budget` fails offline too (a paraphrase that shares no words with the memory). \*\*\* The LLM column is the v0.8.3 run, except the poison rate. In that run, in `ja-poison-shiji-wo-mushi`, the word 送金 ("send money") reached another agent (1 of 11 poison checks): the LLM had read the planted request and restated it in its own words. v0.8.4 cuts the instruction from the message before any model reads it, and a re-run of the 7 `memory_poisoning` scenarios with the LLM passed all 11 checks. One clean run is weaker evidence than the reason behind the fix: the v0.8.3 leak showed up in one run out of four. `exact-order-newer-status` failed in that run because its checks matched the exact words "has shipped" and "was cancelled", which an LLM rewrites every time; the checks now look at distinctive details (DHL, wrong address), and the scenario passes with the LLM in a separate run. The saved result (`bench/results/0.8.3-llm.json`) still has the old checks. Two scenarios depend on how a 4B model words things and pass or fail between runs: `llm-maintenance-consolidation` (the model sometimes extracts nothing, about one run in five) and `stale-trip-destination`; both passed in this run.
+
+**On a public dataset.** `npm run bench:longmemeval` scores retrieval on [LongMemEval-S](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned) (MIT, 470 questions, ~50 sessions each): is the session that holds the answer near the top? With local hashing it is in the top 4 for **53.2%** of questions and in the top 10 for **71.5%**. Preferences (20% @4) and questions that need every evidence session are the weak spots. Answer accuracy isn't measured yet.
+
+**At scale.** A per-customer index keeps recall at p50 0.6 ms / p95 1.9 ms with 100,000 episodes (`npm run bench:scale`).
 
 ## Metrics
 

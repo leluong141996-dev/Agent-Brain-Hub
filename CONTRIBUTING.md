@@ -35,8 +35,28 @@ No LLM is needed for development: the hub runs offline with rules and templates.
 | `server/llm.js` | LLM provider registry and adapters |
 | `server/index.js` | HTTP server: admin API `/api`, Brain API `/v1`, SSE, static UI |
 | `public/` | Vanilla JS UI (no build step); `i18n.js` holds UI strings |
-| `sdk/`, `mcp/`, `examples/` | Client SDK, MCP server, sample connected agent |
+| `sdk/`, `mcp/` | JS and Python clients (no dependencies), MCP server over stdio |
+| `examples/` | A software team on one brain (Python), a LangGraph graph, a connected JS agent |
+| `bench/` | The memory benchmark: scenarios as JSON, runner, report, baselines per version |
+| `docs/` | Features, connecting agents, architecture, configuration |
 | `test/` | `node:test` suites |
+
+## What the tests cover
+
+- `npm test`: 194 unit tests, covering:
+  - the acceptance QA suite from the architecture document: amnesia, contradiction, staleness, skill promotion, 20k-episode load;
+  - permissions and prompt leakage;
+  - English and Japanese;
+  - connected agents (recall/remember), governance, key rotation, the value report;
+  - the LLM layer: provider catalog, adapting to a strict mock OpenAI-style server, storing and masking keys, fetching model lists;
+  - SQLite storage: data survives a reopen (embeddings included), only changed rows are written, the audit log is never truncated and SQL metrics match the in-memory computation, legacy JSON import, reset;
+  - the automatic sleep cycle (idle, pressure, nightly), fact provenance in prompts, embedding providers (with a mock server), and the benchmark harness itself;
+  - memory over time (`asOf`, history) and the entity graph: entity resolution, multi-hop retrieval that never reaches a private or expired fact, the graph API;
+  - open schema and write policies: the relation registry (names, secrets, limits, persistence), provisional relations staying private per domain, promote / merge / delete, each policy, undo, trust, the review queue;
+  - customer data (export and erase, persistence), the Python and JS clients against a running hub, PII formats and what must not be redacted;
+  - self-maintaining memory: correct and forget (permissions, nothing left behind, same answer for hidden and missing facts, company-wide policies out of reach), consolidation from whole sessions, LLM conflict proposals and their lifecycle (REST, SDK and MCP included).
+- `npm run bench`: the memory benchmark. 63 multi-agent scenarios (cross-agent recall, stale facts, contradictions, leakage, multi-hop, long conversations, exact matches, looking back in time, open schema, arbitration, maintenance) scored offline in under a second. Also `npm run bench:longmemeval` (public dataset, retrieval) and `npm run bench:scale` (latency with a large memory). See [bench/README.md](bench/README.md); adding a scenario is one JSON file.
+- `npm run e2e -- --lang vi|en|ja`: 11 steps against a running server, with any LLM configuration (offline, Claude, GPT, local models…). Includes a connected agent through the SDK and the MCP server over stdio. The test uses a new customer so existing data is left alone, but it advances the simulated clock by 7 days.
 
 ## Pull requests
 
