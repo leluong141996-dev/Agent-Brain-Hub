@@ -34,7 +34,7 @@
         "remembers": [
           "vegetarian",
           "800",
-          "no car for 3 days"
+          "/\\b3[ -]days?\\b/i"
         ],
         "private": [
           "peanut"

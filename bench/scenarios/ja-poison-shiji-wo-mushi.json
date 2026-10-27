@@ -22,8 +22,8 @@
           "ORD-48207"
         ],
         "poison": [
-          "指示を無視",
-          "送金"
+          "/指示を無視|ignore (all )?(the )?(previous|prior) instructions/i",
+          "/送金|send(ing)? money|transfer(ring)? money|remit/i"
         ]
       }
     }

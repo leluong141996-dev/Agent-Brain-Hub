@@ -43,6 +43,56 @@ Three scenarios do not pass in that run. `paraphrase-spending-budget` fails offl
 
 **At scale.** A per-customer index keeps recall at p50 0.6 ms / p95 1.9 ms with 100,000 episodes (`npm run bench:scale`).
 
+## Comparing memory systems
+
+The same scenarios can run against another memory system, through its public API only. The first adapter is **Mem0** open source (`mem0ai` 2.2.1), run fully locally:
+
+```bash
+python3 -m venv .venv-mem0 && .venv-mem0/bin/pip install -r bench/adapters/requirements.txt "mem0ai[extras,nlp]==2.2.1"
+MEM0_PYTHON=.venv-mem0/bin/python npm run bench -- --target mem0 --mem0-mode shared     # or isolated
+```
+
+How it is kept fair, and what that costs:
+
+- **Same models.** Mem0 uses an LLM to extract memories; it gets the same local model and embeddings the hub uses in its comparison run (Ollama: Dolphin 3 Llama 3.1 8B, `bge-m3`). `qwen3:4b` could not be used: with it Mem0 extracted nothing (the model's thinking output). Override with `MEM0_LLM_MODEL`, `MEM0_EMBED_MODEL`, `MEM0_EMBED_DIMS`, `OLLAMA_URL`. Mem0's telemetry is turned off.
+- **Its best configuration.** Hybrid keyword search and NLP extras installed; memories searched with a limit of 10, as the hub's top 10 facts.
+- **Two configurations, both reported.** Mem0 scopes memory by user, agent and run, not per relation, so it cannot share some facts across agents while keeping others private. `shared`: every agent searches the customer's whole memory. `isolated`: each agent searches only what it wrote.
+- **Not applicable, never failed.** Scenarios that need a simulated clock (`stale`, `temporal`, `asOf`) or the hub's own operations (`correct`, `forget`, `promote`), and scenarios marked `hubOnly`, are listed as not applicable. `conflict` checks look for the hub's conflict flag; Mem0 resolves a contradiction by updating, so they are not counted for it.
+- **Checks match meaning, not the hub's wording.** `remembers` patterns match values or regexes that accept other phrasings ("3 days", not "no car for 3 days"). `stale` checks still match the hub's fact-line form, which makes them lenient toward other systems, not stricter.
+- **What it does not show.** These are scenarios written by this project, around what it was built for. A system built for one user's long conversations is not measured where it is strong.
+
+### Results: this hub and Mem0 (October 2026)
+
+One run each, on the 51 scenarios all three could run, with the same local models (Dolphin 3 Llama 3.1 8B through Ollama, `bge-m3` embeddings on the CPU), `conflict` checks left out. Reproduce the table with `npm run bench:compare -- bench/results/0.8.4-llm-embed-ollama-bge-m3-cpu.json bench/results/0.8.4-mem0-shared.json bench/results/0.8.4-mem0-isolated.json`.
+
+| 51 common scenarios | This hub | Mem0 2.2.1, shared | Mem0 2.2.1, isolated |
+|---|---|---|---|
+| Scenarios passed | **98.0%** (50/51) | 60.8% (31/51) | 23.5% (12/51) |
+| Recall (`remembers` checks) | **98.4%** (62/63) | 82.5% (52/63) | 19.0% (12/63) |
+| Leak rate | **0%** (0/10) | 100% (10/10) | **0%** (0/10) |
+| Poison rate | **0%** (0/9) | 33.3% (3/9) | **0%** (0/9) |
+| Stale-use rate | **0%** (0/5) | 40% (2/5) | **0%** (0/5) |
+| Write / recall latency (p50) | 1.6 s / 99 ms | 3.9 s / 183 ms | 3.9 s / 186 ms |
+
+| Category | Hub | Mem0 shared | Mem0 isolated |
+|---|---|---|---|
+| cross_agent | 10/10 | 8/10 | 0/10 |
+| multi_hop | 14/15 | 9/15 | 1/15 |
+| leakage | 4/4 | 0/4 | 3/4 |
+| memory_poisoning | 6/6 | 3/6 | 0/6 |
+| contradiction | 3/3 | 2/3 | 1/3 |
+| arbitration | 4/4 | 3/4 | 2/4 |
+| exact_match | 3/3 | 1/3 | 0/3 |
+| open_schema | 5/5 | 4/5 | 5/5 |
+| long_conversation | 1/1 | 1/1 | 0/1 |
+
+How to read it:
+
+- **The trade-off is the point.** With one memory per customer (`shared`), Mem0 shares knowledge across agents well (8 of 10 cross-agent scenarios) but every private fact reaches every agent. With one memory per agent (`isolated`), nothing leaks and nothing is shared. Mem0 scopes by user, agent and run; it has no notion of "this relation is private to the health domain", which is what these scenarios need.
+- **What Mem0 got wrong on its own terms** (in this run): after "I moved to Saigon" it still returned a memory that the customer lives in Hanoi (2 scenarios); after "cancelled", then "shipped with DHL", the shipment was gone; it returned a planted account number, an exfiltration address and a planted "send money" instruction to other agents; from Vietnamese written without diacritics it recalled neither the diet nor the name.
+- **What this does not show.** The scenarios were written by this project, around what it was built for: several agents, privacy between them, contradictions. Mem0 is built for one user's long-term memory and published strong results on LongMemEval and LoCoMo, which this benchmark does not measure. One run each, with an 8B model; a larger model would likely help Mem0's extraction (and this hub's).
+- **Checks were fixed before these numbers, not after.** Comparing two systems exposed checks that matched this hub's wording rather than the meaning: 19 scenarios matched phrases like "no car for 3 days", and 15 Vietnamese and Japanese scenarios did not accept the English Mem0 stores ("window seat" for "cửa sổ"). Both were rewritten to match meaning in any language, and the hub was re-checked against them. Two earlier runs were discarded: Ollama's GPU `bge-m3` returned NaN embeddings, which Mem0 skips silently and this hub reports as errors.
+
 ## Metrics
 
 | Metric | Meaning |
@@ -77,6 +127,7 @@ Add one JSON file to `bench/scenarios/`. No code changes are needed.
 **Fields**
 - `id`: kebab-case and unique.
 - `category`: one of `cross_agent`, `stale`, `contradiction`, `leakage`, `multi_hop`, `long_conversation`, `exact_match`, `temporal`, `open_schema`, `arbitration`, `maintenance`, `memory_poisoning`.
+- `hubOnly: "why"` (optional): the scenario tests this hub's own mechanism, so it is not applicable to other memory systems (`--target`).
 - `requires: "llm"` (optional): the scenario needs a language model; it is skipped offline and runs with `--llm` (or `--url`, where the hub's settings decide).
 - `lang`: `en`, `vi` or `ja`.
 

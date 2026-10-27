@@ -8,6 +8,7 @@
 //   npm run bench -- --no-graph       (ablation: the same run without the v0.6 entity graph)
 //   npm run bench -- --no-firewall    (ablation: the same run without the v0.8.3 memory firewall)
 //   npm run bench -- --url http://localhost:4317 [--token …]  (a running hub, with its own LLM/embedding settings)
+//   npm run bench -- --target mem0 [--mem0-mode shared|isolated]  (Mem0 open source; see bench/README.md)
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
@@ -19,6 +20,7 @@ import { loadScenarios } from './lib/validate.mjs';
 import { runScenario } from './lib/runner.mjs';
 import { InProcessTarget } from './lib/targets/inprocess.mjs';
 import { HttpTarget } from './lib/targets/http.mjs';
+import { Mem0Target, startMem0, stopMem0 } from './lib/targets/mem0.mjs';
 import { summarize, markdown, gate } from './lib/report.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -43,13 +45,33 @@ const filter = opt('filter');
 const picked = filter ? all.filter((s) => s.category === filter || s.id === filter) : all;
 // Scenarios marked requires: "llm" need an LLM: skipped offline. With --url the
 // hub's own settings decide, so they run (and fail visibly if it has none).
-const scenarios = picked.filter((s) => s.requires !== 'llm' || flag('llm') || opt('url'));
+const target = opt('target') || 'hub';
+if (!['hub', 'mem0'].includes(target)) {
+  console.error(`--target must be hub or mem0, got "${target}"`);
+  process.exit(1);
+}
+const mem0Mode = opt('mem0-mode') || 'shared';
+// Another memory system: scenarios it cannot express are reported, not failed.
+const notApplicable = [];
+const scenarios = picked.filter((s) => {
+  if (target === 'mem0') {
+    const why = Mem0Target.notApplicable(s);
+    if (why) notApplicable.push({ id: s.id, category: s.category, reason: why });
+    return !why;
+  }
+  return s.requires !== 'llm' || flag('llm') || opt('url');
+});
 if (!scenarios.length) {
   console.error(`No scenario matches --filter ${filter}`);
   process.exit(1);
 }
 
 const url = opt('url');
+if (target !== 'hub' && (url || flag('llm') || flag('embed') || opt('gate'))) {
+  console.error(`--target ${target} runs another memory system with its own LLM; drop --url / --llm / --embed / --gate.`);
+  process.exit(1);
+}
+const mem0Info = target === 'mem0' ? await startMem0() : null;
 const token = opt('token') || process.env.BRAIN_ADMIN_TOKEN || '';
 if (url && (flag('llm') || flag('embed') || flag('no-graph') || flag('no-firewall'))) {
   console.error('--url benchmarks the hub as it is configured; drop --llm / --embed / --no-graph / --no-firewall (set them in the hub instead, e.g. BRAIN_GRAPH=off).');
@@ -108,8 +130,14 @@ const runId = Date.now().toString(36);
 const results = [];
 const started = performance.now();
 for (const s of scenarios) {
-  const make = url ? (sc) => new HttpTarget({ url, token, lang: sc.lang, scenarioId: sc.id, run: runId }) : (sc) => new InProcessTarget({ lang: sc.lang, llm, embedder });
-  const r = await runScenario(s, make, { llm: url ? !!remote.llm : !!llm });
+  const make = target === 'mem0'
+    ? (sc) => new Mem0Target({ mode: mem0Mode, scenarioId: sc.id, run: runId })
+    : url ? (sc) => new HttpTarget({ url, token, lang: sc.lang, scenarioId: sc.id, run: runId }) : (sc) => new InProcessTarget({ lang: sc.lang, llm, embedder });
+  const r = await runScenario(s, make, { llm: target === 'mem0' ? false : url ? !!remote.llm : !!llm });
+  if (target === 'mem0') {
+    for (const c of r.checks) if (!Mem0Target.counts(c.type)) c.counted = false;
+    if (r.status !== 'error') r.status = r.checks.filter((c) => c.counted).every((c) => c.passed) ? 'passed' : 'failed';
+  }
   results.push(r);
   process.stderr.write(r.status === 'passed' ? '.' : r.status === 'error' ? 'E' : 'F');
 }
@@ -119,16 +147,21 @@ const summary = summarize(results, {
   version: pkg.version,
   commit,
   date: new Date().toISOString(),
-  mode: url
+  mode: target === 'mem0'
+    ? [`mem0 ${mem0Mode}`, `llm: ${mem0Info.llm}`, `embeddings: ${mem0Info.embedder}`].join(', ')
+    : url
     ? [`http`, remote.llm ? `llm: ${remote.llm}` : 'offline', remote.embeddings ? `embeddings: ${remote.embeddings}` : 'hashing'].join(', ')
     : [llm ? `llm: ${llm.label}` : 'offline', embedder ? `embeddings: ${embedder.modelId}` : 'hashing', ...(flag('no-graph') ? ['no graph'] : [])].join(', '),
   node: process.version,
+  ...(notApplicable.length ? { notApplicable } : {}),
   ...(llm ? { llmUsage: { calls: usage.calls, seconds: +(usage.ms / 1000).toFixed(1) } } : {}),
 });
 const compare = opt('compare');
 const base = compare ? JSON.parse(fs.readFileSync(path.resolve(compare), 'utf8')) : null;
 console.log(markdown(summary, base));
 if (llm) console.log(`\nLLM: ${usage.calls} calls, ${(usage.ms / 1000).toFixed(1)} s`);
+if (notApplicable.length) console.log(`\nNot applicable to ${target} (${notApplicable.length}): ${notApplicable.map((n) => `${n.id} (${n.reason})`).join(', ')}`);
+if (target === 'mem0') stopMem0();
 
 const gateFile = opt('gate');
 if (gateFile) {
@@ -154,7 +187,9 @@ if (gateFile) {
 
 if (flag('save')) {
   const slug = (m) => m.replace(/[^a-z0-9.]+/gi, '-');
-  const suffix = url
+  const suffix = target === 'mem0'
+    ? `-mem0-${mem0Mode}`
+    : url
     ? `-http${remote.llm ? '-llm' : ''}${remote.embeddings ? `-embed-${slug(remote.embeddings)}` : ''}`
     : `${llm ? '-llm' : ''}${embedder ? `-embed-${slug(embedder.modelId)}` : ''}${flag('no-graph') ? '-nograph' : ''}${flag('no-firewall') ? '-nofirewall' : ''}`;
   const file = path.join(here, 'results', `${pkg.version}${suffix}.json`);

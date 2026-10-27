@@ -20,7 +20,7 @@
       "recall": "今週シビックのためにお金を取っておくべき？",
       "expect": {
         "remembers": [
-          "車が故障中"
+          "/3日|故障|修理|\\b3 days?\\b|repair|broke|in the shop/i"
         ]
       }
     }

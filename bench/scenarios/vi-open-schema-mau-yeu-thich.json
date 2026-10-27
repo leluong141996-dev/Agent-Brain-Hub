@@ -16,7 +16,7 @@
       "recall": "Gói quà bằng giấy màu gì nhỉ?",
       "expect": {
         "remembers": [
-          "xanh lá"
+          "/xanh lá|\\bgreen\\b/i"
         ]
       }
     }

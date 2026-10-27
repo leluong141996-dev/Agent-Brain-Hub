@@ -298,3 +298,18 @@ test('bench: correct and forget steps validate; maintenance is a category', () =
   const errs = validateScenario(bad, 'n.json', { agents: ['kai'] });
   assert.ok(errs.some((e) => /correct\.relation/.test(e)) && errs.some((e) => /forget\.relation/.test(e)), errs.join('\n'));
 });
+
+test('bench: another memory system is not failed on what it cannot express', async () => {
+  const { Mem0Target } = await import('../bench/lib/targets/mem0.mjs');
+  const sc = (category, steps, extra = {}) => ({ category, steps, ...extra });
+  assert.equal(Mem0Target.notApplicable(sc('cross_agent', [{ say: 'x' }, { advance: '1h' }, { recall: 'y' }])), null, 'advance only separates sessions');
+  assert.match(Mem0Target.notApplicable(sc('stale', [{ say: 'x' }])), /clock/);
+  assert.match(Mem0Target.notApplicable(sc('temporal', [{ say: 'x' }])), /clock/);
+  assert.match(Mem0Target.notApplicable(sc('maintenance', [{ correct: { relation: 'r' } }])), /correct/);
+  assert.match(Mem0Target.notApplicable(sc('open_schema', [{ promote: { relation: 'r' } }])), /promote/);
+  assert.match(Mem0Target.notApplicable(sc('cross_agent', [{ recall: 'y', asOf: 'm' }])), /asOf|mark/);
+  assert.match(Mem0Target.notApplicable(sc('maintenance', [{ say: 'x' }], { hubOnly: 'tests the hub sleep' })), /hub sleep/);
+  assert.equal(Mem0Target.counts('conflict'), false, 'the hub\'s conflict flag is not a fair check for a system that updates instead');
+  assert.equal(Mem0Target.counts('remembers'), true);
+  assert.equal(Mem0Target.counts('private'), true);
+});

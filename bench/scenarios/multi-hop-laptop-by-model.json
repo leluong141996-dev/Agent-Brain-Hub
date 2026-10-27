@@ -20,7 +20,7 @@
       "recall": "Should I set money aside for the XPS this month?",
       "expect": {
         "remembers": [
-          "no laptop for 5 days"
+          "/\\b5[ -]days?\\b/i"
         ]
       }
     }

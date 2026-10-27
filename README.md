@@ -133,7 +133,9 @@ flowchart LR
 | Multi-hop questions | 100% (26.7% without the graph) | 93.3% | 100% |
 | Recall latency (p50) | 0.5 ms | 104 ms | 0.8 ms |
 
-These are our own scenarios, so they compare versions of this project rather than products. On the public [LongMemEval-S](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned) retrieval task, the session holding the answer is in the top 10 for 71.5% of questions with offline hashing; answer accuracy is not measured yet. Methods, the LLM run's caveats and how to add a scenario: [bench/README.md](bench/README.md).
+**Against Mem0** (open source, same local models, on the 51 scenarios both can run): the hub passes 98.0%, Mem0 60.8% when every agent shares one memory per customer (with a 100% leak rate, since it has no per-relation privacy) and 23.5% when each agent keeps its own (no leaks, no sharing). Method, per-category results and what this does not show: [bench/README.md](bench/README.md#comparing-memory-systems).
+
+These are our own scenarios, written around what this hub was built for, so they compare versions of this project and show where its model of shared memory differs, not which product is better overall. On the public [LongMemEval-S](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned) retrieval task, the session holding the answer is in the top 10 for 71.5% of questions with offline hashing; answer accuracy is not measured yet. Methods, the LLM run's caveats and how to add a scenario: [bench/README.md](bench/README.md).
 
 ## Security
 

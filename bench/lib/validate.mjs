@@ -33,6 +33,7 @@ export function validateScenario(s, file, { agents }) {
   if (!CATEGORIES.includes(s.category)) err(`category must be one of ${CATEGORIES.join(', ')}`);
   if (!LANGS.includes(s.lang)) err(`lang must be one of ${LANGS.join(', ')}`);
   if (s.requires !== undefined && s.requires !== 'llm') err('requires must be "llm"');
+  if (s.hubOnly !== undefined && (typeof s.hubOnly !== 'string' || !s.hubOnly.trim())) err('hubOnly must say why the scenario only applies to this hub');
   if (!Array.isArray(s.steps) || !s.steps.length) {
     err('steps must be a non-empty list');
     return errs;

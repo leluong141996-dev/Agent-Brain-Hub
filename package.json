@@ -13,7 +13,8 @@
     "example": "node examples/connected-agent.mjs",
     "bench": "node bench/run.mjs",
     "bench:scale": "node bench/scale.mjs",
-    "bench:longmemeval": "node bench/longmemeval.mjs"
+    "bench:longmemeval": "node bench/longmemeval.mjs",
+    "bench:compare": "node bench/compare.mjs"
   },
   "engines": {
     "node": ">=22"

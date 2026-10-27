@@ -1,0 +1,3 @@
+# Adapters that run the scenarios against other memory systems (see bench/README.md).
+mem0ai==2.2.1
+ollama

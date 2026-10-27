@@ -16,7 +16,7 @@
       "recall": "goi y do an vat cho toi",
       "expect": {
         "remembers": [
-          "/chay/i",
+          "/\\bchay\\b|vegetarian|vegan/i",
           "Lan"
         ]
       }

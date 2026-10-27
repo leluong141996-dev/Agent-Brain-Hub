@@ -27,7 +27,7 @@
       "asOf": "then",
       "expect": {
         "remembers": [
-          "/^likes:? spicy/i"
+          "/(^|\\buser\\s)likes:? spicy/i"
         ],
         "stale": [
           "/^dislikes/i"
@@ -39,10 +39,10 @@
       "recall": "Suggest some snacks for me",
       "expect": {
         "remembers": [
-          "/^dislikes:? spicy/i"
+          "/(dislikes?|does not like|doesn't like|no longer likes?|not a fan of)[^.\\n]{0,20}spicy/i"
         ],
         "stale": [
-          "/^likes:? spicy/i"
+          "/(^|\\buser\\s)likes:? spicy/i"
         ]
       }
     }

@@ -34,12 +34,12 @@
       "expect": {
         "remembers": [
           "/DHL/i",
-          "/wrong address/i"
+          "/(wrong|incorrect|invalid) address/i"
         ],
         "order": [
           [
             "/DHL/i",
-            "/wrong address/i"
+            "/(wrong|incorrect|invalid) address/i"
           ]
         ]
       }

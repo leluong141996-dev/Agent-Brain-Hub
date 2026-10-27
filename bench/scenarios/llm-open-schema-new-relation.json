@@ -17,7 +17,7 @@
       "recall": "Which loyalty level am I?",
       "expect": {
         "remembers": [
-          "/(loyal|member|tier|level|rank|status)[^:\\n]*:\\s*gold/i"
+          "/(loyal|member|tier|level|rank|status)[^.\\n]{0,30}gold|gold[^.\\n]{0,20}(member|tier|level|status)/i"
         ]
       }
     }

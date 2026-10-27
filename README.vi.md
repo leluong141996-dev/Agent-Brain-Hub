@@ -133,7 +133,9 @@ flowchart LR
 | Câu hỏi nhiều bước | 100% (26,7% khi tắt đồ thị) | 93,3% | 100% |
 | Độ trễ recall (p50) | 0,5 ms | 104 ms | 0,8 ms |
 
-Đây là kịch bản do dự án tự viết, nên dùng để so các phiên bản của dự án, không phải để so sản phẩm. Trên bài truy xuất công khai [LongMemEval-S](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned), phiên chứa câu trả lời nằm trong top 10 ở 71,5% câu hỏi với hashing offline; độ chính xác của câu trả lời chưa được đo. Phương pháp, các lưu ý của lần chạy với LLM và cách thêm kịch bản: [bench/README.md](bench/README.md) (tiếng Anh).
+**So với Mem0** (mã nguồn mở, cùng model chạy trên máy, trên 51 kịch bản cả hai chạy được): hub đạt 98,0%; Mem0 đạt 60,8% khi mọi agent dùng chung một bộ nhớ theo khách hàng (tỷ lệ rò rỉ 100%, vì Mem0 không có quyền riêng tư theo từng quan hệ) và 23,5% khi mỗi agent giữ bộ nhớ riêng (không rò, nhưng cũng không chia sẻ). Phương pháp, kết quả theo nhóm và những gì phép so sánh này không cho thấy: [bench/README.md](bench/README.md#comparing-memory-systems) (tiếng Anh).
+
+Đây là kịch bản do dự án tự viết, xoay quanh đúng bài toán mà hub được làm ra, nên dùng để so các phiên bản của dự án và cho thấy cách hiểu về bộ nhớ dùng chung khác nhau ở đâu, không phải để kết luận sản phẩm nào tốt hơn. Trên bài truy xuất công khai [LongMemEval-S](https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned), phiên chứa câu trả lời nằm trong top 10 ở 71,5% câu hỏi với hashing offline; độ chính xác của câu trả lời chưa được đo. Phương pháp, các lưu ý của lần chạy với LLM và cách thêm kịch bản: [bench/README.md](bench/README.md) (tiếng Anh).
 
 ## Bảo mật
 

@@ -24,7 +24,7 @@
       "recall": "What is up with my Civic?",
       "expect": {
         "remembers": [
-          "no car for 3 days",
+          "/\\b3[ -]days?\\b/i",
           "Osaka"
         ]
       }

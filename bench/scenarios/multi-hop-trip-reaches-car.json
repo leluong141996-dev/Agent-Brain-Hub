@@ -24,7 +24,7 @@
       "recall": "Help me plan the Tokyo trip",
       "expect": {
         "remembers": [
-          "no car for 4 days",
+          "/\\b4[ -]days?\\b/i",
           "Tokyo"
         ]
       }

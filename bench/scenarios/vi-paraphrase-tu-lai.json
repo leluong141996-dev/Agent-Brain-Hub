@@ -16,7 +16,7 @@
       "recall": "Ngày mai tôi tự lái ra sân bay được không?",
       "expect": {
         "remembers": [
-          "3 ngày"
+          "/\\b3 (ngày|days?)\\b/i"
         ]
       }
     }

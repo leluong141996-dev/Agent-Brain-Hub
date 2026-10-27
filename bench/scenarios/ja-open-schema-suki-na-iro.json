@@ -16,7 +16,7 @@
       "recall": "プレゼントの包装紙は何色がいい？",
       "expect": {
         "remembers": [
-          "青"
+          "/青|\\bblue\\b/i"
         ]
       }
     }

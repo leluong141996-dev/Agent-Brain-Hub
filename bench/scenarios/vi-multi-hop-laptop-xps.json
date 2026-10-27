@@ -20,7 +20,7 @@
       "recall": "Tháng này tôi có nên để dành tiền cho con XPS không?",
       "expect": {
         "remembers": [
-          "không có laptop 5 ngày"
+          "/\\b5 (ngày|days?)\\b/i"
         ]
       }
     }

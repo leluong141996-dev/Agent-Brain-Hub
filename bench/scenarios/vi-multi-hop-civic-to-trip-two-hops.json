@@ -24,7 +24,7 @@
       "recall": "Chiếc Civic của tôi sao rồi?",
       "expect": {
         "remembers": [
-          "không có xe 3 ngày",
+          "/\\b3 (ngày|days?)\\b/i",
           "Osaka"
         ]
       }

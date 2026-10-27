@@ -16,7 +16,7 @@
       "recall": "Nhắc tôi về chuyến đi sắp tới",
       "expect": {
         "remembers": [
-          "cửa sổ"
+          "/cửa sổ|window/i"
         ]
       }
     }

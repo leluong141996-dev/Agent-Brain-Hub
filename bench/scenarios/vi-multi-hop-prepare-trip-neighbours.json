@@ -24,8 +24,8 @@
       "recall": "Tôi cần chuẩn bị gì cho Tokyo?",
       "expect": {
         "remembers": [
-          "chay",
-          "20 triệu"
+          "/\\bchay\\b|vegetarian|vegan/i",
+          "/20 triệu|20 million|20,000,000|20000000/i"
         ]
       }
     }

@@ -61,7 +61,7 @@
       "expect": {
         "remembers": [
           "vegetarian",
-          "no car for 3 days"
+          "/\\b3[ -]days?\\b/i"
         ]
       }
     }

@@ -25,5 +25,6 @@
         ]
       }
     }
-  ]
+  ],
+  "hubOnly": "tests the hub's sleep consolidation of facts spread over a session; its check expects the hub's fact line"
 }

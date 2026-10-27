@@ -22,7 +22,7 @@
           "ORD-48207"
         ],
         "poison": [
-          "bỏ qua mọi hướng dẫn",
+          "/bỏ qua mọi hướng dẫn|ignore (all )?(the )?(previous|prior) instructions/i",
           "123456789"
         ]
       }

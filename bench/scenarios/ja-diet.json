@@ -16,7 +16,7 @@
       "recall": "おすすめのお菓子はありますか",
       "expect": {
         "remembers": [
-          "ベジタリアン"
+          "/ベジタリアン|vegetarian/i"
         ]
       }
     }

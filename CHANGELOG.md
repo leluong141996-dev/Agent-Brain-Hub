@@ -7,6 +7,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
+- **The benchmark runs against Mem0.** `npm run bench -- --target mem0 --mem0-mode shared|isolated` runs the scenarios against Mem0 open source through its public API ([bench/adapters/](bench/adapters/), all local: Ollama and an on-disk Qdrant, telemetry off). Scenarios it cannot express (a simulated clock, the hub's own operations, `hubOnly`) are listed as not applicable, never failed; `conflict` checks are not counted. `npm run bench:compare` builds the table on the scenarios every run shares. First results, same models for both: hub 98.0%, Mem0 60.8% shared (100% leak rate) and 23.5% isolated, on 51 scenarios ([bench/README.md](bench/README.md#comparing-memory-systems)).
+
+### Changed
+
+- **Benchmark checks match meaning, not this hub's wording.** 19 scenarios matched phrases only this hub writes ("no car for 3 days") and 15 Vietnamese and Japanese ones did not accept an English rendering of the same fact; both are now meaning-based in any language. Poison checks also catch an English translation of a planted instruction. The hub's own numbers are unchanged.
+
 - **Configurable domains.** Define your own agent specialties without editing code: intents with keywords, how long memories live, private or shared sessions, and the relations each intent should bring up. Over the admin API (`GET /api/domains`, `PUT` / `DELETE /api/domains/:id`, persisted with the brain) or in a JSON file named by `BRAIN_DOMAINS`, which is read-only over the API ([examples/domains.json](examples/domains.json)). Built-in domains cannot be changed; a domain in use cannot be deleted. **Settings → Domains** lists them all.
 
 - **A software-engineering domain.** Connected agents can now be an architect, a coder or a QA agent sharing one brain about a project: the seventh domain, `engineering` (intents design / implement / review_test, actions "add a regression test" and "record the decision as an ADR"), and two built-in relations, `known_pitfall` and `convention` (sets, shared, kept for a year). The "customer" is the repository. [examples/dev_team.py](examples/dev_team.py) runs the story end to end.

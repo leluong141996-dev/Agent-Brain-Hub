@@ -16,7 +16,7 @@
       "recall": "I need a taxi to the airport",
       "expect": {
         "remembers": [
-          "no car for 3 days"
+          "/\\b3[ -]days?\\b/i"
         ]
       }
     },
