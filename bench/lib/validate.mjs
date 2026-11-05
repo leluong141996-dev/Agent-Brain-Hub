@@ -4,7 +4,7 @@ import path from 'node:path';
 
 export const CATEGORIES = ['cross_agent', 'stale', 'contradiction', 'leakage', 'multi_hop', 'long_conversation', 'exact_match', 'temporal', 'open_schema', 'arbitration', 'maintenance', 'memory_poisoning'];
 const LANGS = ['vi', 'en', 'ja'];
-const KINDS = ['say', 'recall', 'remember', 'correct', 'forget', 'advance', 'sleep', 'mark', 'promote'];
+const KINDS = ['say', 'recall', 'remember', 'correct', 'forget', 'advance', 'sleep', 'mark', 'promote', 'permissions'];
 const RECALL_CHECKS = ['remembers', 'private', 'stale', 'conflict', 'order', 'poison'];
 const UNITS = { m: 60_000, h: 3_600_000, d: 86_400_000 };
 
@@ -61,6 +61,11 @@ export function validateScenario(s, file, { agents }) {
     if (kind === 'promote') {
       if (typeof st.promote?.relation !== 'string' || !st.promote.relation) err('promote.relation must be a relation name', n);
       if (st.promote?.scope !== undefined && !['private', 'shared'].includes(st.promote.scope)) err('promote.scope must be private or shared', n);
+    }
+    if (kind === 'permissions') {
+      if (!agents.includes(st.agent)) err(`unknown agent "${st.agent}" (known: ${agents.join(', ')})`, n);
+      const p = st.permissions;
+      if (!p || typeof p !== 'object' || !Object.keys(p).length || Object.entries(p).some(([k, v]) => !['readShared', 'write'].includes(k) || typeof v !== 'boolean')) err('permissions must be an object of readShared / write booleans', n);
     }
     if (kind === 'advance' && parseDuration(st.advance) === null) err('"advance" must look like "45m", "6h" or "2d"', n);
     if (kind === 'sleep' && st.sleep !== true) err('"sleep" must be true', n);

@@ -1,7 +1,7 @@
 // Corpus callosum — Cross-Agent Event Bus / Handoff Protocol. Builds a
 // relevance-filtered handoff package so the next agent never has to re-ask,
 // and carries write delegations to the single owner of a fact.
-import { visible } from './neocortex.js';
+import { visible, redactorFor } from './neocortex.js';
 import { factToText } from './ontology.js';
 import { truncate } from '../text.js';
 import { turnVisible, taskName } from './prefrontal.js';
@@ -15,10 +15,11 @@ export function handoff(B, t, { customerId, fromAgentId, toAgent }) {
   );
   const passed = facts.filter((f) => visible(f, toAgent));
   const withheld = facts.length - passed.length;
+  const redact = redactorFor(B, toAgent, customerId);
   const lastTurns = (wm?.turns || [])
     .filter((x) => x.agentId === fromAgentId && turnVisible(B, x, toAgent))
     .slice(-2)
-    .map((x) => `${x.role === 'user' ? 'Customer' : from.name}: ${truncate(x.text, 120)}`);
+    .map((x) => `${x.role === 'user' ? 'Customer' : from.name}: ${truncate(redact(x.text), 120)}`);
   const task = wm?.activeTask && wm.activeTask.agentId === fromAgentId ? wm.activeTask : null;
   const pkg = {
     from: from.name,

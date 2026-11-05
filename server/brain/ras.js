@@ -9,7 +9,7 @@ import { DAY } from '../clock.js';
 import { stateAt } from './temporal.js';
 import { link, entityOf, mentionedEntities } from './entities.js';
 import { estimateTokens, truncate } from '../text.js';
-import { visible, hiddenReason, episodeTier } from './neocortex.js';
+import { visible, hiddenReason, episodeTier, redactorFor } from './neocortex.js';
 import { factToText, factValue, mentionsRelation } from './ontology.js';
 import { relationOf } from './registry.js';
 
@@ -102,6 +102,9 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
   const queryIds = identifiers(query);
   const namesId = (text) => queryIds.size > 0 && [...identifiers(text)].some((id) => queryIds.has(id));
 
+  // Values this agent may not see are removed from the episode text it gets.
+  const redact = redactorFor(B, agent, customerId);
+
   // --- Episodic search ---
   const mine = B.memoryIndex.episodes(customerId);
   const recent = new Set([...mine].sort((a, b) => b.createdAt - a.createdAt).slice(0, 3).map((e) => e.id));
@@ -124,7 +127,7 @@ export function retrieve(B, t, { customerId, agent, query, intent, qvec = null, 
     const idMatch = namesId(e.text);
     const score = 0.6 * sim + 0.25 * recency + 0.15 * e.importance + (idMatch ? ID_BOOST : 0);
     if (tier === 'cold' && sim < 0.3 && !idMatch) continue; // cold store only queried on strong match
-    epCands.push({ kind: 'episodic', id: e.id, text: e.text, tier, scope: e.scope, owner: e.ownerDomain, source: e.agentId, episodeKind: e.kind, at: e.createdAt, validUntil: e.expiresAt || null, score, parts: { sim, recency, importance: e.importance, idMatch: idMatch ? 1 : 0 } });
+    epCands.push({ kind: 'episodic', id: e.id, text: redact(e.text), tier, scope: e.scope, owner: e.ownerDomain, source: e.agentId, episodeKind: e.kind, at: e.createdAt, validUntil: e.expiresAt || null, score, parts: { sim, recency, importance: e.importance, idMatch: idMatch ? 1 : 0 } });
   }
   // Several sessions can name the same order ("cancelled", then "shipped"). They
   // are all history, so all stay, but the newest is the current word: an older

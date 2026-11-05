@@ -142,6 +142,7 @@ Add one JSON file to `bench/scenarios/`. No code changes are needed.
 | `{ "mark": "before-move" }` | remembers the current (simulated) time under a name; a later `recall` can add `"asOf": "before-move"` to ask what the brain believed then |
 | `{ "agent": "kai", "remember": { "facts": [{ "relation": "loyalty_tier", "value": "gold" }] } }` | a connected agent hands the brain facts through `remember` (`/v1/remember` over HTTP); relations outside the built-in ones become provisional |
 | `{ "promote": { "relation": "loyalty_tier", "scope": "shared", "policy": "trust" } }` | an admin promotes a learned relation (`PUT /api/relations/:name`) |
+| `{ "agent": "atlas", "permissions": { "readShared": false } }` | an admin changes an agent's permissions (`PATCH /api/agents/:id`), for example to test revocation |
 | `{ "agent": "kai", "correct": { "relation": "lives_in", "value": "Saigon" } }` | an agent corrects a fact it can see (`/v1/correct`); `wrongValue` picks one value, no `value` just drops it |
 | `{ "agent": "sage", "forget": { "relation": "allergic_to" } }` | an agent forgets on the customer's request (`/v1/forget`); add `value` to forget one value only |
 

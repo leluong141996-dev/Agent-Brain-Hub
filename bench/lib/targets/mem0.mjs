@@ -52,7 +52,7 @@ export async function startMem0({ python = process.env.MEM0_PYTHON || 'python3' 
 export function stopMem0() { bridge?.close(); bridge = null; }
 
 const CLOCK = new Set(['stale', 'temporal']);
-const UNSUPPORTED = ['mark', 'correct', 'forget', 'promote'];
+const UNSUPPORTED = ['mark', 'correct', 'forget', 'promote', 'permissions'];
 
 export class Mem0Target {
   constructor({ mode = 'shared', scenarioId = 'scenario', run = Date.now().toString(36) }) {

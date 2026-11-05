@@ -1,0 +1,43 @@
+{
+  "id": "leakage-permission-revoked",
+  "category": "leakage",
+  "lang": "en",
+  "description": "An agent reads shared memory, then its shared-read permission is revoked. On its next call nothing shared may reach it: not the facts, the session summaries or the turns.",
+  "steps": [
+    {
+      "agent": "mia",
+      "say": "I live in Hanoi and I am vegetarian"
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "sleep": true
+    },
+    {
+      "agent": "atlas",
+      "recall": "Find me a hotel restaurant for dinner",
+      "expect": {
+        "remembers": [
+          "vegetarian"
+        ]
+      }
+    },
+    {
+      "agent": "atlas",
+      "permissions": {
+        "readShared": false
+      }
+    },
+    {
+      "agent": "atlas",
+      "recall": "Find me a hotel restaurant for dinner",
+      "expect": {
+        "private": [
+          "vegetarian",
+          "Hanoi"
+        ]
+      }
+    }
+  ]
+}

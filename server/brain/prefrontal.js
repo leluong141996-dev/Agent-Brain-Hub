@@ -4,6 +4,7 @@ import { DOMAINS, SHARED_INTENTS, domainOf } from '../agents.js';
 import { includesAny, truncate } from '../text.js';
 import { tr } from '../i18n.js';
 import { firewallOn, neutralize } from './firewall.js';
+import { redactorFor } from './neocortex.js';
 
 // What another agent may later read of a turn: instruction-like sentences are
 // removed (the live message itself still reaches the agent that was asked).
@@ -129,17 +130,21 @@ function capTurns(wm) {
 
 export const pendingTurns = (wm) => (wm?.turns || []).filter((x) => !x.consolidated).length;
 
-// A turn spoken with a private-scope agent (e.g. Health) is only visible to
-// agents of that same domain — working memory obeys the same partitioning.
+// Working memory obeys the same rules as stored memory: a turn spoken with a
+// private-scope agent (e.g. Health) is only visible to agents of that domain,
+// and another agent's turn is shared memory, so an agent whose shared-read
+// permission is off does not see it.
 export function turnVisible(B, turn, agent) {
+  if (turn.agentId === agent.id) return true;
   const domain = B.agentDomain(turn.agentId);
-  if (!domain || domain === agent.domain) return true;
-  return DOMAINS[domain]?.episodeScope !== 'private';
+  if (domain && DOMAINS[domain]?.episodeScope === 'private') return domain === agent.domain;
+  return agent.permissions?.readShared !== false;
 }
 
 export function hotTurns(B, wm, agent) {
+  const redact = redactorFor(B, agent, wm.customerId);
   return wm.turns
     .filter((x) => turnVisible(B, x, agent))
     .slice(-HOT_TURNS * 2)
-    .map((x) => `${x.role === 'user' ? 'Customer' : 'Agent'}: ${truncate(x.text, 160)}`);
+    .map((x) => `${x.role === 'user' ? 'Customer' : 'Agent'}: ${truncate(redact(x.text), 160)}`);
 }

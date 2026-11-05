@@ -29,6 +29,8 @@ What the shared memory does, one feature at a time. The [README](../README.md) h
 - **Brainstem:** redacts PII (phone numbers worldwide, email, card numbers, US social security numbers, IBANs, Vietnamese ID numbers) before anything is remembered, and has a crisis reflex in all 3 languages.
 - **API keys:** stored as SHA-256 and compared in constant time. Keys can be rotated; the old key stops working immediately.
 
+**Revocation is checked at retrieval time, for derived text too.** Permissions and scopes are evaluated on every call, against what is true now. A value can outlive its fact's visibility in a session summary, a conversation turn or a handoff written earlier; before any of those reaches an agent, the values of facts it may not see are replaced with `[private]`. The stored text is unchanged, so the owner domain still reads it in full. What an agent received before its access changed is out of reach (see the ROADMAP).
+
 ## Domains
 
 A domain is an agent specialty: the intents its agents recognise, how long their memories live, whether their sessions are private, and which relations an intent needs. Seven are built in (personal, repair, travel, health, finance, shopping, engineering). Define your own without touching code, over the admin API or in a file:

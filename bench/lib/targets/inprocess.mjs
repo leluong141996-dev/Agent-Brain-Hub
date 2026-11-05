@@ -46,6 +46,10 @@ export class InProcessTarget {
     this.brain.updateRelation(relation, body);
   }
 
+  async permissions(agent, permissions) {
+    this.brain.updateAgent(agent, { permissions });
+  }
+
   async now() {
     return this.brain.clock.now();
   }

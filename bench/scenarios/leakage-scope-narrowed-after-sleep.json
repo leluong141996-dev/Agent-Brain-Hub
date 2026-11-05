@@ -1,0 +1,57 @@
+{
+  "id": "leakage-scope-narrowed-after-sleep",
+  "category": "leakage",
+  "lang": "en",
+  "description": "A learned relation is shared, summarised during sleep, then narrowed to private by an admin. Another domain must lose the value everywhere, including the session summary written while it was shared. Suggested by a reader on daily.dev.",
+  "steps": [
+    {
+      "agent": "kai",
+      "remember": {
+        "facts": [
+          {
+            "relation": "loyalty_tier",
+            "value": "gold"
+          }
+        ],
+        "text": "I am a gold member of your loyalty programme"
+      }
+    },
+    {
+      "promote": {
+        "relation": "loyalty_tier",
+        "scope": "shared",
+        "policy": "trust"
+      }
+    },
+    {
+      "advance": "1h"
+    },
+    {
+      "sleep": true
+    },
+    {
+      "agent": "atlas",
+      "recall": "What loyalty tier is this customer?",
+      "expect": {
+        "remembers": [
+          "gold"
+        ]
+      }
+    },
+    {
+      "promote": {
+        "relation": "loyalty_tier",
+        "scope": "private"
+      }
+    },
+    {
+      "agent": "atlas",
+      "recall": "What loyalty tier is this customer?",
+      "expect": {
+        "private": [
+          "gold"
+        ]
+      }
+    }
+  ]
+}

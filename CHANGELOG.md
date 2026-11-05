@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Revoked access leaked through derived text** (found by a reader on daily.dev). Authorization was checked at retrieval time for facts, but session summaries, working-memory turns and handoffs quote values, and they kept the scope they were written with. After a relation was narrowed to private, another domain still read the value in a summary written while it was shared; after an agent's shared-read permission was revoked, it still saw other agents' turns. Now, before any of that text reaches an agent, the values of the customer's facts it may not see are replaced with `[private]` (the stored text is unchanged, so the owner domain still sees it), and working memory follows `readShared` like every other shared memory. Two new leakage scenarios cover it (`leakage-scope-narrowed-after-sleep`, `leakage-permission-revoked`); both leak without the fix. The benchmark has a new step, `permissions`, to change an agent's permissions mid-scenario.
+
 ### Added
 
 - **The benchmark runs against Mem0.** `npm run bench -- --target mem0 --mem0-mode shared|isolated` runs the scenarios against Mem0 open source through its public API ([bench/adapters/](bench/adapters/), all local: Ollama and an on-disk Qdrant, telemetry off). Scenarios it cannot express (a simulated clock, the hub's own operations, `hubOnly`) are listed as not applicable, never failed; `conflict` checks are not counted. `npm run bench:compare` builds the table on the scenarios every run shares. First results, same models for both: hub 98.0%, Mem0 60.8% shared (100% leak rate) and 23.5% isolated, on 51 scenarios ([bench/README.md](bench/README.md#comparing-memory-systems)).

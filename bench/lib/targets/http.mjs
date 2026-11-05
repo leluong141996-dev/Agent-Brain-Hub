@@ -77,6 +77,11 @@ export class HttpTarget {
     await this.call('PUT', `/api/relations/${encodeURIComponent(relation)}`, body);
   }
 
+  async permissions(agent, permissions) {
+    const a = await this.agent(agent);
+    await this.call('PATCH', `/api/agents/${encodeURIComponent(a.id)}`, { permissions });
+  }
+
   async now() {
     return (await this.call('GET', '/api/state')).now;
   }

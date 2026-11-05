@@ -43,7 +43,7 @@ No LLM is needed for development: the hub runs offline with rules and templates.
 
 ## What the tests cover
 
-- `npm test`: 194 unit tests, covering:
+- `npm test`: 205 unit tests, covering:
   - the acceptance QA suite from the architecture document: amnesia, contradiction, staleness, skill promotion, 20k-episode load;
   - permissions and prompt leakage;
   - English and Japanese;

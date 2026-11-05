@@ -50,6 +50,8 @@ export async function runScenario(s, makeTarget, { llm = false } = {}) {
       } else if (st.promote !== undefined) {
         const { relation, ...body } = st.promote;
         await target.promote(relation, { action: 'promote', ...body });
+      } else if (st.permissions !== undefined) {
+        await target.permissions(st.agent, st.permissions);
       } else if (st.advance !== undefined) {
         await target.advance(parseDuration(st.advance));
       } else if (st.mark !== undefined) {

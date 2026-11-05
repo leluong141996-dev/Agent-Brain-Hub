@@ -361,6 +361,30 @@ export function scrubPatterns(values) {
   });
 }
 
+// Authorization at retrieval time, for derived text. Session summaries, turns
+// and handoffs quote values, and they keep the scope they were written with. A
+// fact can stop being visible to an agent later (its relation narrowed to
+// private, the agent's read permission revoked), so before any of that text
+// reaches an agent, the values of this customer's facts the agent may not see
+// are replaced. The stored text is untouched: the owner domain still sees it.
+// Values under 3 characters are left alone ("2", "no"), as they would hide
+// unrelated words. Returns a function text → text.
+export function redactorFor(B, agent, customerId) {
+  const facts = B.memoryIndex ? B.memoryIndex.facts(customerId) : B.state.facts.filter((f) => f.customerId === customerId);
+  const hidden = new Set();
+  const seen = new Set();
+  for (const f of facts) {
+    if (f.customerId !== customerId) continue; // company-wide policies
+    const values = [f.value, ...Object.values(f.valueI18n || {})].map((v) => String(v ?? '').trim()).filter((v) => v.length >= 3);
+    for (const v of values) (visible(f, agent) ? seen : hidden).add(v.toLowerCase());
+  }
+  // A value the agent may also see through a visible fact is not a secret.
+  const secret = [...hidden].filter((v) => !seen.has(v));
+  if (!secret.length) return (text) => text;
+  const patterns = scrubPatterns(secret);
+  return (text) => patterns.reduce((t, re) => t.replace(re, '[private]'), String(text));
+}
+
 // v0.8: forget on the customer's request. Facts of the relation the agent can
 // see are deleted in every version (no history, no vectors), and their values
 // are scrubbed from what the agent can see of this customer: episodes,
